@@ -3,7 +3,8 @@
   "scripts": {
     "build": "npm run build --workspaces --if-present",
     "prebuild": "npm run prebuild --workspaces --if-present",
-    "dev": "npm run dev --workspaces --if-present"
+    "dev": "npm run dev --workspaces --if-present",
+    "sync:env": "node scripts/sync-env.mjs"
   },
   "type": "module",
   "workspaces": [
