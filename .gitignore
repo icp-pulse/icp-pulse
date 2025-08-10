@@ -1,0 +1,19 @@
+# dfx temporary files
+.dfx/
+
+# generated files
+**/declarations/
+
+# rust
+target/
+
+# frontend code
+**/node_modules/
+**/dist/
+
+# environment variables
+.env
+
+# examples folder is symlinked to submodule
+examples/
+.idea
