@@ -18,10 +18,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ThemeProvider attribute="class" enableSystem defaultTheme="system">
           <Providers>
             <IcpAuthProvider>
-              <div className="max-w-5xl mx-auto px-4 py-4">
+              <div className="mx-auto px-4 py-4">
                 <header className="flex items-center justify-between py-2 gap-3">
                   <a href="/" className="font-semibold">ICP Polls & Surveys</a>
                   <div className="flex items-center gap-2">
+                    <a href="/admin" className="px-3 py-1.5 text-sm rounded bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 transition-colors">
+                      Admin
+                    </a>
                     <LoginButton />
                     <ThemeToggle />
                   </div>

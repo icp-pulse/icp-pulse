@@ -36,7 +36,7 @@ export default function NewProjectPage() {
           startTransition(async () => {
             try {
               await createProjectAction(v)
-              window.location.href = '/admin/projects'
+              window.location.href = '/admin'
             } catch (e: any) {
               setErr(e.message || 'Error')
             }

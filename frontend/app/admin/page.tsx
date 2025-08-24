@@ -4,8 +4,7 @@ import { useState } from 'react'
 import Sidebar from '@/components/layout/sidebar'
 import { TopHeader } from '@/components/layout/top-header'
 import Header from '@/components/layout/header'
-import ProjectStats from '@/components/projects/project-stats'
-import ProjectTable from '@/components/projects/project-table'
+import ProjectAdmin from '@/components/admin/project-admin'
 import SurveyBuilder from '@/components/surveys/survey-builder'
 import SurveyList from '@/components/surveys/survey-list'
 import PollCreator from '@/components/polls/poll-creator'
@@ -33,14 +32,11 @@ export default function AdminDashboardPage() {
       />
       <div className="flex">
         <Sidebar activeTab={activeTab} onTabChange={setActiveTab} isCollapsed={isSidebarCollapsed} />
-        <main className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 pt-16 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
+        <main className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
           <Header title={current.title} description={current.description} activeTab={activeTab} />
-          <div className="flex-1 overflow-auto p-6">
+          <div className="flex-1 overflow-auto px-6 py-4">
             {activeTab === 'projects' && (
-              <div className="space-y-6">
-                <ProjectStats />
-                <ProjectTable />
-              </div>
+              <ProjectAdmin />
             )}
             {activeTab === 'surveys' && (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
