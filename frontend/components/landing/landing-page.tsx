@@ -433,7 +433,7 @@ export function LandingPage() {
             {[
               {
                 name: 'East',
-                role: 'Co-founder & CEO',
+                role: 'Co-founder',
                 bio: 'Jonathan co-founded TruePulse and brings over 20 years of experience in project management, software development, and technology advisory across industries including heavy construction machinery, fintech, loan appraisals, insurance, and energy. He leads the design and development of TruePulse’s user interface, creating seamless dashboards that make creating and responding to polls effortless.',
                 avatar: 'E'
               },
