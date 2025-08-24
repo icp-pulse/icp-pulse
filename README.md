@@ -14,7 +14,7 @@ cd frontend && npm install
 2) Start local replica and deploy canisters:
 
 ```
-dfx start --background
+dfx start --clean --background
 dfx deploy
 ```
 
