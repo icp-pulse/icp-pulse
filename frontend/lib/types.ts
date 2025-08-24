@@ -37,7 +37,7 @@ export type BackendService = {
   vote(pollId: bigint, optionId: bigint): Promise<boolean>
   close_poll(pollId: bigint): Promise<boolean>
 
-  create_survey(scopeType: string, scopeId: bigint, title: string, description: string, closesAt: bigint, rewardFund: bigint, allowAnonymous: boolean, questions: { type_: string; text: string; required: boolean; choices: string[] | null; min: bigint | null; max: bigint | null; helpText: string | null }[]): Promise<bigint>
+  create_survey(scopeType: string, scopeId: bigint, title: string, description: string, closesAt: bigint, rewardFund: bigint, allowAnonymous: boolean, questions: { type_: string; text: string; required: boolean; choices: [string[]] | []; min: [bigint] | []; max: [bigint] | []; helpText: [string] | [] }[]): Promise<bigint>
   get_survey(id: bigint): Promise<[Survey] | []>
   list_surveys_by_project(projectId: bigint, offset: bigint, limit: bigint): Promise<SurveySummary[]>
   list_surveys_by_product(productId: bigint, offset: bigint, limit: bigint): Promise<SurveySummary[]>
