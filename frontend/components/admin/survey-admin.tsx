@@ -1,0 +1,313 @@
+"use client"
+
+import { useState } from 'react'
+import { Plus, Search, Filter, MoreHorizontal, Edit, Trash2, Eye, FileText, Users, BarChart3 } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+
+// Mock data - replace with actual data fetching
+const mockSurveys = [
+  {
+    id: '1',
+    title: 'Customer Satisfaction Survey Q4 2024',
+    description: 'Annual customer satisfaction measurement focusing on product quality and service experience',
+    status: 'active',
+    project: 'Customer Feedback Survey',
+    owner: 'Sarah Johnson',
+    createdAt: '2024-01-20',
+    questions: 12,
+    responses: 156,
+    completionRate: 78
+  },
+  {
+    id: '2',
+    title: 'Product Feature Feedback',
+    description: 'Gathering user feedback on new dashboard features and UI improvements',
+    status: 'draft',
+    project: 'Product Research',
+    owner: 'Mike Chen',
+    createdAt: '2024-01-18',
+    questions: 8,
+    responses: 0,
+    completionRate: 0
+  },
+  {
+    id: '3',
+    title: 'Employee Engagement Survey',
+    description: 'Internal survey to measure employee satisfaction and engagement levels',
+    status: 'completed',
+    project: 'HR Initiative',
+    owner: 'Emma Davis',
+    createdAt: '2024-01-10',
+    questions: 15,
+    responses: 89,
+    completionRate: 92
+  }
+]
+
+export default function SurveyAdmin() {
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [surveys] = useState(mockSurveys)
+
+  const filteredSurveys = surveys.filter(survey => {
+    const matchesSearch = survey.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         survey.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         survey.project.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesStatus = statusFilter === 'all' || survey.status === statusFilter
+    return matchesSearch && matchesStatus
+  })
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'active':
+        return 'bg-green-100 text-green-800 border-green-200'
+      case 'draft':
+        return 'bg-gray-100 text-gray-800 border-gray-200'
+      case 'completed':
+        return 'bg-blue-100 text-blue-800 border-blue-200'
+      case 'paused':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200'
+      case 'archived':
+        return 'bg-red-100 text-red-800 border-red-200'
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200'
+    }
+  }
+
+  const getCompletionRateColor = (rate: number) => {
+    if (rate >= 80) return 'text-green-600'
+    if (rate >= 60) return 'text-yellow-600'
+    return 'text-red-600'
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">Surveys</h1>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Create and manage survey forms across projects
+          </p>
+        </div>
+        <Button>
+          <Plus className="w-4 h-4 mr-2" />
+          New Survey
+        </Button>
+      </div>
+
+      {/* Stats Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Surveys</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">{surveys.length}</p>
+              </div>
+              <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                <FileText className="w-4 h-4 text-blue-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                  {surveys.filter(s => s.status === 'active').length}
+                </p>
+              </div>
+              <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
+                <BarChart3 className="w-4 h-4 text-green-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Responses</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                  {surveys.reduce((sum, s) => sum + s.responses, 0)}
+                </p>
+              </div>
+              <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                <Users className="w-4 h-4 text-purple-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Avg. Completion</p>
+                <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
+                  {Math.round(surveys.reduce((sum, s) => sum + s.completionRate, 0) / surveys.length)}%
+                </p>
+              </div>
+              <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
+                <BarChart3 className="w-4 h-4 text-orange-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Filters */}
+      <div className="flex items-center gap-4">
+        <div className="relative flex-1 max-w-sm">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Input
+            placeholder="Search surveys..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <Select value={statusFilter} onValueChange={setStatusFilter}>
+          <SelectTrigger className="w-40">
+            <Filter className="w-4 h-4 mr-2" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Status</SelectItem>
+            <SelectItem value="active">Active</SelectItem>
+            <SelectItem value="draft">Draft</SelectItem>
+            <SelectItem value="completed">Completed</SelectItem>
+            <SelectItem value="paused">Paused</SelectItem>
+            <SelectItem value="archived">Archived</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Surveys Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {filteredSurveys.map((survey) => (
+          <Card key={survey.id} className="hover:shadow-md transition-shadow">
+            <CardHeader className="pb-3">
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <CardTitle className="text-lg font-medium line-clamp-1">{survey.title}</CardTitle>
+                  <CardDescription className="mt-1 line-clamp-2">
+                    {survey.description}
+                  </CardDescription>
+                </div>
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                  <MoreHorizontal className="w-4 h-4" />
+                </Button>
+              </div>
+              <div className="flex items-center gap-2">
+                <Badge className={`w-fit ${getStatusColor(survey.status)}`}>
+                  {survey.status}
+                </Badge>
+                <Badge variant="outline" className="text-xs">
+                  {survey.project}
+                </Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {/* Survey Stats */}
+              <div className="grid grid-cols-3 gap-4 text-center">
+                <div>
+                  <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">{survey.questions}</p>
+                  <p className="text-xs text-gray-500">Questions</p>
+                </div>
+                <div>
+                  <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">{survey.responses}</p>
+                  <p className="text-xs text-gray-500">Responses</p>
+                </div>
+                <div>
+                  <p className={`text-lg font-semibold ${getCompletionRateColor(survey.completionRate)}`}>
+                    {survey.completionRate}%
+                  </p>
+                  <p className="text-xs text-gray-500">Completion</p>
+                </div>
+              </div>
+
+              {/* Progress Bar */}
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-500">Completion Rate</span>
+                  <span className={`font-medium ${getCompletionRateColor(survey.completionRate)}`}>
+                    {survey.completionRate}%
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div 
+                    className={`h-2 rounded-full transition-all ${
+                      survey.completionRate >= 80 ? 'bg-green-500' :
+                      survey.completionRate >= 60 ? 'bg-yellow-500' : 'bg-red-500'
+                    }`}
+                    style={{ width: `${survey.completionRate}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Survey Info */}
+              <div className="pt-3 border-t space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-500">Owner</span>
+                  <span className="font-medium">{survey.owner}</span>
+                </div>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-gray-500">Created</span>
+                  <span className="font-medium">{new Date(survey.createdAt).toLocaleDateString()}</span>
+                </div>
+              </div>
+
+              {/* Actions */}
+              <div className="flex gap-2 pt-2">
+                <Button variant="outline" size="sm" className="flex-1">
+                  <Eye className="w-4 h-4 mr-1" />
+                  View
+                </Button>
+                <Button variant="outline" size="sm" className="flex-1">
+                  <Edit className="w-4 h-4 mr-1" />
+                  Edit
+                </Button>
+                <Button variant="outline" size="sm" className="flex-1">
+                  <BarChart3 className="w-4 h-4 mr-1" />
+                  Results
+                </Button>
+                <Button variant="outline" size="sm" className="px-3">
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Empty State */}
+      {filteredSurveys.length === 0 && (
+        <div className="text-center py-12">
+          <div className="w-16 h-16 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4">
+            <FileText className="w-8 h-8 text-gray-400" />
+          </div>
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No surveys found</h3>
+          <p className="text-gray-500 mb-6">
+            {searchQuery || statusFilter !== 'all' 
+              ? 'Try adjusting your search or filter criteria.' 
+              : 'Get started by creating your first survey.'}
+          </p>
+          <Button>
+            <Plus className="w-4 h-4 mr-2" />
+            Create Survey
+          </Button>
+        </div>
+      )}
+    </div>
+  )
+}

@@ -1,0 +1,524 @@
+"use client"
+
+import { ScrollReveal } from './scroll-reveal'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { 
+  Vote, 
+  FileText, 
+  FolderOpen, 
+  BarChart3, 
+  Users, 
+  Shield, 
+  Zap, 
+  Globe,
+  ChevronDown,
+  Check,
+  ArrowRight,
+  Github,
+  Twitter,
+  Linkedin
+} from 'lucide-react'
+
+export function LandingPage() {
+  return (
+    <div className="min-h-screen bg-white dark:bg-gray-900">
+      {/* Hero Section */}
+      <section className="relative pt-20 pb-32 overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-blue-900/20 dark:to-purple-900/20" />
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <ScrollReveal className="text-center">
+            <Badge className="mb-6 px-4 py-2 text-sm font-medium bg-blue-100 text-blue-800 border-blue-200">
+              🚀 Built on Internet Computer Protocol
+            </Badge>
+            <h1 className="text-4xl md:text-6xl font-bold text-gray-900 dark:text-white mb-6">
+              Context-Aware
+              <span className="bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent"> 
+                {' '}Polls & Surveys
+              </span>
+            </h1>
+            <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-3xl mx-auto">
+              Organize feedback under Projects and Products. Create intelligent surveys and polls 
+              that adapt to your organization's needs, all powered by blockchain technology.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button size="lg" className="px-8 py-3 text-lg">
+                Get Started Free
+                <ArrowRight className="ml-2 w-5 h-5" />
+              </Button>
+              <Button variant="outline" size="lg" className="px-8 py-3 text-lg">
+                View Demo
+              </Button>
+            </div>
+          </ScrollReveal>
+          
+          <ScrollReveal delay={200} className="mt-16">
+            <div className="relative max-w-4xl mx-auto">
+              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 border">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                  <div className="text-center">
+                    <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+                      <FolderOpen className="w-6 h-6 text-blue-600" />
+                    </div>
+                    <h3 className="font-semibold mb-2">Project Organization</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Group surveys and polls under projects</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+                      <BarChart3 className="w-6 h-6 text-purple-600" />
+                    </div>
+                    <h3 className="font-semibold mb-2">Real-time Analytics</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Track responses and engagement</p>
+                  </div>
+                  <div className="text-center">
+                    <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-4">
+                      <Shield className="w-6 h-6 text-green-600" />
+                    </div>
+                    <h3 className="font-semibold mb-2">Blockchain Security</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Immutable and transparent data</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </ScrollReveal>
+
+          <ScrollReveal delay={300} className="mt-8 text-center">
+            <ChevronDown className="w-8 h-8 text-gray-400 mx-auto animate-bounce" />
+          </ScrollReveal>
+        </div>
+      </section>
+
+      {/* Features Section */}
+      <section className="py-24 bg-gray-50 dark:bg-gray-800/50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <ScrollReveal className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">
+              Everything you need to gather feedback
+            </h2>
+            <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
+              Powerful features designed to make feedback collection simple, organized, and actionable.
+            </p>
+          </ScrollReveal>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {[
+              {
+                icon: FolderOpen,
+                title: 'Project Organization',
+                description: 'Group related surveys and polls under projects for better organization and context.',
+                color: 'blue'
+              },
+              {
+                icon: FileText,
+                title: 'Advanced Surveys',
+                description: 'Create complex surveys with conditional logic, multiple question types, and validation.',
+                color: 'purple'
+              },
+              {
+                icon: Vote,
+                title: 'Quick Polls',
+                description: 'Get instant feedback with simple polls. Perfect for quick decisions and team votes.',
+                color: 'green'
+              },
+              {
+                icon: BarChart3,
+                title: 'Real-time Analytics',
+                description: 'Track responses, completion rates, and analyze results with detailed insights.',
+                color: 'orange'
+              },
+              {
+                icon: Users,
+                title: 'Team Collaboration',
+                description: 'Invite team members, manage permissions, and collaborate on feedback collection.',
+                color: 'pink'
+              },
+              {
+                icon: Shield,
+                title: 'Blockchain Security',
+                description: 'Built on ICP for maximum security, transparency, and data immutability.',
+                color: 'indigo'
+              }
+            ].map((feature, index) => (
+              <ScrollReveal key={feature.title} delay={index * 100}>
+                <Card className="h-full hover:shadow-lg transition-shadow">
+                  <CardContent className="p-6">
+                    <div className={`w-12 h-12 bg-${feature.color}-100 rounded-lg flex items-center justify-center mb-4`}>
+                      <feature.icon className={`w-6 h-6 text-${feature.color}-600`} />
+                    </div>
+                    <h3 className="text-xl font-semibold mb-3">{feature.title}</h3>
+                    <p className="text-gray-600 dark:text-gray-300">{feature.description}</p>
+                  </CardContent>
+                </Card>
+              </ScrollReveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Projects Section */}
+      <section className="py-24">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <ScrollReveal className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">
+              Organize with Projects
+            </h2>
+            <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
+              Keep your surveys and polls organized by grouping them under projects. 
+              Perfect for product development, research studies, or team initiatives.
+            </p>
+          </ScrollReveal>
+
+          <ScrollReveal delay={200}>
+            <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-gray-800 dark:to-gray-700 rounded-2xl p-8 md:p-12">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+                <div>
+                  <h3 className="text-2xl md:text-3xl font-bold mb-6">Project-Based Organization</h3>
+                  <ul className="space-y-4">
+                    {[
+                      'Group related surveys and polls together',
+                      'Track project-specific metrics and goals',
+                      'Manage team access and permissions per project',
+                      'Export consolidated reports for stakeholders'
+                    ].map((item, index) => (
+                      <li key={index} className="flex items-start">
+                        <Check className="w-5 h-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" />
+                        <span className="text-gray-700 dark:text-gray-300">{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Button className="mt-8">
+                    Explore Projects
+                    <ArrowRight className="ml-2 w-4 h-4" />
+                  </Button>
+                </div>
+                <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
+                  <div className="space-y-4">
+                    {[
+                      { name: 'Customer Feedback Q4', surveys: 3, polls: 2, status: 'Active' },
+                      { name: 'Product Research', surveys: 5, polls: 1, status: 'In Progress' },
+                      { name: 'Employee Engagement', surveys: 2, polls: 4, status: 'Completed' }
+                    ].map((project, index) => (
+                      <div key={index} className="border rounded-lg p-4">
+                        <div className="flex justify-between items-start mb-2">
+                          <h4 className="font-medium">{project.name}</h4>
+                          <Badge className="text-xs">{project.status}</Badge>
+                        </div>
+                        <div className="flex gap-4 text-sm text-gray-600 dark:text-gray-400">
+                          <span>{project.surveys} Surveys</span>
+                          <span>{project.polls} Polls</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </ScrollReveal>
+        </div>
+      </section>
+
+      {/* Surveys Section */}
+      <section className="py-24 bg-gray-50 dark:bg-gray-800/50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            <ScrollReveal>
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8">
+                <div className="flex items-center mb-6">
+                  <FileText className="w-8 h-8 text-blue-600 mr-3" />
+                  <h3 className="text-xl font-semibold">Survey Builder</h3>
+                </div>
+                <div className="space-y-4">
+                  <div className="border-l-4 border-blue-500 pl-4">
+                    <h4 className="font-medium">Multiple Choice Question</h4>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">What's your preferred meeting time?</p>
+                  </div>
+                  <div className="border-l-4 border-purple-500 pl-4">
+                    <h4 className="font-medium">Rating Scale</h4>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Rate your satisfaction (1-10)</p>
+                  </div>
+                  <div className="border-l-4 border-green-500 pl-4">
+                    <h4 className="font-medium">Open Text</h4>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Additional comments or suggestions</p>
+                  </div>
+                </div>
+              </div>
+            </ScrollReveal>
+
+            <ScrollReveal delay={200}>
+              <div>
+                <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-6">
+                  Advanced Survey Features
+                </h2>
+                <p className="text-xl text-gray-600 dark:text-gray-300 mb-8">
+                  Create sophisticated surveys with conditional logic, multiple question types, 
+                  and advanced validation rules.
+                </p>
+                <ul className="space-y-4">
+                  {[
+                    'Conditional logic and branching',
+                    'Multiple question types (MCQ, rating, text, etc.)',
+                    'Response validation and required fields',
+                    'Progress tracking and completion rates',
+                    'Anonymous and identified responses',
+                    'Export to multiple formats'
+                  ].map((item, index) => (
+                    <li key={index} className="flex items-start">
+                      <Check className="w-5 h-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" />
+                      <span className="text-gray-700 dark:text-gray-300">{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </ScrollReveal>
+          </div>
+        </div>
+      </section>
+
+      {/* Polls Section */}
+      <section className="py-24">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            <ScrollReveal>
+              <div>
+                <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-6">
+                  Quick Decision Making
+                </h2>
+                <p className="text-xl text-gray-600 dark:text-gray-300 mb-8">
+                  Get instant feedback with simple, effective polls. Perfect for team decisions, 
+                  quick votes, and gathering immediate input.
+                </p>
+                <ul className="space-y-4">
+                  {[
+                    'Single and multiple choice polls',
+                    'Real-time result updates',
+                    'Anonymous voting options',
+                    'Time-limited polls with deadlines',
+                    'Visual result charts and graphs',
+                    'Easy sharing and distribution'
+                  ].map((item, index) => (
+                    <li key={index} className="flex items-start">
+                      <Check className="w-5 h-5 text-green-500 mr-3 mt-0.5 flex-shrink-0" />
+                      <span className="text-gray-700 dark:text-gray-300">{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </ScrollReveal>
+
+            <ScrollReveal delay={200}>
+              <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-8">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center">
+                    <Vote className="w-8 h-8 text-purple-600 mr-3" />
+                    <h3 className="text-xl font-semibold">Team Lunch Poll</h3>
+                  </div>
+                  <Badge className="bg-green-100 text-green-800">Active</Badge>
+                </div>
+                <p className="text-gray-600 dark:text-gray-400 mb-6">Where should we go for lunch this Friday?</p>
+                <div className="space-y-3">
+                  {[
+                    { option: 'Italian Restaurant', votes: 12, percentage: 40 },
+                    { option: 'Sushi Bar', votes: 9, percentage: 30 },
+                    { option: 'Burger Joint', votes: 6, percentage: 20 },
+                    { option: 'Healthy Salads', votes: 3, percentage: 10 }
+                  ].map((item, index) => (
+                    <div key={index} className="flex items-center">
+                      <div className="flex-1">
+                        <div className="flex justify-between mb-1">
+                          <span className="text-sm font-medium">{item.option}</span>
+                          <span className="text-sm text-gray-600">{item.votes} votes</span>
+                        </div>
+                        <div className="w-full bg-gray-200 rounded-full h-2">
+                          <div 
+                            className="bg-purple-600 h-2 rounded-full transition-all"
+                            style={{ width: `${item.percentage}%` }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </ScrollReveal>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ Section */}
+      <section className="py-24 bg-gray-50 dark:bg-gray-800/50">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <ScrollReveal className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">
+              Frequently Asked Questions
+            </h2>
+            <p className="text-xl text-gray-600 dark:text-gray-300">
+              Everything you need to know about our platform
+            </p>
+          </ScrollReveal>
+
+          <div className="space-y-8">
+            {[
+              {
+                question: 'What makes this different from other survey tools?',
+                answer: 'Our platform is built on the Internet Computer Protocol, providing unmatched security, transparency, and data ownership. Plus, our project-based organization makes managing multiple surveys and polls much more intuitive.'
+              },
+              {
+                question: 'Is my data secure on the blockchain?',
+                answer: 'Absolutely. All data is stored securely on the Internet Computer blockchain, ensuring immutability, transparency, and protection against data breaches. You maintain full ownership of your data.'
+              },
+              {
+                question: 'Can I collaborate with my team?',
+                answer: 'Yes! You can invite team members to projects, manage permissions, and collaborate on survey and poll creation. Team members can have different access levels based on their role.'
+              },
+              {
+                question: 'How do I organize multiple surveys and polls?',
+                answer: 'Use our project-based organization system. Group related surveys and polls under projects, making it easy to track progress, analyze results, and manage team access for specific initiatives.'
+              },
+              {
+                question: 'Can I export my data and results?',
+                answer: 'Yes, you can export survey responses and poll results in various formats including CSV, Excel, and PDF. Generate comprehensive reports for stakeholders and decision-makers.'
+              }
+            ].map((faq, index) => (
+              <ScrollReveal key={index} delay={index * 100}>
+                <Card className="p-6">
+                  <h3 className="text-lg font-semibold mb-3">{faq.question}</h3>
+                  <p className="text-gray-600 dark:text-gray-300">{faq.answer}</p>
+                </Card>
+              </ScrollReveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Call to Action Section */}
+      <section className="py-24">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <ScrollReveal>
+            <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-8 md:p-12 text-white">
+              <h2 className="text-3xl md:text-4xl font-bold mb-6">
+                Ready to get started?
+              </h2>
+              <p className="text-xl mb-8 opacity-90">
+                Join thousands of teams already using our platform to gather meaningful feedback 
+                and make data-driven decisions.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                <Button size="lg" variant="secondary" className="px-8 py-3 text-lg">
+                  Start Free Trial
+                  <ArrowRight className="ml-2 w-5 h-5" />
+                </Button>
+                <Button size="lg" variant="outline" className="px-8 py-3 text-lg border-white text-white hover:bg-white hover:text-blue-600">
+                  Contact Sales
+                </Button>
+              </div>
+            </div>
+          </ScrollReveal>
+        </div>
+      </section>
+
+      {/* Team Section */}
+      <section className="py-24 bg-gray-50 dark:bg-gray-800/50">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <ScrollReveal className="text-center mb-16">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">
+              Meet Our Team
+            </h2>
+            <p className="text-xl text-gray-600 dark:text-gray-300">
+              Passionate builders creating the future of feedback collection
+            </p>
+          </ScrollReveal>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {[
+              {
+                name: 'East',
+                role: 'Co-founder & CEO',
+                bio: 'Jonathan co-founded TruePulse and brings over 20 years of experience in project management, software development, and technology advisory across industries including heavy construction machinery, fintech, loan appraisals, insurance, and energy. He leads the design and development of TruePulse’s user interface, creating seamless dashboards that make creating and responding to polls effortless.',
+                avatar: 'E'
+              },
+              {
+                name: 'Adam',
+                role: 'Co-founder',
+                bio: 'Adam co-founded TruePulse, bringing experience from DecentraVerify and TrueYou into the project. He drives product innovation and strategy, ensuring TruePulse evolves to meet the needs of both Web3 and mainstream users.',
+                avatar: 'A'
+              },
+              {
+                name: 'Oscar',
+                role: 'Backend Engineer',
+                bio: 'Oscar builds and maintains the backend architecture of TruePulse. With strong skills in real-time data processing, APIs, and scalable systems, he ensures poll data is securely handled, stored, and delivered efficiently.',
+                avatar: 'O'
+              }
+            ].map((member, index) => (
+              <ScrollReveal key={member.name} delay={index * 100}>
+                <Card className="text-center p-6">
+                  <div className="w-20 h-20 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center text-white text-xl font-bold mx-auto mb-4">
+                    {member.avatar}
+                  </div>
+                  <h3 className="text-xl font-semibold mb-1">{member.name}</h3>
+                  <p className="text-blue-600 dark:text-blue-400 mb-3">{member.role}</p>
+                  <p className="text-gray-600 dark:text-gray-300 text-sm">{member.bio}</p>
+                </Card>
+              </ScrollReveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="bg-gray-900 text-white py-12">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+            <div className="md:col-span-2">
+              <h3 className="text-2xl font-bold mb-4">ICP Polls & Surveys</h3>
+              <p className="text-gray-400 mb-6">
+                Context-aware feedback collection platform built on the Internet Computer Protocol. 
+                Secure, transparent, and user-owned data.
+              </p>
+              <div className="flex space-x-4">
+                <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
+                  <Twitter className="w-5 h-5" />
+                </Button>
+                <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
+                  <Github className="w-5 h-5" />
+                </Button>
+                <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
+                  <Linkedin className="w-5 h-5" />
+                </Button>
+              </div>
+            </div>
+            
+            <div>
+              <h4 className="font-semibold mb-4">Product</h4>
+              <ul className="space-y-2 text-gray-400">
+                <li><a href="/projects" className="hover:text-white transition-colors">Projects</a></li>
+                <li><a href="/surveys" className="hover:text-white transition-colors">Surveys</a></li>
+                <li><a href="/polls" className="hover:text-white transition-colors">Polls</a></li>
+                <li><a href="/admin" className="hover:text-white transition-colors">Admin</a></li>
+              </ul>
+            </div>
+            
+            <div>
+              <h4 className="font-semibold mb-4">Company</h4>
+              <ul className="space-y-2 text-gray-400">
+                <li><a href="/about" className="hover:text-white transition-colors">About</a></li>
+                <li><a href="/contact" className="hover:text-white transition-colors">Contact</a></li>
+                <li><a href="/privacy" className="hover:text-white transition-colors">Privacy</a></li>
+                <li><a href="/terms" className="hover:text-white transition-colors">Terms</a></li>
+              </ul>
+            </div>
+          </div>
+          
+          <div className="border-t border-gray-800 mt-8 pt-8 flex flex-col md:flex-row justify-between items-center">
+            <p className="text-gray-400 text-sm">
+              © 2024 ICP Polls & Surveys. All rights reserved.
+            </p>
+            <p className="text-gray-400 text-sm mt-2 md:mt-0">
+              Built on Internet Computer Protocol 🚀
+            </p>
+          </div>
+        </div>
+      </footer>
+    </div>
+  )
+}
