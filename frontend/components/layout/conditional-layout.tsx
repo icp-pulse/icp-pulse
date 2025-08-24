@@ -35,7 +35,7 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
   }
 
   return (
-    <div className="max-w-5xl mx-auto px-4 py-4">
+    <div className="mx-auto px-4 py-4">
       <header className="flex items-center justify-between py-2 gap-3">
         <a href="/" className="font-semibold">ICP Polls & Surveys</a>
         <div className="flex items-center gap-2">
