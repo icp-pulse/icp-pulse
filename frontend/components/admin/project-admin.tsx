@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Plus, Search, Filter, MoreHorizontal, Edit, Trash2, Eye } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,36 +8,67 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
-// Mock data - replace with actual data fetching
-const mockProjects = [
-  {
-    id: '1',
-    name: 'Customer Feedback Survey',
-    description: 'Collecting customer satisfaction data for Q4',
-    status: 'active',
-    owner: 'John Doe',
-    createdAt: '2024-01-15',
-    surveys: 3,
-    polls: 2,
-    responses: 245
-  },
-  {
-    id: '2', 
-    name: 'Product Research',
-    description: 'Market research for new product launch',
-    status: 'draft',
-    owner: 'Jane Smith',
-    createdAt: '2024-01-10',
-    surveys: 1,
-    polls: 1,
-    responses: 0
-  }
-]
+interface Project {
+  id: number
+  slug: string
+  name: string
+  description: string
+  createdBy: string
+  createdAt: number
+  status: string
+  surveys?: number
+  polls?: number
+  responses?: number
+}
 
 export default function ProjectAdmin() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
-  const [projects] = useState(mockProjects)
+  const [projects, setProjects] = useState<Project[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // Fetch projects from API endpoint
+  useEffect(() => {
+    async function fetchProjects() {
+      try {
+        setLoading(true)
+        setError(null)
+        
+        const response = await fetch('/api/projects')
+        if (!response.ok) {
+          throw new Error(`Failed to fetch projects: ${response.status}`)
+        }
+        
+        const apiProjects = await response.json()
+        
+        // Transform API data to match our interface
+        const transformedProjects = apiProjects.map((project: any) => ({
+          id: Number(project.id),
+          slug: project.slug || project.name.toLowerCase().replace(/\s+/g, '-'),
+          name: project.name,
+          description: project.description,
+          createdBy: project.owner || project.createdBy || 'Unknown',
+          createdAt: project.createdAt ? new Date(project.createdAt).getTime() * 1000000 : Date.now() * 1000000,
+          status: project.status,
+          // TODO: Get actual counts from surveys/polls APIs
+          surveys: 0,
+          polls: 0,
+          responses: 0
+        }))
+        
+        setProjects(transformedProjects)
+        
+      } catch (err) {
+        console.error('Error fetching projects:', err)
+        setError(err instanceof Error ? err.message : 'Failed to fetch projects')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchProjects()
+  }, [])
 
   const filteredProjects = projects.filter(project => {
     const matchesSearch = project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -71,7 +102,7 @@ export default function ProjectAdmin() {
             Manage your survey and poll projects
           </p>
         </div>
-        <Button>
+        <Button onClick={() => window.location.href = '/projects/new'}>
           <Plus className="w-4 h-4 mr-2" />
           New Project
         </Button>
@@ -131,7 +162,7 @@ export default function ProjectAdmin() {
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Responses</p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  {projects.reduce((sum, p) => sum + p.responses, 0)}
+                  {projects.reduce((sum, p) => sum + (p.responses || 0), 0)}
                 </p>
               </div>
               <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
@@ -168,9 +199,32 @@ export default function ProjectAdmin() {
         </Select>
       </div>
 
+      {/* Loading State */}
+      {loading && (
+        <div className="text-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-500">Loading projects...</p>
+        </div>
+      )}
+
+      {/* Error State */}
+      {error && (
+        <div className="text-center py-12">
+          <div className="w-16 h-16 mx-auto bg-red-100 rounded-full flex items-center justify-center mb-4">
+            <div className="w-8 h-8 bg-red-600 rounded"></div>
+          </div>
+          <h3 className="text-lg font-medium text-red-900 mb-2">Error Loading Projects</h3>
+          <p className="text-red-600 mb-6">{error}</p>
+          <Button onClick={() => window.location.reload()}>
+            Try Again
+          </Button>
+        </div>
+      )}
+
       {/* Projects Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredProjects.map((project) => (
+      {!loading && !error && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredProjects.map((project) => (
           <Card key={project.id} className="hover:shadow-md transition-shadow">
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
@@ -209,11 +263,15 @@ export default function ProjectAdmin() {
               <div className="pt-3 border-t space-y-2">
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-500">Owner</span>
-                  <span className="font-medium">{project.owner}</span>
+                  <span className="font-medium text-xs" title={project.createdBy}>
+                    {typeof project.createdBy === 'string' ? project.createdBy.slice(0, 8) : 'Unknown'}...
+                  </span>
                 </div>
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-gray-500">Created</span>
-                  <span className="font-medium">{new Date(project.createdAt).toLocaleDateString()}</span>
+                  <span className="font-medium">
+                    {new Date(Number(project.createdAt) / 1000000).toLocaleDateString()}
+                  </span>
                 </div>
               </div>
 
@@ -233,11 +291,12 @@ export default function ProjectAdmin() {
               </div>
             </CardContent>
           </Card>
-        ))}
-      </div>
+          ))}
+        </div>
+      )}
 
       {/* Empty State */}
-      {filteredProjects.length === 0 && (
+      {!loading && !error && filteredProjects.length === 0 && (
         <div className="text-center py-12">
           <div className="w-16 h-16 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4">
             <Plus className="w-8 h-8 text-gray-400" />
@@ -248,7 +307,7 @@ export default function ProjectAdmin() {
               ? 'Try adjusting your search or filter criteria.' 
               : 'Get started by creating your first project.'}
           </p>
-          <Button>
+          <Button onClick={() => window.location.href = '/projects/new'}>
             <Plus className="w-4 h-4 mr-2" />
             Create Project
           </Button>

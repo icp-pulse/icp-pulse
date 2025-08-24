@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Plus, Search, Filter, MoreHorizontal, Edit, Trash2, Eye, FileText, Users, BarChart3 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,50 +8,38 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
-// Mock data - replace with actual data fetching
-const mockSurveys = [
-  {
-    id: '1',
-    title: 'Customer Satisfaction Survey Q4 2024',
-    description: 'Annual customer satisfaction measurement focusing on product quality and service experience',
-    status: 'active',
-    project: 'Customer Feedback Survey',
-    owner: 'Sarah Johnson',
-    createdAt: '2024-01-20',
-    questions: 12,
-    responses: 156,
-    completionRate: 78
-  },
-  {
-    id: '2',
-    title: 'Product Feature Feedback',
-    description: 'Gathering user feedback on new dashboard features and UI improvements',
-    status: 'draft',
-    project: 'Product Research',
-    owner: 'Mike Chen',
-    createdAt: '2024-01-18',
-    questions: 8,
-    responses: 0,
-    completionRate: 0
-  },
-  {
-    id: '3',
-    title: 'Employee Engagement Survey',
-    description: 'Internal survey to measure employee satisfaction and engagement levels',
-    status: 'completed',
-    project: 'HR Initiative',
-    owner: 'Emma Davis',
-    createdAt: '2024-01-10',
-    questions: 15,
-    responses: 89,
-    completionRate: 92
-  }
-]
-
 export default function SurveyAdmin() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
-  const [surveys] = useState(mockSurveys)
+  const [surveys, setSurveys] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // Fetch surveys from API endpoint
+  useEffect(() => {
+    async function fetchSurveys() {
+      try {
+        setLoading(true)
+        setError(null)
+        
+        const response = await fetch('/api/surveys')
+        if (!response.ok) {
+          throw new Error(`Failed to fetch surveys: ${response.status}`)
+        }
+        
+        const apiSurveys = await response.json()
+        setSurveys(apiSurveys)
+        
+      } catch (err) {
+        console.error('Error fetching surveys:', err)
+        setError(err instanceof Error ? err.message : 'Failed to fetch surveys')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchSurveys()
+  }, [])
 
   const filteredSurveys = surveys.filter(survey => {
     const matchesSearch = survey.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -192,9 +180,32 @@ export default function SurveyAdmin() {
         </Select>
       </div>
 
+      {/* Loading State */}
+      {loading && (
+        <div className="text-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-500">Loading surveys...</p>
+        </div>
+      )}
+
+      {/* Error State */}
+      {error && (
+        <div className="text-center py-12">
+          <div className="w-16 h-16 mx-auto bg-red-100 rounded-full flex items-center justify-center mb-4">
+            <div className="w-8 h-8 bg-red-600 rounded"></div>
+          </div>
+          <h3 className="text-lg font-medium text-red-900 mb-2">Error Loading Surveys</h3>
+          <p className="text-red-600 mb-6">{error}</p>
+          <Button onClick={() => window.location.reload()}>
+            Try Again
+          </Button>
+        </div>
+      )}
+
       {/* Surveys Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {filteredSurveys.map((survey) => (
+      {!loading && !error && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {filteredSurveys.map((survey) => (
           <Card key={survey.id} className="hover:shadow-md transition-shadow">
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
@@ -288,10 +299,11 @@ export default function SurveyAdmin() {
             </CardContent>
           </Card>
         ))}
-      </div>
+        </div>
+      )}
 
       {/* Empty State */}
-      {filteredSurveys.length === 0 && (
+      {!loading && !error && filteredSurveys.length === 0 && (
         <div className="text-center py-12">
           <div className="w-16 h-16 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4">
             <FileText className="w-8 h-8 text-gray-400" />
