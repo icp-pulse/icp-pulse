@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Plus, Search, Filter, MoreHorizontal, Edit, Trash2, Eye, Vote, Users, TrendingUp, Clock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -8,89 +8,44 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
-// Mock data - replace with actual data fetching
-const mockPolls = [
-  {
-    id: '1',
-    title: 'Preferred Meeting Time for Team Standup',
-    description: 'Help us decide the best time for daily team meetings that works for everyone',
-    status: 'active',
-    project: 'Team Operations',
-    owner: 'Alex Thompson',
-    createdAt: '2024-01-22',
-    expiresAt: '2024-02-22',
-    options: 4,
-    votes: 28,
-    participants: 24,
-    type: 'single-choice'
-  },
-  {
-    id: '2',
-    title: 'Company Logo Design Vote',
-    description: 'Choose your favorite logo design from our final three options for the rebrand',
-    status: 'active',
-    project: 'Marketing Campaign',
-    owner: 'Lisa Park',
-    createdAt: '2024-01-20',
-    expiresAt: '2024-01-30',
-    options: 3,
-    votes: 145,
-    participants: 89,
-    type: 'single-choice'
-  },
-  {
-    id: '3',
-    title: 'Office Lunch Options',
-    description: 'Vote for your preferred catering options for our monthly office lunch',
-    status: 'draft',
-    project: 'Office Management',
-    owner: 'David Kim',
-    createdAt: '2024-01-19',
-    expiresAt: '2024-02-19',
-    options: 5,
-    votes: 0,
-    participants: 0,
-    type: 'multiple-choice'
-  },
-  {
-    id: '4',
-    title: 'Project Priority Ranking',
-    description: 'Rank upcoming projects by priority to help with resource allocation',
-    status: 'completed',
-    project: 'Product Planning',
-    owner: 'Rachel Green',
-    createdAt: '2024-01-05',
-    expiresAt: '2024-01-15',
-    options: 6,
-    votes: 67,
-    participants: 34,
-    type: 'ranking'
-  },
-  {
-    id: '5',
-    title: 'Work From Home Policy',
-    description: 'Share your thoughts on the proposed work from home policy changes',
-    status: 'expired',
-    project: 'HR Initiative',
-    owner: 'Tom Wilson',
-    createdAt: '2024-01-01',
-    expiresAt: '2024-01-20',
-    options: 4,
-    votes: 92,
-    participants: 78,
-    type: 'single-choice'
-  }
-]
 
 export default function PollAdmin() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
-  const [polls] = useState(mockPolls)
+  const [polls, setPolls] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  // Fetch polls from API endpoint
+  useEffect(() => {
+    async function fetchPolls() {
+      try {
+        setLoading(true)
+        setError(null)
+        
+        const response = await fetch('/api/polls')
+        if (!response.ok) {
+          throw new Error(`Failed to fetch polls: ${response.status}`)
+        }
+        
+        const apiPolls = await response.json()
+        setPolls(apiPolls)
+        
+      } catch (err) {
+        console.error('Error fetching polls:', err)
+        setError(err instanceof Error ? err.message : 'Failed to fetch polls')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchPolls()
+  }, [])
 
   const filteredPolls = polls.filter(poll => {
-    const matchesSearch = poll.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         poll.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         poll.project.toLowerCase().includes(searchQuery.toLowerCase())
+    const matchesSearch = (poll.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         (poll.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         (poll.project || '').toLowerCase().includes(searchQuery.toLowerCase())
     const matchesStatus = statusFilter === 'all' || poll.status === statusFilter
     return matchesSearch && matchesStatus
   })
@@ -148,7 +103,7 @@ export default function PollAdmin() {
             Create and manage polls for quick decision making
           </p>
         </div>
-        <Button>
+        <Button onClick={() => window.location.href = '/polls/new'}>
           <Plus className="w-4 h-4 mr-2" />
           New Poll
         </Button>
@@ -192,7 +147,7 @@ export default function PollAdmin() {
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Votes</p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  {polls.reduce((sum, p) => sum + p.votes, 0)}
+                  {polls.reduce((sum, p) => sum + (p.totalVotes || 0), 0)}
                 </p>
               </div>
               <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
@@ -208,7 +163,11 @@ export default function PollAdmin() {
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Avg. Participation</p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  {Math.round(polls.reduce((sum, p) => sum + (p.votes > 0 ? (p.participants / p.votes) * 100 : 0), 0) / polls.length)}%
+                  {polls.length > 0 ? Math.round(polls.reduce((sum, p) => {
+                    const votes = p.totalVotes || 0;
+                    const participants = p.participants || 0;
+                    return sum + (votes > 0 ? (participants / votes) * 100 : 0);
+                  }, 0) / polls.length) : 0}%
                 </p>
               </div>
               <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
@@ -246,11 +205,34 @@ export default function PollAdmin() {
         </Select>
       </div>
 
+      {/* Loading State */}
+      {loading && (
+        <div className="text-center py-12">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-500">Loading polls...</p>
+        </div>
+      )}
+
+      {/* Error State */}
+      {error && (
+        <div className="text-center py-12">
+          <div className="w-16 h-16 mx-auto bg-red-100 rounded-full flex items-center justify-center mb-4">
+            <div className="w-8 h-8 bg-red-600 rounded"></div>
+          </div>
+          <h3 className="text-lg font-medium text-red-900 mb-2">Error Loading Polls</h3>
+          <p className="text-red-600 mb-6">{error}</p>
+          <Button onClick={() => window.location.reload()}>
+            Try Again
+          </Button>
+        </div>
+      )}
+
       {/* Polls Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {!loading && !error && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {filteredPolls.map((poll) => {
-          const daysLeft = getDaysLeft(poll.expiresAt)
-          const participationRate = getParticipationRate(poll.votes, poll.participants)
+          const daysLeft = getDaysLeft(poll.closesAt || poll.expiresAt || new Date().toISOString())
+          const participationRate = getParticipationRate(poll.totalVotes || 0, poll.participants || 0)
           
           return (
             <Card key={poll.id} className="hover:shadow-md transition-shadow">
@@ -270,11 +252,11 @@ export default function PollAdmin() {
                   <Badge className={`w-fit ${getStatusColor(poll.status)}`}>
                     {poll.status}
                   </Badge>
-                  <Badge className={`w-fit text-xs ${getTypeColor(poll.type)}`}>
-                    {poll.type.replace('-', ' ')}
+                  <Badge className={`w-fit text-xs ${getTypeColor(poll.type || 'single-choice')}`}>
+                    {poll.type ? poll.type.replace('-', ' ') : 'single choice'}
                   </Badge>
                   <Badge variant="outline" className="text-xs">
-                    {poll.project}
+                    {poll.project || 'Unknown Project'}
                   </Badge>
                 </div>
               </CardHeader>
@@ -282,15 +264,15 @@ export default function PollAdmin() {
                 {/* Poll Stats */}
                 <div className="grid grid-cols-3 gap-4 text-center">
                   <div>
-                    <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">{poll.options}</p>
+                    <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">{poll.options || 0}</p>
                     <p className="text-xs text-gray-500">Options</p>
                   </div>
                   <div>
-                    <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">{poll.votes}</p>
+                    <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">{poll.totalVotes || 0}</p>
                     <p className="text-xs text-gray-500">Votes</p>
                   </div>
                   <div>
-                    <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">{poll.participants}</p>
+                    <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">{poll.participants || 0}</p>
                     <p className="text-xs text-gray-500">Participants</p>
                   </div>
                 </div>
@@ -307,7 +289,7 @@ export default function PollAdmin() {
                 )}
 
                 {/* Participation Progress */}
-                {poll.votes > 0 && (
+                {(poll.totalVotes || 0) > 0 && (
                   <div className="space-y-1">
                     <div className="flex justify-between text-xs">
                       <span className="text-gray-500">Participation Rate</span>
@@ -328,15 +310,15 @@ export default function PollAdmin() {
                 <div className="pt-3 border-t space-y-2">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-500">Owner</span>
-                    <span className="font-medium">{poll.owner}</span>
+                    <span className="font-medium">{poll.createdBy || poll.owner || 'Unknown'}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-500">Created</span>
-                    <span className="font-medium">{new Date(poll.createdAt).toLocaleDateString()}</span>
+                    <span className="font-medium">{poll.createdAt ? new Date(poll.createdAt).toLocaleDateString() : 'Unknown'}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-500">Expires</span>
-                    <span className="font-medium">{new Date(poll.expiresAt).toLocaleDateString()}</span>
+                    <span className="font-medium">{(poll.closesAt || poll.expiresAt) ? new Date(poll.closesAt || poll.expiresAt).toLocaleDateString() : 'Unknown'}</span>
                   </div>
                 </div>
 
@@ -362,26 +344,29 @@ export default function PollAdmin() {
             </Card>
           )
         })}
-      </div>
+        </div>
+      )}
 
       {/* Empty State */}
-      {filteredPolls.length === 0 && (
         <div className="text-center py-12">
-          <div className="w-16 h-16 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4">
-            <Vote className="w-8 h-8 text-gray-400" />
-          </div>
-          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No polls found</h3>
-          <p className="text-gray-500 mb-6">
-            {searchQuery || statusFilter !== 'all' 
-              ? 'Try adjusting your search or filter criteria.' 
-              : 'Get started by creating your first poll.'}
-          </p>
-          <Button>
+          {!loading && !error && filteredPolls.length === 0 && (
+          <>
+            <div className="w-16 h-16 mx-auto bg-gray-100 rounded-full flex items-center justify-center mb-4">
+              <Vote className="w-8 h-8 text-gray-400" />
+            </div>
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No polls found</h3>
+            <p className="text-gray-500 mb-6">
+              {searchQuery || statusFilter !== 'all' 
+                ? 'Try adjusting your search or filter criteria.' 
+                : 'Get started by creating your first poll.'}
+            </p>
+          </>
+          )}
+          <Button onClick={() => window.location.href = '/polls/new'}>
             <Plus className="w-4 h-4 mr-2" />
             Create Poll
           </Button>
         </div>
-      )}
     </div>
   )
 }

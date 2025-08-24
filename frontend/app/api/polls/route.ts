@@ -40,11 +40,22 @@ export async function GET(req: NextRequest) {
           const fullPoll = await backend.get_poll(summary.id)
           if (fullPoll && fullPoll.length > 0) {
             const poll = fullPoll[0]
+            // Transform status from Motoko variant to string
+            let statusString = 'draft'
+            if (typeof poll.status === 'object' && poll.status !== null) {
+              if ('active' in poll.status) statusString = 'active'
+              else if ('completed' in poll.status) statusString = 'completed'
+              else if ('paused' in poll.status) statusString = 'paused'
+              else if ('archived' in poll.status) statusString = 'archived'
+            } else if (typeof poll.status === 'string') {
+              statusString = poll.status
+            }
+
             polls.push({
               id: Number(poll.id),
               title: poll.title,
               description: poll.description,
-              status: poll.status,
+              status: statusString,
               projectId: Number(poll.scopeId),
               createdBy: typeof poll.createdBy === 'string' 
                 ? poll.createdBy 
@@ -78,11 +89,23 @@ export async function GET(req: NextRequest) {
               const fullPoll = await backend.get_poll(summary.id)
               if (fullPoll && fullPoll.length > 0) {
                 const poll = fullPoll[0]
+                
+                // Transform status from Motoko variant to string
+                let statusString = 'draft'
+                if (typeof poll.status === 'object' && poll.status !== null) {
+                  if ('active' in poll.status) statusString = 'active'
+                  else if ('completed' in poll.status) statusString = 'completed'
+                  else if ('paused' in poll.status) statusString = 'paused'
+                  else if ('archived' in poll.status) statusString = 'archived'
+                } else if (typeof poll.status === 'string') {
+                  statusString = poll.status
+                }
+
                 polls.push({
                   id: Number(poll.id),
                   title: poll.title,
                   description: poll.description,
-                  status: poll.status,
+                  status: statusString,
                   projectId: Number(poll.scopeId),
                   createdBy: typeof poll.createdBy === 'string' 
                     ? poll.createdBy 
