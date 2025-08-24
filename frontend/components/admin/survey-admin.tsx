@@ -82,7 +82,7 @@ export default function SurveyAdmin() {
             Create and manage survey forms across projects
           </p>
         </div>
-        <Button>
+        <Button onClick={() => window.location.href = '/surveys/new'}>
           <Plus className="w-4 h-4 mr-2" />
           New Survey
         </Button>
@@ -314,7 +314,7 @@ export default function SurveyAdmin() {
               ? 'Try adjusting your search or filter criteria.' 
               : 'Get started by creating your first survey.'}
           </p>
-          <Button>
+          <Button onClick={() => window.location.href = '/surveys/new'}>
             <Plus className="w-4 h-4 mr-2" />
             Create Survey
           </Button>
