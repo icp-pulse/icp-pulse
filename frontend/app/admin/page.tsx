@@ -1,6 +1,7 @@
 "use client"
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Sidebar from '@/components/layout/sidebar'
 import { TopHeader } from '@/components/layout/top-header'
 import Header from '@/components/layout/header'
@@ -17,7 +18,16 @@ const tabConfigs: Record<TabType, { title: string; description: string }> = {
 }
 
 export default function AdminDashboardPage() {
+  const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = useState<TabType>('projects')
+
+  // Set initial tab from URL parameter
+  useEffect(() => {
+    const tabParam = searchParams.get('tab') as TabType
+    if (tabParam && ['projects', 'surveys', 'polls'].includes(tabParam)) {
+      setActiveTab(tabParam)
+    }
+  }, [searchParams])
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const current = tabConfigs[activeTab]
 
