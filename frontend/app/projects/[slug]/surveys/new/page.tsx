@@ -1,10 +1,13 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { createBackend } from '@/lib/icp'
+import type { ProjectSummary } from '@/lib/types'
 
 type QuestionType = 'single' | 'multi' | 'likert' | 'short' | 'long' | 'number' | 'rating'
 
@@ -20,6 +23,7 @@ interface Question {
 }
 
 export default function NewSurveyPage({ params }: { params: { slug: string } }) {
+  const router = useRouter()
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [closesAt, setClosesAt] = useState('')
@@ -27,6 +31,37 @@ export default function NewSurveyPage({ params }: { params: { slug: string } }) 
   const [allowAnonymous, setAllowAnonymous] = useState(false)
   const [questions, setQuestions] = useState<Question[]>([])
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [project, setProject] = useState<ProjectSummary | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    const loadProject = async () => {
+      try {
+        setLoading(true)
+        const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID || ''
+        const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
+        const backend = await createBackend({ canisterId, host })
+        
+        const projects = await backend.list_projects(0n, 100n)
+        const foundProject = projects.find(p => p.slug === params.slug)
+        
+        if (!foundProject) {
+          setError('Project not found')
+          return
+        }
+        
+        setProject(foundProject)
+      } catch (err) {
+        console.error('Error loading project:', err)
+        setError('Failed to load project')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    loadProject()
+  }, [params.slug])
 
   const addQuestion = () => {
     const newQuestion: Question = {
@@ -48,29 +83,111 @@ export default function NewSurveyPage({ params }: { params: { slug: string } }) 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    
+    if (!project) {
+      setError('Project not loaded')
+      return
+    }
+    
     if (!title || !description || questions.length === 0) {
-      alert('Please fill in all required fields and add at least one question')
+      setError('Please fill in all required fields and add at least one question')
+      return
+    }
+
+    // Validate questions
+    const invalidQuestion = questions.find(q => 
+      !q.text.trim() || 
+      (q.type === 'single' || q.type === 'multi') && (!q.choices || q.choices.length < 2 || q.choices.some(c => !c.trim()))
+    )
+    
+    if (invalidQuestion) {
+      setError('All questions must have text and choice questions need at least 2 non-empty choices')
       return
     }
 
     setIsSubmitting(true)
+    setError(null)
+    
     try {
-      // TODO: Implement backend call
-      console.log('Survey data:', {
+      const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID || ''
+      const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
+      const backend = await createBackend({ canisterId, host })
+      
+      // Convert datetime-local to nanoseconds timestamp
+      const closesAtNs = closesAt ? BigInt(new Date(closesAt).getTime() * 1_000_000) : BigInt(Date.now() + 30 * 24 * 60 * 60 * 1000) * BigInt(1_000_000) // Default to 30 days from now
+      
+      // Prepare questions for backend - using Candid optional format
+      const backendQuestions = questions.map(q => ({
+        type_: q.type,
+        text: q.text,
+        required: q.required,
+        choices: q.choices?.length ? [q.choices] : [],
+        min: q.min !== undefined ? [BigInt(q.min)] : [],
+        max: q.max !== undefined ? [BigInt(q.max)] : [],
+        helpText: q.helpText?.trim() ? [q.helpText.trim()] : []
+      }))
+      
+      console.log('Sending survey data:', {
+        scopeType: 'project',
+        scopeId: project.id,
         title,
         description,
-        closesAt,
-        rewardFund,
+        closesAt: closesAtNs,
+        rewardFund: BigInt(rewardFund),
         allowAnonymous,
-        questions
+        questions: backendQuestions
       })
-      alert('Survey creation will be implemented')
+      
+      const surveyId = await backend.create_survey(
+        'project',
+        project.id,
+        title,
+        description,
+        closesAtNs,
+        BigInt(rewardFund),
+        allowAnonymous,
+        backendQuestions
+      )
+      
+      console.log('Survey created with ID:', surveyId)
+      
+      // Navigate back to projects page
+      router.push('/projects')
     } catch (error) {
       console.error('Error creating survey:', error)
-      alert('Error creating survey')
+      setError('Failed to create survey. Please try again.')
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold">Create Survey</h1>
+            <p className="text-muted-foreground">Loading project...</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  if (error && !project) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold">Create Survey</h1>
+            <p className="text-red-600">{error}</p>
+          </div>
+        </div>
+        <Button asChild variant="outline">
+          <a href="/projects">Back to Projects</a>
+        </Button>
+      </div>
+    )
   }
 
   return (
@@ -78,9 +195,15 @@ export default function NewSurveyPage({ params }: { params: { slug: string } }) 
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-semibold">Create Survey</h1>
-          <p className="text-muted-foreground">Project: {params.slug}</p>
+          <p className="text-muted-foreground">Project: {project?.name || params.slug}</p>
         </div>
       </div>
+      
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-600 px-4 py-3 rounded-md">
+          {error}
+        </div>
+      )}
       
       <form onSubmit={handleSubmit} className="max-w-4xl space-y-6">
         <Card>
