@@ -1,7 +1,5 @@
 import { Folder, ClipboardList, BarChart3, Download, Settings } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-// Replace @shared/schema types with simple local types for now
-// type TabType = "projects" | "surveys" | "polls";
 import { cn } from "@lib/utils";
 
 interface SidebarProps {
@@ -11,9 +9,42 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ activeTab, onTabChange, isCollapsed }: SidebarProps) {
-  const { data: projects = [] } = useQuery<any[]>({ queryKey: ["/api/projects"] });
-  const { data: surveys = [] } = useQuery<any[]>({ queryKey: ["/api/surveys"] });
-  const { data: polls = [] } = useQuery<any[]>({ queryKey: ["/api/polls"] });
+  // Fetch data from our implemented API endpoints
+  const { data: projects = [] } = useQuery<any[]>({ 
+    queryKey: ["/api/projects"],
+    queryFn: async () => {
+      const response = await fetch('/api/projects')
+      if (!response.ok) {
+        throw new Error('Failed to fetch projects')
+      }
+      return response.json()
+    },
+    staleTime: 30000, // Cache for 30 seconds
+  });
+  
+  const { data: surveys = [] } = useQuery<any[]>({ 
+    queryKey: ["/api/surveys"],
+    queryFn: async () => {
+      const response = await fetch('/api/surveys')
+      if (!response.ok) {
+        throw new Error('Failed to fetch surveys')
+      }
+      return response.json()
+    },
+    staleTime: 30000,
+  });
+  
+  const { data: polls = [] } = useQuery<any[]>({ 
+    queryKey: ["/api/polls"],
+    queryFn: async () => {
+      const response = await fetch('/api/polls')
+      if (!response.ok) {
+        throw new Error('Failed to fetch polls')
+      }
+      return response.json()
+    },
+    staleTime: 30000,
+  });
 
   const navItems = [
     { id: "projects" as const, icon: Folder, label: "Projects", count: projects.length },
