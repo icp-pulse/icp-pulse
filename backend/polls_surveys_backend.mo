@@ -8,7 +8,7 @@ import Principal "mo:base/Principal";
 import Text "mo:base/Text";
 import Time "mo:base/Time";
 
-actor class polls_surveys_backend() = this {
+persistent actor class polls_surveys_backend() = this {
   // Types
   type ProjectId = Nat;
   type ProductId = Nat;
