@@ -1,7 +1,6 @@
 import Array "mo:base/Array";
 import Blob "mo:base/Blob";
 import Bool "mo:base/Bool";
-import Iter "mo:base/Iter";
 import Nat "mo:base/Nat";
 import Int "mo:base/Int";
 import Principal "mo:base/Principal";
@@ -103,17 +102,17 @@ persistent actor class polls_surveys_backend() = this {
   type AnswerInput = { questionId : Nat; nat : ?Nat; nats : ?[Nat]; text : ?Text };
 
   // Stable counters and storage (use arrays to avoid HashMap requirements)
-  stable var nextProjectId : Nat = 1;
-  stable var nextProductId : Nat = 1;
-  stable var nextPollId : Nat = 1;
-  stable var nextSurveyId : Nat = 1;
-  stable var nextSubmissionId : Nat = 1;
+  var nextProjectId : Nat = 1;
+  var nextProductId : Nat = 1;
+  var nextPollId : Nat = 1;
+  var nextSurveyId : Nat = 1;
+  var nextSubmissionId : Nat = 1;
 
-  stable var projects : [Project] = [];
-  stable var products : [Product] = [];
-  stable var polls : [Poll] = [];
-  stable var surveys : [Survey] = [];
-  stable var submissions : [Submission] = [];
+  var projects : [Project] = [];
+  var products : [Product] = [];
+  var polls : [Poll] = [];
+  var surveys : [Survey] = [];
+  var submissions : [Submission] = [];
 
   // Helpers
   private func now() : Int { Time.now() };
