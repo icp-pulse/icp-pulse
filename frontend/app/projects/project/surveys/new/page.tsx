@@ -35,6 +35,13 @@ export default function NewSurveyPage({ params }: { params: { slug: string } }) 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Get minimum datetime (current time + 1 minute)
+  const getMinDateTime = () => {
+    const now = new Date()
+    now.setMinutes(now.getMinutes() + 1) // Add 1 minute buffer
+    return now.toISOString().slice(0, 16) // Format for datetime-local input
+  }
+
   useEffect(() => {
     const loadProject = async () => {
       try {
@@ -94,6 +101,16 @@ export default function NewSurveyPage({ params }: { params: { slug: string } }) 
       return
     }
 
+    // Validate closing date
+    if (closesAt) {
+      const closingDate = new Date(closesAt)
+      const now = new Date()
+      if (closingDate <= now) {
+        setError('Survey closing date must be in the future')
+        return
+      }
+    }
+
     // Validate questions
     const invalidQuestion = questions.find(q => 
       !q.text.trim() || 
@@ -114,7 +131,15 @@ export default function NewSurveyPage({ params }: { params: { slug: string } }) 
       const backend = await createBackend({ canisterId, host })
       
       // Convert datetime-local to nanoseconds timestamp
-      const closesAtNs = closesAt ? BigInt(new Date(closesAt).getTime() * 1_000_000) : BigInt(Date.now() + 30 * 24 * 60 * 60 * 1000) * BigInt(1_000_000) // Default to 30 days from now
+      let closesAtDate = closesAt ? new Date(closesAt) : new Date()
+      const now = new Date()
+      
+      // If no closesAt provided or it's in the past, set it to 30 days from now
+      if (!closesAt || closesAtDate <= now) {
+        closesAtDate = new Date(now.getTime() + (30 * 24 * 60 * 60 * 1000)) // 30 days from now
+      }
+      
+      const closesAtNs = BigInt(closesAtDate.getTime() * 1_000_000)
       
       // Prepare questions for backend - using Candid optional format
       const backendQuestions = questions.map(q => ({
@@ -248,9 +273,11 @@ export default function NewSurveyPage({ params }: { params: { slug: string } }) 
                 <Input
                   id="closesAt"
                   type="datetime-local"
+                  min={getMinDateTime()}
                   value={closesAt}
                   onChange={(e) => setClosesAt(e.target.value)}
                 />
+                <p className="text-xs text-gray-500 mt-1">Survey must close in the future</p>
               </div>
               
               <div>

@@ -22,7 +22,12 @@ const schema = z.object({
   title: z.string().min(2, 'Title must be at least 2 characters'),
   description: z.string().min(2, 'Description must be at least 2 characters'),
   projectId: z.string().min(1, 'Please select a project'),
-  expiresAt: z.string().min(1, 'Please set an expiry date'),
+  expiresAt: z.string().min(1, 'Please set an expiry date').refine((dateStr) => {
+    if (!dateStr) return false
+    const selectedDate = new Date(dateStr)
+    const now = new Date()
+    return selectedDate > now
+  }, 'Expiry date must be in the future'),
   allowAnonymous: z.boolean().default(false),
   allowMultiple: z.boolean().default(false),
   options: z.array(optionSchema).min(2, 'At least two options are required'),
@@ -55,7 +60,17 @@ async function createPollAction(values: FormValues, identity: any) {
   const { title, description, projectId, expiresAt, allowAnonymous, allowMultiple, options, fundingEnabled, totalFundICP, rewardPerVote } = values
   
   const backendOptions = options.map(opt => opt.text)
-  const expiresAtNs = new Date(expiresAt).getTime() * 1_000_000
+  
+  // Convert to nanoseconds and ensure it's in the future
+  const expiresAtDate = new Date(expiresAt)
+  const now = new Date()
+  
+  // If no expiresAt provided or it's in the past, set it to 7 days from now
+  if (!expiresAt || expiresAtDate <= now) {
+    expiresAtDate.setTime(now.getTime() + (7 * 24 * 60 * 60 * 1000)) // 7 days from now
+  }
+  
+  const expiresAtNs = expiresAtDate.getTime() * 1_000_000
   
   try {
     // Calculate funding parameters
@@ -87,6 +102,13 @@ export default function NewPollPage() {
   const [projects, setProjects] = useState<Project[]>([])
   const { identity } = useIcpAuth()
   const router = useRouter()
+  
+  // Get minimum datetime (current time + 1 minute)
+  const getMinDateTime = () => {
+    const now = new Date()
+    now.setMinutes(now.getMinutes() + 1) // Add 1 minute buffer
+    return now.toISOString().slice(0, 16) // Format for datetime-local input
+  }
 
   const { register, handleSubmit, formState: { errors }, control, setValue, watch } = useForm({
     resolver: zodResolver(schema),
@@ -220,10 +242,12 @@ export default function NewPollPage() {
                 <label className="block text-sm font-medium mb-2">Expires At</label>
                 <Input 
                   type="datetime-local"
+                  min={getMinDateTime()}
                   {...register('expiresAt')} 
                   className="w-full"
                 />
                 {errors.expiresAt && <p className="text-sm text-red-600 mt-1">{errors.expiresAt.message}</p>}
+                <p className="text-xs text-gray-500 mt-1">Poll must expire in the future</p>
               </div>
             </div>
 

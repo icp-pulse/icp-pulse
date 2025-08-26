@@ -6,7 +6,7 @@ import { Providers } from '@/components/Providers'
 import { ConditionalLayout } from '@/components/layout/conditional-layout'
 
 export const metadata: Metadata = {
-  title: 'ICP Polls & Surveys',
+  title: 'ICP Pulse',
   description: 'Context-aware polls & surveys on ICP',
 }
 

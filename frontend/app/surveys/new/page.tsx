@@ -28,7 +28,12 @@ const schema = z.object({
   title: z.string().min(2, 'Title must be at least 2 characters'),
   description: z.string().min(2, 'Description must be at least 2 characters'),
   projectId: z.string().min(1, 'Please select a project'),
-  closesAt: z.string().min(1, 'Please set a closing date'),
+  closesAt: z.string().min(1, 'Please set a closing date').refine((dateStr) => {
+    if (!dateStr) return false
+    const selectedDate = new Date(dateStr)
+    const now = new Date()
+    return selectedDate > now
+  }, 'Closing date must be in the future'),
   allowAnonymous: z.boolean().default(false),
   questions: z.array(questionSchema).min(1, 'At least one question is required'),
   // Funding fields
@@ -59,7 +64,26 @@ async function createSurveyAction(values: FormValues, identity: any) {
   // Convert form values to backend format
   const { title, description, projectId, closesAt, allowAnonymous, questions, fundingEnabled, totalFundICP, rewardPerResponse } = values
   
-  const closesAtNs = new Date(closesAt).getTime() * 1_000_000
+  // Convert to nanoseconds and ensure it's in the future
+  const closesAtDate = new Date(closesAt)
+  const now = new Date()
+  
+  // If no closesAt provided or it's in the past, set it to 30 days from now
+  if (!closesAt || closesAtDate <= now) {
+    console.warn('Survey close date is in the past or not provided, setting to 30 days from now')
+    closesAtDate.setTime(now.getTime() + (30 * 24 * 60 * 60 * 1000)) // 30 days from now
+  }
+  
+  const closesAtNs = closesAtDate.getTime() * 1_000_000
+  
+  console.log('Survey creation details:', {
+    title,
+    closesAt,
+    closesAtDate: closesAtDate.toISOString(),
+    closesAtNs,
+    currentTime: now.toISOString(),
+    questionsCount: questions.length
+  })
   
   // Transform questions to backend format  
   const backendQuestions = questions.map(q => {
@@ -112,6 +136,13 @@ export default function NewSurveyPage() {
   const [projects, setProjects] = useState<Project[]>([])
   const { identity } = useIcpAuth()
   const router = useRouter()
+  
+  // Get minimum datetime (current time + 1 minute)
+  const getMinDateTime = () => {
+    const now = new Date()
+    now.setMinutes(now.getMinutes() + 1) // Add 1 minute buffer
+    return now.toISOString().slice(0, 16) // Format for datetime-local input
+  }
 
   const { register, handleSubmit, formState: { errors }, control, setValue, watch } = useForm({
     resolver: zodResolver(schema),
@@ -275,10 +306,12 @@ export default function NewSurveyPage() {
                 <label className="block text-sm font-medium mb-2">Closes At</label>
                 <Input 
                   type="datetime-local"
+                  min={getMinDateTime()}
                   {...register('closesAt')} 
                   className="w-full"
                 />
                 {errors.closesAt && <p className="text-sm text-red-600 mt-1">{errors.closesAt.message}</p>}
+                <p className="text-xs text-gray-500 mt-1">Survey must close in the future</p>
               </div>
             </div>
 
