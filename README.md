@@ -42,13 +42,34 @@ TruePulse leverages **ICP smart contracts** to deliver:
 
 ## 📂 Repository Structure
 ```
-root/
- ├── src/            # Frontend (React + Tailwind)
- ├── canisters/      # Motoko/Rust canisters
- ├── docs/           # Pitch deck, whitepaper, diagrams
- ├── test/           # Unit & integration tests
- ├── package.json    # Frontend dependencies
- └── README.md       # This file
+icp-pulse/
+├── backend/                    # Motoko smart contracts
+│   └── polls_surveys_backend.mo
+├── frontend/                   # Next.js frontend application
+│   ├── app/                   # Next.js app router pages
+│   │   ├── admin/            # Admin dashboard pages
+│   │   ├── polls/            # Poll-related pages
+│   │   ├── projects/         # Project management pages
+│   │   ├── surveys/          # Survey pages
+│   │   └── survey-response/  # Survey response page
+│   ├── components/           # Reusable React components
+│   │   ├── admin/           # Admin-specific components
+│   │   ├── landing/         # Landing page components
+│   │   ├── layout/          # Layout components
+│   │   ├── polls/           # Poll components
+│   │   ├── projects/        # Project components
+│   │   ├── surveys/         # Survey components
+│   │   └── ui/              # shadcn/ui components
+│   ├── hooks/               # Custom React hooks
+│   ├── lib/                 # Utility libraries and configurations
+│   └── utils/               # Helper utilities
+├── src/declarations/        # Generated ICP canister declarations
+├── scripts/                 # Build and deployment scripts
+├── docs/                    # Documentation and market reports
+├── dfx.json                 # DFX configuration
+├── mops.toml               # Motoko package manager config
+├── package.json            # Root dependencies
+└── README.md               # This file
 ```
 
 ---
@@ -100,8 +121,8 @@ npm run test
 ---
 
 ## 🌍 Roadmap
-- **Q3 2025** – Launch poll creation & voting MVP  
-- **Q4 2025** – Add incentivized rewards via tokens/NFTs  
+- **Q3 2025** – Launch project, survey, and poll administration & voting MVP  
+- **Q4 2025** – Add incentivized rewards via tokens/NFTs
 - **Q1 2026** – DAO governance module for community funds  
 - **Q2 2026** – Multi-chain integration (Ethereum, TON, etc.)  
 
