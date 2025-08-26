@@ -4,6 +4,8 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTransition, useState } from 'react'
+import { useIcpAuth } from '@/components/IcpAuthProvider'
+import { useRouter } from 'next/navigation'
 
 const schema = z.object({
   name: z.string().min(2),
@@ -12,18 +14,32 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>
 
-async function createProjectAction(values: FormValues) {
-  const res = await fetch('/projects/new/action', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(values),
-  })
-  if (!res.ok) throw new Error('Failed to create project')
+async function createProjectAction(values: FormValues, identity: any) {
+  const { createBackendWithIdentity } = await import('@/lib/icp')
+  
+  if (!identity) {
+    throw new Error('Please login first')
+  }
+
+  const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
+  const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
+  
+  const backend = await createBackendWithIdentity({ canisterId, host, identity })
+  
+  try {
+    const projectId = await backend.create_project(values.name, values.description)
+    return { success: true, projectId }
+  } catch (error) {
+    console.error('Error creating project:', error)
+    throw new Error('Failed to create project: ' + (error as Error).message)
+  }
 }
 
 export default function NewProjectPage() {
   const [pending, startTransition] = useTransition()
   const [err, setErr] = useState<string | null>(null)
+  const { identity } = useIcpAuth()
+  const router = useRouter()
   const { register, handleSubmit, formState: { errors } } = useForm<FormValues>({ resolver: zodResolver(schema) })
 
   return (
@@ -35,8 +51,8 @@ export default function NewProjectPage() {
           setErr(null)
           startTransition(async () => {
             try {
-              await createProjectAction(v)
-              window.location.href = '/admin'
+              await createProjectAction(v, identity)
+              router.push('/admin')
             } catch (e: any) {
               setErr(e.message || 'Error')
             }

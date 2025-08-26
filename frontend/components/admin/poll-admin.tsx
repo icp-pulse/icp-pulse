@@ -7,7 +7,16 @@ import { Input } from '@/components/ui/input'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useIcpAuth } from '@/components/IcpAuthProvider'
 
+// Helper function to convert ICP Status variant to string
+function statusToString(status: any): string {
+  if (!status) return 'unknown'
+  if (status.active !== undefined) return 'active'
+  if (status.closed !== undefined) return 'closed'
+  if (typeof status === 'string') return status
+  return 'unknown'
+}
 
 export default function PollAdmin() {
   const [searchQuery, setSearchQuery] = useState('')
@@ -15,21 +24,40 @@ export default function PollAdmin() {
   const [polls, setPolls] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { identity } = useIcpAuth()
 
-  // Fetch polls from API endpoint
+  // Fetch polls from ICP backend
   useEffect(() => {
     async function fetchPolls() {
+      if (!identity) {
+        setLoading(false)
+        return
+      }
+      
       try {
         setLoading(true)
         setError(null)
         
-        const response = await fetch('/api/polls')
-        if (!response.ok) {
-          throw new Error(`Failed to fetch polls: ${response.status}`)
+        const { createBackendWithIdentity } = await import('@/lib/icp')
+        const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
+        const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
+        const backend = await createBackendWithIdentity({ canisterId, host, identity })
+        
+        // First get all projects
+        const projects = await backend.list_projects(0n, 100n)
+        
+        // Then get polls for each project
+        const allPolls: any[] = []
+        for (const project of projects) {
+          try {
+            const projectPolls = await backend.list_polls_by_project(project.id, 0n, 100n)
+            allPolls.push(...projectPolls)
+          } catch (err) {
+            console.warn(`Failed to fetch polls for project ${project.id}:`, err)
+          }
         }
         
-        const apiPolls = await response.json()
-        setPolls(apiPolls)
+        setPolls(allPolls)
         
       } catch (err) {
         console.error('Error fetching polls:', err)
@@ -40,13 +68,14 @@ export default function PollAdmin() {
     }
 
     fetchPolls()
-  }, [])
+  }, [identity])
 
   const filteredPolls = polls.filter(poll => {
     const matchesSearch = (poll.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
                          (poll.description || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
                          (poll.project || '').toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesStatus = statusFilter === 'all' || poll.status === statusFilter
+    const pollStatusString = statusToString(poll.status)
+    const matchesStatus = statusFilter === 'all' || pollStatusString === statusFilter
     return matchesSearch && matchesStatus
   })
 
@@ -131,7 +160,7 @@ export default function PollAdmin() {
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active</p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  {polls.filter(p => p.status === 'active').length}
+                  {polls.filter(p => statusToString(p.status) === 'active').length}
                 </p>
               </div>
               <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
@@ -249,8 +278,8 @@ export default function PollAdmin() {
                   </Button>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <Badge className={`w-fit ${getStatusColor(poll.status)}`}>
-                    {poll.status}
+                  <Badge className={`w-fit ${getStatusColor(statusToString(poll.status))}`}>
+                    {statusToString(poll.status)}
                   </Badge>
                   <Badge className={`w-fit text-xs ${getTypeColor(poll.type || 'single-choice')}`}>
                     {poll.type ? poll.type.replace('-', ' ') : 'single choice'}
@@ -278,7 +307,7 @@ export default function PollAdmin() {
                 </div>
 
                 {/* Time Remaining */}
-                {poll.status === 'active' && (
+                {statusToString(poll.status) === 'active' && (
                   <div className="flex items-center justify-center space-x-2 py-2 bg-gray-50 rounded-lg">
                     <Clock className="w-4 h-4 text-gray-500" />
                     <span className="text-sm text-gray-700">

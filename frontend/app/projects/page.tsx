@@ -1,20 +1,40 @@
-import { createBackend } from '@/lib/icp'
+"use client"
+
+import { useState, useEffect } from 'react'
 import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { useIcpAuth } from '@/components/IcpAuthProvider'
 
-export const dynamic = 'force-dynamic'
+export default function ProjectsPage() {
+  const [projects, setProjects] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const { identity } = useIcpAuth()
 
-async function listProjects() {
-  'use server'
-  const canisterId = process.env.CANISTER_ID_POLLS_SURVEYS_BACKEND || process.env.POLLS_SURVEYS_BACKEND_CANISTER_ID || process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID || ''
-  const host = process.env.DFX_NETWORK === 'ic' ? 'https://ic0.app' : 'http://127.0.0.1:4943'
-  const backend = await createBackend({ canisterId, host })
-  const res = await backend.list_projects(0n, 20n)
-  return res
-}
+  useEffect(() => {
+    async function fetchProjects() {
+      if (!identity) return
+      
+      try {
+        const { createBackendWithIdentity } = await import('@/lib/icp')
+        const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
+        const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
+        const backend = await createBackendWithIdentity({ canisterId, host, identity })
+        
+        const projectData = await backend.list_projects(0n, 20n)
+        setProjects(projectData)
+      } catch (error) {
+        console.error('Failed to fetch projects:', error)
+      } finally {
+        setLoading(false)
+      }
+    }
+    
+    fetchProjects()
+  }, [identity])
 
-export default async function ProjectsPage() {
-  const projects = await listProjects()
+  if (loading) {
+    return <div>Loading projects...</div>
+  }
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">

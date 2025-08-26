@@ -7,6 +7,16 @@ import { Input } from '@/components/ui/input'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useIcpAuth } from '@/components/IcpAuthProvider'
+
+// Helper function to convert ICP Status variant to string
+function statusToString(status: any): string {
+  if (!status) return 'unknown'
+  if (status.active !== undefined) return 'active'
+  if (status.closed !== undefined) return 'closed'
+  if (typeof status === 'string') return status
+  return 'unknown'
+}
 
 export default function SurveyAdmin() {
   const [searchQuery, setSearchQuery] = useState('')
@@ -14,21 +24,40 @@ export default function SurveyAdmin() {
   const [surveys, setSurveys] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { identity } = useIcpAuth()
 
-  // Fetch surveys from API endpoint
+  // Fetch surveys from ICP backend
   useEffect(() => {
     async function fetchSurveys() {
+      if (!identity) {
+        setLoading(false)
+        return
+      }
+      
       try {
         setLoading(true)
         setError(null)
         
-        const response = await fetch('/api/surveys')
-        if (!response.ok) {
-          throw new Error(`Failed to fetch surveys: ${response.status}`)
+        const { createBackendWithIdentity } = await import('@/lib/icp')
+        const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
+        const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
+        const backend = await createBackendWithIdentity({ canisterId, host, identity })
+        
+        // First get all projects
+        const projects = await backend.list_projects(0n, 100n)
+        
+        // Then get surveys for each project
+        const allSurveys: any[] = []
+        for (const project of projects) {
+          try {
+            const projectSurveys = await backend.list_surveys_by_project(project.id, 0n, 100n)
+            allSurveys.push(...projectSurveys)
+          } catch (err) {
+            console.warn(`Failed to fetch surveys for project ${project.id}:`, err)
+          }
         }
         
-        const apiSurveys = await response.json()
-        setSurveys(apiSurveys)
+        setSurveys(allSurveys)
         
       } catch (err) {
         console.error('Error fetching surveys:', err)
@@ -39,13 +68,14 @@ export default function SurveyAdmin() {
     }
 
     fetchSurveys()
-  }, [])
+  }, [identity])
 
   const filteredSurveys = surveys.filter(survey => {
     const matchesSearch = survey.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          survey.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         survey.project.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesStatus = statusFilter === 'all' || survey.status === statusFilter
+                         (survey.project || '').toLowerCase().includes(searchQuery.toLowerCase())
+    const surveyStatusString = statusToString(survey.status)
+    const matchesStatus = statusFilter === 'all' || surveyStatusString === statusFilter
     return matchesSearch && matchesStatus
   })
 
@@ -110,7 +140,7 @@ export default function SurveyAdmin() {
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active</p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  {surveys.filter(s => s.status === 'active').length}
+                  {surveys.filter(s => statusToString(s.status) === 'active').length}
                 </p>
               </div>
               <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
@@ -220,8 +250,8 @@ export default function SurveyAdmin() {
                 </Button>
               </div>
               <div className="flex items-center gap-2">
-                <Badge className={`w-fit ${getStatusColor(survey.status)}`}>
-                  {survey.status}
+                <Badge className={`w-fit ${getStatusColor(statusToString(survey.status))}`}>
+                  {statusToString(survey.status)}
                 </Badge>
                 <Badge variant="outline" className="text-xs">
                   {survey.project}

@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useIcpAuth } from '@/components/IcpAuthProvider'
 
 interface Project {
   id: number
@@ -27,20 +28,26 @@ export default function ProjectAdmin() {
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { identity } = useIcpAuth()
 
-  // Fetch projects from API endpoint
+  // Fetch projects from ICP backend
   useEffect(() => {
     async function fetchProjects() {
+      if (!identity) {
+        setLoading(false)
+        return
+      }
+      
       try {
         setLoading(true)
         setError(null)
         
-        const response = await fetch('/api/projects')
-        if (!response.ok) {
-          throw new Error(`Failed to fetch projects: ${response.status}`)
-        }
+        const { createBackendWithIdentity } = await import('@/lib/icp')
+        const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
+        const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
+        const backend = await createBackendWithIdentity({ canisterId, host, identity })
         
-        const apiProjects = await response.json()
+        const apiProjects = await backend.list_projects(0n, 100n)
         
         // Transform API data to match our interface
         const transformedProjects = apiProjects.map((project: any) => ({
@@ -68,7 +75,7 @@ export default function ProjectAdmin() {
     }
 
     fetchProjects()
-  }, [])
+  }, [identity])
 
   const filteredProjects = projects.filter(project => {
     const matchesSearch = project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||

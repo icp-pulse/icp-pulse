@@ -47,11 +47,19 @@ export const idlFactory = ({ IDL: I = IDL }) => {
   const PollSummary = I.Record({ id: I.Nat, scopeType: ScopeType, scopeId: I.Nat, title: I.Text, status: Status, totalVotes: I.Nat })
 
   const QuestionType = I.Variant({ single: I.Null, multi: I.Null, likert: I.Null, short: I.Null, long: I.Null, number: I.Null, rating: I.Null })
-  const Question = I.Record({ id: I.Nat, type_: QuestionType, text: I.Text, required: I.Bool, choices: I.Opt(I.Vec(I.Text)), min: I.Opt(I.Nat), max: I.Opt(I.Nat), helpText: I.Opt(I.Text) })
+  const Question = I.Record({ id: I.Nat, qType: QuestionType, text: I.Text, required: I.Bool, choices: I.Opt(I.Vec(I.Text)), min: I.Opt(I.Nat), max: I.Opt(I.Nat), helpText: I.Opt(I.Text) })
   const Survey = I.Record({ id: I.Nat, scopeType: ScopeType, scopeId: I.Nat, title: I.Text, description: I.Text, createdBy: I.Principal, createdAt: I.Int, closesAt: I.Int, status: Status, rewardFund: I.Nat, allowAnonymous: I.Bool, questions: I.Vec(Question), submissionsCount: I.Nat })
   const SurveySummary = I.Record({ id: I.Nat, scopeType: ScopeType, scopeId: I.Nat, title: I.Text, status: Status, submissionsCount: I.Nat })
 
-  const QuestionInput = I.Record({ type_: I.Text, text: I.Text, required: I.Bool, choices: I.Opt(I.Vec(I.Text)), min: I.Opt(I.Nat), max: I.Opt(I.Nat), helpText: I.Opt(I.Text) })
+  const QuestionInput = I.Record({ 
+    qType: I.Text,  // Use qType to avoid reserved keyword issues
+    text: I.Text, 
+    required: I.Bool, 
+    choices: I.Opt(I.Vec(I.Text)), 
+    min: I.Opt(I.Nat), 
+    max: I.Opt(I.Nat), 
+    helpText: I.Opt(I.Text) 
+  })
   const AnswerInput = I.Record({ questionId: I.Nat, nat: I.Opt(I.Nat), nats: I.Opt(I.Vec(I.Nat)), text: I.Opt(I.Text) })
 
   return I.Service({

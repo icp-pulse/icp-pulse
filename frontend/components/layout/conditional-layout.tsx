@@ -18,7 +18,7 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
         <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b">
           <div className="max-w-7xl mx-auto px-4 py-3">
             <div className="flex items-center justify-between">
-              <a href="/" className="font-semibold text-lg">ICP Polls & Surveys</a>
+              <a href="/" className="font-semibold text-lg" suppressHydrationWarning>ICP Polls & Surveys</a>
               <div className="flex items-center gap-2">
                 <a href="/admin" className="px-3 py-1.5 text-sm rounded bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 transition-colors">
                   Admin

@@ -1,6 +1,7 @@
 import { Folder, ClipboardList, BarChart3, Download, Settings } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@lib/utils";
+import { useIcpAuth } from '@/components/IcpAuthProvider';
 
 interface SidebarProps {
   activeTab: "projects" | "surveys" | "polls";
@@ -9,41 +10,83 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ activeTab, onTabChange, isCollapsed }: SidebarProps) {
-  // Fetch data from our implemented API endpoints
+  const { identity } = useIcpAuth();
+
+  // Fetch data from ICP backend
   const { data: projects = [] } = useQuery<any[]>({ 
-    queryKey: ["/api/projects"],
+    queryKey: ["projects", identity?.getPrincipal().toString()],
     queryFn: async () => {
-      const response = await fetch('/api/projects')
-      if (!response.ok) {
-        throw new Error('Failed to fetch projects')
-      }
-      return response.json()
+      if (!identity) return []
+      
+      const { createBackendWithIdentity } = await import('@/lib/icp')
+      const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
+      const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
+      const backend = await createBackendWithIdentity({ canisterId, host, identity })
+      
+      return await backend.list_projects(0n, 100n)
     },
     staleTime: 30000, // Cache for 30 seconds
+    enabled: !!identity,
   });
   
   const { data: surveys = [] } = useQuery<any[]>({ 
-    queryKey: ["/api/surveys"],
+    queryKey: ["surveys", identity?.getPrincipal().toString()],
     queryFn: async () => {
-      const response = await fetch('/api/surveys')
-      if (!response.ok) {
-        throw new Error('Failed to fetch surveys')
+      if (!identity) return []
+      
+      const { createBackendWithIdentity } = await import('@/lib/icp')
+      const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
+      const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
+      const backend = await createBackendWithIdentity({ canisterId, host, identity })
+      
+      // Get all projects first
+      const projects = await backend.list_projects(0n, 100n)
+      
+      // Then get surveys for each project
+      const allSurveys: any[] = []
+      for (const project of projects) {
+        try {
+          const projectSurveys = await backend.list_surveys_by_project(project.id, 0n, 100n)
+          allSurveys.push(...projectSurveys)
+        } catch (err) {
+          console.warn(`Failed to fetch surveys for project ${project.id}:`, err)
+        }
       }
-      return response.json()
+      
+      return allSurveys
     },
     staleTime: 30000,
+    enabled: !!identity,
   });
   
   const { data: polls = [] } = useQuery<any[]>({ 
-    queryKey: ["/api/polls"],
+    queryKey: ["polls", identity?.getPrincipal().toString()],
     queryFn: async () => {
-      const response = await fetch('/api/polls')
-      if (!response.ok) {
-        throw new Error('Failed to fetch polls')
+      if (!identity) return []
+      
+      const { createBackendWithIdentity } = await import('@/lib/icp')
+      const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
+      const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
+      const backend = await createBackendWithIdentity({ canisterId, host, identity })
+      
+      // Get all projects first
+      const projects = await backend.list_projects(0n, 100n)
+      
+      // Then get polls for each project
+      const allPolls: any[] = []
+      for (const project of projects) {
+        try {
+          const projectPolls = await backend.list_polls_by_project(project.id, 0n, 100n)
+          allPolls.push(...projectPolls)
+        } catch (err) {
+          console.warn(`Failed to fetch polls for project ${project.id}:`, err)
+        }
       }
-      return response.json()
+      
+      return allPolls
     },
     staleTime: 30000,
+    enabled: !!identity,
   });
 
   const navItems = [
