@@ -1,5 +1,9 @@
 # TruePulse – Decentralized Polls & Surveys on ICP
 
+[Demo](https://utkw6-eyaaa-aaaao-a4o7a-cai.icp0.io/)
+[Pitchdeck](https://www.canva.com/design/DAGxLqA2h3U/5uTAN5rb1lzDqD7qiNl5Yg/view?utm_content=DAGxLqA2h3U&utm_campaign=designshare&utm_medium=link2&utm_source=uniquelinks&utlId=ha53a44d899)
+
+
 ## 🚀 Project Summary
 TruePulse is a decentralized polls & surveys platform built on the **Internet Computer Protocol (ICP)**.  
 It enables communities, DAOs, and organizations to create transparent, incentivized, and tamper-proof polls — ensuring fair participation and verifiable results without relying on centralized intermediaries.
