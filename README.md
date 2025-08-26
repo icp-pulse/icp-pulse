@@ -40,9 +40,10 @@ TruePulse leverages **ICP smart contracts** to deliver:
 ---
 
 ## 📺 Demo
-- **Demo Video (Functional, <10 min):** [Link here]  
-- **Pitch Video (Team + Solution + Roadmap):** [Link here]  
-- **Live Demo (if applicable):** [https://utkw6-eyaaa-aaaao-a4o7a-cai.icp0.io](https://utkw6-eyaaa-aaaao-a4o7a-cai.icp0.io)  
+- **Demo Video (Functional):** [[Link](https://youtu.be/sonGyeNZkjA)]  
+- **Pitch Video (Team + Solution + Roadmap):** [[Link](https://youtu.be/tGnw1th9j10)]  
+- **Live Demo (ICP Mainnet):** [https://utkw6-eyaaa-aaaao-a4o7a-cai.icp0.io](https://utkw6-eyaaa-aaaao-a4o7a-cai.icp0.io)
+- **Pitch Deck:** [Link](https://www.canva.com/design/DAGxLqA2h3U/5uTAN5rb1lzDqD7qiNl5Yg/view?utm_content=DAGxLqA2h3U&utm_campaign=designshare&utm_medium=link2&utm_source=uniquelinks&utlId=ha53a44d899)
 
 ---
 
