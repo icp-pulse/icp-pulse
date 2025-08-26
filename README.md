@@ -112,13 +112,6 @@ Access at: `http://localhost:3000`
 
 ---
 
-## 🧪 Tests
-Run unit and integration tests:
-```bash
-npm run test
-```
-
----
 
 ## 🌍 Roadmap
 - **Q3 2025** – Launch project, survey, and poll administration & voting MVP  
