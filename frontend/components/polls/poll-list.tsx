@@ -79,7 +79,7 @@ export default function PollList() {
                 <div className="flex items-start justify-between mb-3">
                   <h4 className="text-sm font-medium text-slate-900">{poll.question}</h4>
                   <span className="text-xs text-slate-500">
-                    {getTimeLeft(poll.createdAt || new Date(), poll.duration)}
+                    {getTimeLeft(new Date(poll.createdAt || new Date()), poll.duration)}
                   </span>
                 </div>
                 

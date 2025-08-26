@@ -40,7 +40,7 @@ export function LandingPage() {
             </h1>
             <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-3xl mx-auto">
               Organize feedback under Projects and Products. Create intelligent surveys and polls 
-              that adapt to your organization's needs, all powered by blockchain technology.
+              that adapt to your organization&apos;s needs, all powered by blockchain technology.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Button size="lg" className="px-8 py-3 text-lg">
@@ -231,7 +231,7 @@ export function LandingPage() {
                 <div className="space-y-4">
                   <div className="border-l-4 border-blue-500 pl-4">
                     <h4 className="font-medium">Multiple Choice Question</h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">What's your preferred meeting time?</p>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">What&apos;s your preferred meeting time?</p>
                   </div>
                   <div className="border-l-4 border-purple-500 pl-4">
                     <h4 className="font-medium">Rating Scale</h4>

@@ -56,12 +56,12 @@ export async function POST(req: NextRequest) {
     // Create poll in backend
     const pollId = await backend.create_poll(
       'project', // scopeType
-      Number(projectId), // scopeId as number
+      BigInt(projectId), // scopeId as bigint
       title,
       description,
       backendOptions, // options array
-      expiresAtNs, // closesAt as number
-      0 // rewardFund as number
+      BigInt(expiresAtNs), // closesAt as bigint
+      BigInt(0) // rewardFund as bigint
     )
     
     return NextResponse.json({ 

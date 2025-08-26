@@ -48,9 +48,9 @@ export type SurveyQuestion = { id: string; question: string; type: 'multiple_cho
 
 export const insertPollSchema = z.object({
   question: z.string().min(2),
-  options: z.array(z.object({ id: z.string(), text: z.string(), votes: z.number().default(0) })).min(2),
-  duration: z.enum(['1_day','3_days','1_week','1_month']).default('1_day'),
-  privacy: z.enum(['public','private','invite_only']).default('public'),
-  status: z.enum(['active']).default('active'),
+  options: z.array(z.object({ id: z.string(), text: z.string(), votes: z.number().optional().default(0) })).min(2),
+  duration: z.enum(['1_day','3_days','1_week','1_month']).optional().default('1_day'),
+  privacy: z.enum(['public','private','invite_only']).optional().default('public'),
+  status: z.enum(['active']).optional().default('active'),
 })
 export type InsertPoll = z.infer<typeof insertPollSchema>

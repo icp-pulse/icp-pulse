@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createBackend } from '@/lib/icp'
 
+export const runtime = 'nodejs'
+
 function nsToIso(ns: bigint | number): string {
   const n = typeof ns === 'number' ? BigInt(ns) : ns
   const ms = Number(n / 1_000_000n)
@@ -40,6 +42,7 @@ export async function GET(req: NextRequest) {
           const fullPoll = await backend.get_poll(summary.id)
           if (fullPoll && fullPoll.length > 0) {
             const poll = fullPoll[0]
+            if (!poll) continue
             // Transform status from Motoko variant to string
             let statusString = 'draft'
             if (typeof poll.status === 'object' && poll.status !== null) {
@@ -59,7 +62,7 @@ export async function GET(req: NextRequest) {
               projectId: Number(poll.scopeId),
               createdBy: typeof poll.createdBy === 'string' 
                 ? poll.createdBy 
-                : poll.createdBy?.toString() || 'Unknown',
+                : (poll.createdBy as any)?.toString() || 'Unknown',
               createdAt: nsToIso(poll.createdAt),
               closesAt: nsToIso(poll.closesAt),
               totalVotes: Number(poll.totalVotes),
@@ -89,6 +92,7 @@ export async function GET(req: NextRequest) {
               const fullPoll = await backend.get_poll(summary.id)
               if (fullPoll && fullPoll.length > 0) {
                 const poll = fullPoll[0]
+                if (!poll) continue
                 
                 // Transform status from Motoko variant to string
                 let statusString = 'draft'
@@ -109,7 +113,7 @@ export async function GET(req: NextRequest) {
                   projectId: Number(poll.scopeId),
                   createdBy: typeof poll.createdBy === 'string' 
                     ? poll.createdBy 
-                    : poll.createdBy?.toString() || 'Unknown',
+                    : (poll.createdBy as any)?.toString() || 'Unknown',
                   createdAt: nsToIso(poll.createdAt),
                   closesAt: nsToIso(poll.closesAt),
                   totalVotes: Number(poll.totalVotes),

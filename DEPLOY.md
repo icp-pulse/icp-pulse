@@ -48,7 +48,7 @@ dfx identity use icp-pulse-mainnet-deploy
 dfx identity get-principal
 
 # Check your identity's cycles balance
-dfx wallet --network ic balance
+dfx cycles --network ic balance
 ```
 
 ### 2. Acquire Cycles

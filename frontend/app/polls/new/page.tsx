@@ -51,7 +51,7 @@ export default function NewPollPage() {
   const [error, setError] = useState<string | null>(null)
   const [projects, setProjects] = useState<Project[]>([])
 
-  const { register, handleSubmit, formState: { errors }, control, watch, setValue } = useForm<FormValues>({
+  const { register, handleSubmit, formState: { errors }, control, watch, setValue } = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
       options: [
