@@ -100,8 +100,8 @@ npm run test
 ---
 
 ## 🌍 Roadmap
-- **Q3 2025** – Launch poll creation & voting MVP  
-- **Q4 2025** – Add incentivized rewards via tokens/NFTs  
+- **Q3 2025** – Launch project, survey, and poll administration & voting MVP  
+- **Q4 2025** – Add incentivized rewards via tokens/NFTs
 - **Q1 2026** – DAO governance module for community funds  
 - **Q2 2026** – Multi-chain integration (Ethereum, TON, etc.)  
 
