@@ -156,7 +156,7 @@ export default function SurveyAdmin() {
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Responses</p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  {surveys.reduce((sum, s) => sum + s.responses, 0)}
+                  {surveys.reduce((sum, s) => sum + Number(s.responses || 0n), 0)}
                 </p>
               </div>
               <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
@@ -172,7 +172,7 @@ export default function SurveyAdmin() {
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Avg. Completion</p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  {Math.round(surveys.reduce((sum, s) => sum + s.completionRate, 0) / surveys.length)}%
+                  {surveys.length > 0 ? Math.round(surveys.reduce((sum, s) => sum + Number(s.completionRate || 0), 0) / surveys.length) : 0}%
                 </p>
               </div>
               <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center">
@@ -266,12 +266,12 @@ export default function SurveyAdmin() {
                   <p className="text-xs text-gray-500">Questions</p>
                 </div>
                 <div>
-                  <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">{survey.responses}</p>
+                  <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">{Number(survey.responses || 0n)}</p>
                   <p className="text-xs text-gray-500">Responses</p>
                 </div>
                 <div>
-                  <p className={`text-lg font-semibold ${getCompletionRateColor(survey.completionRate)}`}>
-                    {survey.completionRate}%
+                  <p className={`text-lg font-semibold ${getCompletionRateColor(Number(survey.completionRate || 0))}`}>
+                    {Number(survey.completionRate || 0)}%
                   </p>
                   <p className="text-xs text-gray-500">Completion</p>
                 </div>
@@ -281,17 +281,17 @@ export default function SurveyAdmin() {
               <div className="space-y-1">
                 <div className="flex justify-between text-xs">
                   <span className="text-gray-500">Completion Rate</span>
-                  <span className={`font-medium ${getCompletionRateColor(survey.completionRate)}`}>
-                    {survey.completionRate}%
+                  <span className={`font-medium ${getCompletionRateColor(Number(survey.completionRate || 0))}`}>
+                    {Number(survey.completionRate || 0)}%
                   </span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
                   <div 
                     className={`h-2 rounded-full transition-all ${
-                      survey.completionRate >= 80 ? 'bg-green-500' :
-                      survey.completionRate >= 60 ? 'bg-yellow-500' : 'bg-red-500'
+                      Number(survey.completionRate || 0) >= 80 ? 'bg-green-500' :
+                      Number(survey.completionRate || 0) >= 60 ? 'bg-yellow-500' : 'bg-red-500'
                     }`}
-                    style={{ width: `${survey.completionRate}%` }}
+                    style={{ width: `${Number(survey.completionRate || 0)}%` }}
                   />
                 </div>
               </div>

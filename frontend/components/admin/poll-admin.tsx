@@ -176,7 +176,7 @@ export default function PollAdmin() {
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Votes</p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  {polls.reduce((sum, p) => sum + (p.totalVotes || 0), 0)}
+                  {polls.reduce((sum, p) => sum + Number(p.totalVotes || 0n), 0)}
                 </p>
               </div>
               <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
@@ -193,8 +193,8 @@ export default function PollAdmin() {
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Avg. Participation</p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                   {polls.length > 0 ? Math.round(polls.reduce((sum, p) => {
-                    const votes = p.totalVotes || 0;
-                    const participants = p.participants || 0;
+                    const votes = Number(p.totalVotes || 0n);
+                    const participants = Number(p.participants || 0n);
                     return sum + (votes > 0 ? (participants / votes) * 100 : 0);
                   }, 0) / polls.length) : 0}%
                 </p>
@@ -261,7 +261,7 @@ export default function PollAdmin() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {filteredPolls.map((poll) => {
           const daysLeft = getDaysLeft(poll.closesAt || poll.expiresAt || new Date().toISOString())
-          const participationRate = getParticipationRate(poll.totalVotes || 0, poll.participants || 0)
+          const participationRate = getParticipationRate(Number(poll.totalVotes || 0n), Number(poll.participants || 0n))
           
           return (
             <Card key={poll.id} className="hover:shadow-md transition-shadow">
@@ -297,11 +297,11 @@ export default function PollAdmin() {
                     <p className="text-xs text-gray-500">Options</p>
                   </div>
                   <div>
-                    <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">{poll.totalVotes || 0}</p>
+                    <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">{Number(poll.totalVotes || 0n)}</p>
                     <p className="text-xs text-gray-500">Votes</p>
                   </div>
                   <div>
-                    <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">{poll.participants || 0}</p>
+                    <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">{Number(poll.participants || 0n)}</p>
                     <p className="text-xs text-gray-500">Participants</p>
                   </div>
                 </div>
@@ -318,7 +318,7 @@ export default function PollAdmin() {
                 )}
 
                 {/* Participation Progress */}
-                {(poll.totalVotes || 0) > 0 && (
+                {Number(poll.totalVotes || 0n) > 0 && (
                   <div className="space-y-1">
                     <div className="flex justify-between text-xs">
                       <span className="text-gray-500">Participation Rate</span>

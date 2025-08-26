@@ -1,7 +1,6 @@
 {
   "name": "polls-surveys-frontend",
   "private": true,
-  "type": "module",
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",

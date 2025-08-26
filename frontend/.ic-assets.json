@@ -1,0 +1,20 @@
+[
+  {
+    "match": "**/*",
+    "headers": {
+      "cache-control": "public, max-age=31536000, immutable"
+    }
+  },
+  {
+    "match": "*.html",
+    "headers": {
+      "cache-control": "public, max-age=0, must-revalidate"
+    }
+  },
+  {
+    "match": "service-worker.js",
+    "headers": {
+      "cache-control": "public, max-age=0, must-revalidate"
+    }
+  }
+]
