@@ -9,6 +9,15 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useIcpAuth } from '@/components/IcpAuthProvider'
 
+// Helper function to convert ICP Status variant to string
+function statusToString(status: any): string {
+  if (!status) return 'unknown'
+  if (status.active !== undefined) return 'active'
+  if (status.closed !== undefined) return 'closed'
+  if (typeof status === 'string') return status
+  return 'unknown'
+}
+
 export default function SurveyAdmin() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
@@ -64,8 +73,9 @@ export default function SurveyAdmin() {
   const filteredSurveys = surveys.filter(survey => {
     const matchesSearch = survey.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          survey.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         survey.project.toLowerCase().includes(searchQuery.toLowerCase())
-    const matchesStatus = statusFilter === 'all' || survey.status === statusFilter
+                         (survey.project || '').toLowerCase().includes(searchQuery.toLowerCase())
+    const surveyStatusString = statusToString(survey.status)
+    const matchesStatus = statusFilter === 'all' || surveyStatusString === statusFilter
     return matchesSearch && matchesStatus
   })
 
@@ -130,7 +140,7 @@ export default function SurveyAdmin() {
               <div>
                 <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active</p>
                 <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
-                  {surveys.filter(s => s.status === 'active').length}
+                  {surveys.filter(s => statusToString(s.status) === 'active').length}
                 </p>
               </div>
               <div className="w-8 h-8 bg-green-100 rounded-lg flex items-center justify-center">
@@ -240,8 +250,8 @@ export default function SurveyAdmin() {
                 </Button>
               </div>
               <div className="flex items-center gap-2">
-                <Badge className={`w-fit ${getStatusColor(survey.status)}`}>
-                  {survey.status}
+                <Badge className={`w-fit ${getStatusColor(statusToString(survey.status))}`}>
+                  {statusToString(survey.status)}
                 </Badge>
                 <Badge variant="outline" className="text-xs">
                   {survey.project}
