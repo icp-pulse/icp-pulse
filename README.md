@@ -1,7 +1,7 @@
 # TruePulse – Decentralized Polls & Surveys on ICP
 
-[Demo](https://utkw6-eyaaa-aaaao-a4o7a-cai.icp0.io/)
-[Pitchdeck](https://www.canva.com/design/DAGxLqA2h3U/5uTAN5rb1lzDqD7qiNl5Yg/view?utm_content=DAGxLqA2h3U&utm_campaign=designshare&utm_medium=link2&utm_source=uniquelinks&utlId=ha53a44d899)
+* [Demo](https://utkw6-eyaaa-aaaao-a4o7a-cai.icp0.io/)
+* [Pitchdeck](https://www.canva.com/design/DAGxLqA2h3U/5uTAN5rb1lzDqD7qiNl5Yg/view?utm_content=DAGxLqA2h3U&utm_campaign=designshare&utm_medium=link2&utm_source=uniquelinks&utlId=ha53a44d899)
 
 
 ## 🚀 Project Summary
