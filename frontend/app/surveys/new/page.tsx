@@ -31,6 +31,10 @@ const schema = z.object({
   closesAt: z.string().min(1, 'Please set a closing date'),
   allowAnonymous: z.boolean().default(false),
   questions: z.array(questionSchema).min(1, 'At least one question is required'),
+  // Funding fields
+  fundingEnabled: z.boolean().default(false),
+  totalFundICP: z.number().min(0).optional(),
+  rewardPerResponse: z.number().min(0).optional(),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -53,7 +57,7 @@ async function createSurveyAction(values: FormValues, identity: any) {
   const backend = await createBackendWithIdentity({ canisterId, host, identity })
   
   // Convert form values to backend format
-  const { title, description, projectId, closesAt, allowAnonymous, questions } = values
+  const { title, description, projectId, closesAt, allowAnonymous, questions, fundingEnabled, totalFundICP, rewardPerResponse } = values
   
   const closesAtNs = new Date(closesAt).getTime() * 1_000_000
   
@@ -78,15 +82,21 @@ async function createSurveyAction(values: FormValues, identity: any) {
     typeof value === 'bigint' ? value.toString() : value, 2))
   
   try {
+    // Calculate funding parameters
+    const rewardFundLegacy = fundingEnabled ? Math.floor((totalFundICP || 0) * 100) : 0 // Convert decimal to integer (cents)
+    const rewardPerResponseE8s = fundingEnabled && rewardPerResponse ? BigInt(Math.floor(rewardPerResponse * 100_000_000)) : null
+    
     const surveyId = await backend.create_survey(
       'project',
       BigInt(projectId),
       title,
       description,
       BigInt(closesAtNs),
-      BigInt(0), // rewardFund
+      BigInt(rewardFundLegacy), // legacy rewardFund for backward compatibility
       allowAnonymous,
-      backendQuestions as any
+      backendQuestions as any,
+      fundingEnabled,
+      rewardPerResponseE8s ? [rewardPerResponseE8s] : [] // Optional parameter as array
     )
     
     return { success: true, surveyId }
@@ -112,7 +122,10 @@ export default function NewSurveyPage() {
         required: true,
         choices: [],
         helpText: ''
-      }]
+      }],
+      fundingEnabled: false,
+      totalFundICP: 0,
+      rewardPerResponse: 0,
     }
   })
 
@@ -177,6 +190,11 @@ export default function NewSurveyPage() {
   const requiresMinMax = (type: string) => {
     return ['likert', 'number', 'rating'].includes(type)
   }
+
+  const fundingEnabled = watch('fundingEnabled')
+  const totalFundICP = watch('totalFundICP') || 0
+  const rewardPerResponse = watch('rewardPerResponse') || 0
+  const maxResponses = rewardPerResponse > 0 ? Math.floor(totalFundICP / rewardPerResponse) : 0
 
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6">
@@ -275,6 +293,88 @@ export default function NewSurveyPage() {
                 Allow anonymous responses
               </label>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Funding Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Funding & Rewards</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="fundingEnabled"
+                {...register('fundingEnabled')}
+                className="rounded border-gray-300"
+              />
+              <label htmlFor="fundingEnabled" className="text-sm font-medium">
+                Enable ICP rewards for responses
+              </label>
+            </div>
+            
+            {fundingEnabled && (
+              <div className="space-y-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Total Fund (ICP)</label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      {...register('totalFundICP', { valueAsNumber: true })}
+                      placeholder="10.00"
+                      className="w-full"
+                    />
+                    {errors.totalFundICP && <p className="text-sm text-red-600 mt-1">{errors.totalFundICP.message}</p>}
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Reward per Response (ICP)</label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      {...register('rewardPerResponse', { valueAsNumber: true })}
+                      placeholder="0.50"
+                      className="w-full"
+                    />
+                    {errors.rewardPerResponse && <p className="text-sm text-red-600 mt-1">{errors.rewardPerResponse.message}</p>}
+                  </div>
+                </div>
+                
+                {totalFundICP > 0 && rewardPerResponse > 0 && (
+                  <div className="bg-white dark:bg-gray-800 p-3 rounded border">
+                    <h4 className="font-medium text-sm mb-2">Funding Summary</h4>
+                    <div className="text-sm space-y-1">
+                      <div className="flex justify-between">
+                        <span>Total Fund:</span>
+                        <span className="font-mono">{totalFundICP.toFixed(2)} ICP</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Reward per Response:</span>
+                        <span className="font-mono">{rewardPerResponse.toFixed(2)} ICP</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Max Funded Responses:</span>
+                        <span className="font-mono">{maxResponses}</span>
+                      </div>
+                      <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400">
+                        <span>Total in e8s:</span>
+                        <span className="font-mono">{Math.floor(totalFundICP * 100_000_000).toLocaleString()}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="text-xs text-gray-600 dark:text-gray-400">
+                  <p>• Participants will receive ICP rewards directly to their wallets upon survey completion</p>
+                  <p>• Rewards are distributed automatically from your funded amount</p>
+                  <p>• Once the fund is depleted, no more rewards will be given</p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 

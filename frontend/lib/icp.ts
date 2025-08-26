@@ -1,5 +1,5 @@
 import { Actor, HttpAgent, type Identity } from '@dfinity/agent'
-import { idlFactory as backendIDL } from './polls_surveys_backend.idl'
+import { idlFactory as backendIDL } from '../../src/declarations/polls_surveys_backend'
 
 export type CanisterConfig = { canisterId: string; host?: string }
 
@@ -22,7 +22,7 @@ export async function createBackend({ canisterId, host }: CanisterConfig) {
     }
   }
   
-  return Actor.createActor(backendIDL as any, { agent, canisterId }) as unknown as import('./types').BackendService
+  return Actor.createActor(backendIDL as any, { agent, canisterId }) as unknown as import('../../src/declarations/polls_surveys_backend/polls_surveys_backend.did')._SERVICE
 }
 
 export async function createBackendWithIdentity({ canisterId, host, identity }: CanisterConfig & { identity: Identity }) {
@@ -43,5 +43,5 @@ export async function createBackendWithIdentity({ canisterId, host, identity }: 
     }
   }
   
-  return Actor.createActor(backendIDL as any, { agent, canisterId }) as unknown as import('./types').BackendService
+  return Actor.createActor(backendIDL as any, { agent, canisterId }) as unknown as import('../../src/declarations/polls_surveys_backend/polls_surveys_backend.did')._SERVICE
 }

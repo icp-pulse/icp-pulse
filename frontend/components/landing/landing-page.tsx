@@ -4,6 +4,7 @@ import { ScrollReveal } from './scroll-reveal'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import Link from 'next/link'
 import { 
   Vote, 
   FileText, 
@@ -18,7 +19,8 @@ import {
   ArrowRight,
   Github,
   Twitter,
-  Linkedin
+  Linkedin,
+  Settings
 } from 'lucide-react'
 
 export function LandingPage() {
@@ -43,13 +45,17 @@ export function LandingPage() {
               that adapt to your organization&apos;s needs, all powered by blockchain technology.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Button size="lg" className="px-8 py-3 text-lg">
-                Get Started Free
-                <ArrowRight className="ml-2 w-5 h-5" />
-              </Button>
-              <Button variant="outline" size="lg" className="px-8 py-3 text-lg">
-                View Demo
-              </Button>
+              <Link href="/projects">
+                <Button size="lg" className="px-8 py-3 text-lg w-full sm:w-auto">
+                  Explore Projects
+                  <ArrowRight className="ml-2 w-5 h-5" />
+                </Button>
+              </Link>
+              <Link href="/admin">
+                <Button variant="outline" size="lg" className="px-8 py-3 text-lg w-full sm:w-auto">
+                  Admin Dashboard
+                </Button>
+              </Link>
             </div>
           </ScrollReveal>
           
@@ -83,9 +89,160 @@ export function LandingPage() {
             </div>
           </ScrollReveal>
 
-          <ScrollReveal delay={300} className="mt-8 text-center">
+          {/* Quick Navigation */}
+          <ScrollReveal delay={400} className="mt-12">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
+              <Link href="/projects">
+                <Card className="hover:shadow-lg transition-all cursor-pointer group">
+                  <CardContent className="p-6 text-center">
+                    <FolderOpen className="w-8 h-8 text-blue-600 mx-auto mb-3 group-hover:scale-110 transition-transform" />
+                    <h3 className="font-semibold mb-2">Browse Projects</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">View all projects and their surveys</p>
+                  </CardContent>
+                </Card>
+              </Link>
+              
+              <Link href="/surveys">
+                <Card className="hover:shadow-lg transition-all cursor-pointer group">
+                  <CardContent className="p-6 text-center">
+                    <FileText className="w-8 h-8 text-purple-600 mx-auto mb-3 group-hover:scale-110 transition-transform" />
+                    <h3 className="font-semibold mb-2">View Surveys</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Participate in active surveys</p>
+                  </CardContent>
+                </Card>
+              </Link>
+              
+              <Link href="/polls">
+                <Card className="hover:shadow-lg transition-all cursor-pointer group">
+                  <CardContent className="p-6 text-center">
+                    <Vote className="w-8 h-8 text-green-600 mx-auto mb-3 group-hover:scale-110 transition-transform" />
+                    <h3 className="font-semibold mb-2">Quick Polls</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Vote on current polls</p>
+                  </CardContent>
+                </Card>
+              </Link>
+              
+              <Link href="/admin">
+                <Card className="hover:shadow-lg transition-all cursor-pointer group">
+                  <CardContent className="p-6 text-center">
+                    <Settings className="w-8 h-8 text-orange-600 mx-auto mb-3 group-hover:scale-110 transition-transform" />
+                    <h3 className="font-semibold mb-2">Admin Panel</h3>
+                    <p className="text-sm text-gray-600 dark:text-gray-400">Manage your content</p>
+                  </CardContent>
+                </Card>
+              </Link>
+            </div>
+          </ScrollReveal>
+
+          <ScrollReveal delay={500} className="mt-12 text-center">
             <ChevronDown className="w-8 h-8 text-gray-400 mx-auto animate-bounce" />
           </ScrollReveal>
+        </div>
+      </section>
+
+      {/* Getting Started Section */}
+      <section className="py-16 bg-white dark:bg-gray-900">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <ScrollReveal className="text-center mb-12">
+            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">
+              Start Exploring Now
+            </h2>
+            <p className="text-xl text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
+              Choose your path to get started with context-aware feedback collection
+            </p>
+          </ScrollReveal>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            <ScrollReveal delay={100}>
+              <Card className="text-center p-8 hover:shadow-xl transition-all border-2 border-transparent hover:border-blue-200">
+                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Users className="w-8 h-8 text-blue-600" />
+                </div>
+                <h3 className="text-xl font-semibold mb-4">I&apos;m a Participant</h3>
+                <p className="text-gray-600 dark:text-gray-300 mb-6">
+                  Looking to respond to surveys or vote on polls? Browse available content and contribute your feedback.
+                </p>
+                <div className="space-y-3">
+                  <Link href="/projects" className="block">
+                    <Button variant="outline" className="w-full">
+                      <FolderOpen className="w-4 h-4 mr-2" />
+                      Browse Projects
+                    </Button>
+                  </Link>
+                  <Link href="/surveys" className="block">
+                    <Button variant="outline" className="w-full">
+                      <FileText className="w-4 h-4 mr-2" />
+                      Take Surveys
+                    </Button>
+                  </Link>
+                  <Link href="/polls" className="block">
+                    <Button variant="outline" className="w-full">
+                      <Vote className="w-4 h-4 mr-2" />
+                      Vote on Polls
+                    </Button>
+                  </Link>
+                </div>
+              </Card>
+            </ScrollReveal>
+
+            <ScrollReveal delay={200}>
+              <Card className="text-center p-8 hover:shadow-xl transition-all border-2 border-transparent hover:border-purple-200">
+                <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <BarChart3 className="w-8 h-8 text-purple-600" />
+                </div>
+                <h3 className="text-xl font-semibold mb-4">I&apos;m a Creator</h3>
+                <p className="text-gray-600 dark:text-gray-300 mb-6">
+                  Ready to create surveys and polls? Start by setting up a project to organize your feedback collection.
+                </p>
+                <div className="space-y-3">
+                  <Link href="/projects/new" className="block">
+                    <Button variant="outline" className="w-full">
+                      <FolderOpen className="w-4 h-4 mr-2" />
+                      Create Project
+                    </Button>
+                  </Link>
+                  <Link href="/surveys/new" className="block">
+                    <Button variant="outline" className="w-full">
+                      <FileText className="w-4 h-4 mr-2" />
+                      New Survey
+                    </Button>
+                  </Link>
+                  <Link href="/polls/new" className="block">
+                    <Button variant="outline" className="w-full">
+                      <Vote className="w-4 h-4 mr-2" />
+                      New Poll
+                    </Button>
+                  </Link>
+                </div>
+              </Card>
+            </ScrollReveal>
+
+            <ScrollReveal delay={300}>
+              <Card className="text-center p-8 hover:shadow-xl transition-all border-2 border-transparent hover:border-green-200">
+                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                  <Settings className="w-8 h-8 text-green-600" />
+                </div>
+                <h3 className="text-xl font-semibold mb-4">I&apos;m an Admin</h3>
+                <p className="text-gray-600 dark:text-gray-300 mb-6">
+                  Managing content and analyzing results? Access your dashboard to oversee all projects, surveys, and polls.
+                </p>
+                <div className="space-y-3">
+                  <Link href="/admin" className="block">
+                    <Button variant="outline" className="w-full">
+                      <Settings className="w-4 h-4 mr-2" />
+                      Admin Dashboard
+                    </Button>
+                  </Link>
+                  <Link href="/admin?tab=projects" className="block">
+                    <Button variant="outline" className="w-full">
+                      <BarChart3 className="w-4 h-4 mr-2" />
+                      View Analytics
+                    </Button>
+                  </Link>
+                </div>
+              </Card>
+            </ScrollReveal>
+          </div>
         </div>
       </section>
 
@@ -187,10 +344,12 @@ export function LandingPage() {
                       </li>
                     ))}
                   </ul>
-                  <Button className="mt-8">
-                    Explore Projects
-                    <ArrowRight className="ml-2 w-4 h-4" />
-                  </Button>
+                  <Link href="/projects">
+                    <Button className="mt-8">
+                      Explore Projects
+                      <ArrowRight className="ml-2 w-4 h-4" />
+                    </Button>
+                  </Link>
                 </div>
                 <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6">
                   <div className="space-y-4">
@@ -404,13 +563,17 @@ export function LandingPage() {
                 and make data-driven decisions.
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Button size="lg" variant="secondary" className="px-8 py-3 text-lg">
-                  Start Free Trial
-                  <ArrowRight className="ml-2 w-5 h-5" />
-                </Button>
-                <Button size="lg" variant="outline" className="px-8 py-3 text-lg border-white text-white hover:bg-white hover:text-blue-600">
-                  Contact Sales
-                </Button>
+                <Link href="/projects/new">
+                  <Button size="lg" variant="secondary" className="px-8 py-3 text-lg w-full sm:w-auto">
+                    Create Your First Project
+                    <ArrowRight className="ml-2 w-5 h-5" />
+                  </Button>
+                </Link>
+                <Link href="/admin">
+                  <Button size="lg" variant="outline" className="px-8 py-3 text-lg border-white text-white hover:bg-white hover:text-blue-600 w-full sm:w-auto">
+                    View Dashboard
+                  </Button>
+                </Link>
               </div>
             </div>
           </ScrollReveal>
@@ -434,7 +597,7 @@ export function LandingPage() {
               {
                 name: 'East',
                 role: 'Co-founder',
-                bio: 'Jonathan co-founded TruePulse and brings over 20 years of experience in project management, software development, and technology advisory across industries including heavy construction machinery, fintech, loan appraisals, insurance, and energy. He leads the design and development of TruePulse’s user interface, creating seamless dashboards that make creating and responding to polls effortless.',
+                bio: 'East co-founded TruePulse and brings over 20 years of experience in project management, software development, and technology advisory across industries including heavy construction machinery, fintech, loan appraisals, insurance, and energy. He leads the design and development of TruePulse’s user interface, creating seamless dashboards that make creating and responding to polls effortless.',
                 avatar: 'E'
               },
               {
@@ -470,7 +633,7 @@ export function LandingPage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div className="md:col-span-2">
-              <h3 className="text-2xl font-bold mb-4">ICP Polls & Surveys</h3>
+              <h3 className="text-2xl font-bold mb-4">ICP Pulse</h3>
               <p className="text-gray-400 mb-6">
                 Context-aware feedback collection platform built on the Internet Computer Protocol. 
                 Secure, transparent, and user-owned data.
@@ -511,7 +674,7 @@ export function LandingPage() {
           
           <div className="border-t border-gray-800 mt-8 pt-8 flex flex-col md:flex-row justify-between items-center">
             <p className="text-gray-400 text-sm">
-              © 2024 ICP Polls & Surveys. All rights reserved.
+              © 2025 ICP Pulse. All rights reserved.
             </p>
             <p className="text-gray-400 text-sm mt-2 md:mt-0">
               Built on Internet Computer Protocol 🚀

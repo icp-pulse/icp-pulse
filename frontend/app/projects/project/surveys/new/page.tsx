@@ -44,7 +44,7 @@ export default function NewSurveyPage({ params }: { params: { slug: string } }) 
         const backend = await createBackend({ canisterId, host })
         
         const projects = await backend.list_projects(0n, 100n)
-        const foundProject = projects.find(p => p.slug === params.slug)
+        const foundProject = projects.find((p: any) => p.slug === params.slug)
         
         if (!foundProject) {
           setError('Project not found')
@@ -118,14 +118,14 @@ export default function NewSurveyPage({ params }: { params: { slug: string } }) 
       
       // Prepare questions for backend - using Candid optional format
       const backendQuestions = questions.map(q => ({
-        type_: q.type as string,
+        qType: q.type as string,
         text: q.text,
         required: q.required,
         choices: q.choices?.length ? [q.choices] : [],
         min: q.min !== undefined ? [BigInt(q.min)] : [],
         max: q.max !== undefined ? [BigInt(q.max)] : [],
         helpText: q.helpText?.trim() ? [q.helpText.trim()] : []
-      })) as { type_: string; text: string; required: boolean; choices: [] | [string[]]; min: [] | [bigint]; max: [] | [bigint]; helpText: [] | [string]; }[]
+      })) as { qType: string; text: string; required: boolean; choices: [] | [string[]]; min: [] | [bigint]; max: [] | [bigint]; helpText: [] | [string]; }[]
       
       console.log('Sending survey data:', {
         scopeType: 'project',
@@ -144,9 +144,11 @@ export default function NewSurveyPage({ params }: { params: { slug: string } }) 
         title,
         description,
         closesAtNs,
-        BigInt(rewardFund),
+        BigInt(Math.floor(parseFloat(rewardFund || '0') * 100)), // Convert decimal to cents
         allowAnonymous,
-        backendQuestions
+        backendQuestions,
+        false, // fundingEnabled - default to false for this old form
+        [] // rewardPerResponse - empty optional
       )
       
       console.log('Survey created with ID:', surveyId)
@@ -258,10 +260,11 @@ export default function NewSurveyPage({ params }: { params: { slug: string } }) 
                 <Input
                   id="rewardFund"
                   type="number"
+                  step="0.01"
                   min="0"
                   value={rewardFund}
                   onChange={(e) => setRewardFund(e.target.value)}
-                  placeholder="0"
+                  placeholder="0.00"
                 />
               </div>
             </div>

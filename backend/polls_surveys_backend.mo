@@ -2,6 +2,7 @@ import Array "mo:base/Array";
 import Blob "mo:base/Blob";
 import Bool "mo:base/Bool";
 import Nat "mo:base/Nat";
+import Nat64 "mo:base/Nat64";
 import Int "mo:base/Int";
 import Principal "mo:base/Principal";
 import Text "mo:base/Text";
@@ -15,6 +16,14 @@ persistent actor class polls_surveys_backend() = this {
   type SurveyId = Nat;
 
   type Status = { #active; #closed };
+
+  type FundingInfo = {
+    totalFund: Nat64;        // Total ICP in e8s
+    rewardPerResponse: Nat64; // ICP per valid response in e8s
+    maxResponses: Nat;       // Maximum funded responses
+    currentResponses: Nat;   // Current response count
+    remainingFund: Nat64;    // Remaining ICP balance in e8s
+  };
   type ScopeType = { #project; #product };
 
   type Project = {
@@ -56,7 +65,8 @@ persistent actor class polls_surveys_backend() = this {
     closesAt : Int;
     status : Status;
     totalVotes : Nat;
-    rewardFund : Nat;
+    rewardFund : Nat;  // Keep for backward compatibility
+    fundingInfo : ?FundingInfo;
     voterPrincipals : [Principal];
   };
 
@@ -85,7 +95,8 @@ persistent actor class polls_surveys_backend() = this {
     createdAt : Int;
     closesAt : Int;
     status : Status;
-    rewardFund : Nat;
+    rewardFund : Nat;  // Keep for backward compatibility
+    fundingInfo : ?FundingInfo;
     allowAnonymous : Bool;
     questions : [Question];
     submissionsCount : Nat;
@@ -218,12 +229,22 @@ persistent actor class polls_surveys_backend() = this {
   };
 
   // Polls
-  public shared (msg) func create_poll(scopeType : Text, scopeId : Nat, title : Text, description : Text, options : [Text], closesAt : Int, rewardFund : Nat) : async PollId {
+  public shared (msg) func create_poll(scopeType : Text, scopeId : Nat, title : Text, description : Text, options : [Text], closesAt : Int, rewardFund : Nat, fundingEnabled : Bool, rewardPerVote : ?Nat64) : async PollId {
     assert(options.size() >= 2);
     assert(closesAt > now());
     let id = nextPollId; nextPollId += 1;
     let opts = Array.tabulate<OptionT>(options.size(), func i { { id = i; text = options[i]; votes = 0 } });
-    let poll : Poll = { id = id; scopeType = toScopeType(scopeType); scopeId = scopeId; title = title; description = description; options = opts; createdBy = msg.caller; createdAt = now(); closesAt = closesAt; status = #active; totalVotes = 0; rewardFund = rewardFund; voterPrincipals = [] };
+    let fundingInfo = if (fundingEnabled) {
+      switch (rewardPerVote) {
+        case (?reward) {
+          let totalFund = Nat64.fromNat(rewardFund) * 1_000_000; // Convert cents to e8s (rewardFund is in cents, so multiply by 1M instead of 100M)
+          let maxResponses = if (reward > 0) { Nat64.toNat(totalFund / reward) } else { 0 };
+          ?{ totalFund = totalFund; rewardPerResponse = reward; maxResponses = maxResponses; currentResponses = 0; remainingFund = totalFund }
+        };
+        case null { null }
+      }
+    } else { null };
+    let poll : Poll = { id = id; scopeType = toScopeType(scopeType); scopeId = scopeId; title = title; description = description; options = opts; createdBy = msg.caller; createdAt = now(); closesAt = closesAt; status = #active; totalVotes = 0; rewardFund = rewardFund; fundingInfo = fundingInfo; voterPrincipals = [] };
     polls := Array.append(polls, [poll]);
     id
   };
@@ -269,7 +290,16 @@ persistent actor class polls_surveys_backend() = this {
               if (j == optionId) { { id = o.id; text = o.text; votes = o.votes + 1 } } else { o }
             });
             ok := true;
-            { p with options = updatedOptions; totalVotes = p.totalVotes + 1; voterPrincipals = Array.append(p.voterPrincipals, [msg.caller]) }
+            // Update funding info if enabled
+            let updatedFunding = switch (p.fundingInfo) {
+              case (?funding) {
+                if (funding.currentResponses < funding.maxResponses) {
+                  ?{ funding with currentResponses = funding.currentResponses + 1; remainingFund = funding.remainingFund - funding.rewardPerResponse }
+                } else { ?funding }
+              };
+              case null { null }
+            };
+            { p with options = updatedOptions; totalVotes = p.totalVotes + 1; voterPrincipals = Array.append(p.voterPrincipals, [msg.caller]); fundingInfo = updatedFunding }
           }
         }
       } else { p }
@@ -287,7 +317,7 @@ persistent actor class polls_surveys_backend() = this {
   };
 
   // Surveys
-  public shared (msg) func create_survey(scopeType : Text, scopeId : Nat, title : Text, description : Text, closesAt : Int, rewardFund : Nat, allowAnonymous : Bool, questions : [QuestionInput]) : async SurveyId {
+  public shared (msg) func create_survey(scopeType : Text, scopeId : Nat, title : Text, description : Text, closesAt : Int, rewardFund : Nat, allowAnonymous : Bool, questions : [QuestionInput], fundingEnabled : Bool, rewardPerResponse : ?Nat64) : async SurveyId {
     assert(questions.size() >= 1);
     assert(closesAt > now());
     let id = nextSurveyId; nextSurveyId += 1;
@@ -295,7 +325,17 @@ persistent actor class polls_surveys_backend() = this {
       let qi = questions[i];
       { id = i; qType = toQuestionType(qi.qType); text = qi.text; required = qi.required; choices = qi.choices; min = qi.min; max = qi.max; helpText = qi.helpText }
     });
-    let survey : Survey = { id = id; scopeType = toScopeType(scopeType); scopeId = scopeId; title = title; description = description; createdBy = msg.caller; createdAt = now(); closesAt = closesAt; status = #active; rewardFund = rewardFund; allowAnonymous = allowAnonymous; questions = qs; submissionsCount = 0 };
+    let fundingInfo = if (fundingEnabled) {
+      switch (rewardPerResponse) {
+        case (?reward) {
+          let totalFund = Nat64.fromNat(rewardFund) * 1_000_000; // Convert cents to e8s (rewardFund is in cents, so multiply by 1M instead of 100M)
+          let maxResponses = if (reward > 0) { Nat64.toNat(totalFund / reward) } else { 0 };
+          ?{ totalFund = totalFund; rewardPerResponse = reward; maxResponses = maxResponses; currentResponses = 0; remainingFund = totalFund }
+        };
+        case null { null }
+      }
+    } else { null };
+    let survey : Survey = { id = id; scopeType = toScopeType(scopeType); scopeId = scopeId; title = title; description = description; createdBy = msg.caller; createdAt = now(); closesAt = closesAt; status = #active; rewardFund = rewardFund; fundingInfo = fundingInfo; allowAnonymous = allowAnonymous; questions = qs; submissionsCount = 0 };
     surveys := Array.append(surveys, [survey]);
     id
   };
@@ -400,7 +440,16 @@ persistent actor class polls_surveys_backend() = this {
             };
             submissions := Array.append(submissions, [newSub]);
             ok := true;
-            { s with submissionsCount = s.submissionsCount + 1 }
+            // Update funding info if enabled
+            let updatedFunding = switch (s.fundingInfo) {
+              case (?funding) {
+                if (funding.currentResponses < funding.maxResponses) {
+                  ?{ funding with currentResponses = funding.currentResponses + 1; remainingFund = funding.remainingFund - funding.rewardPerResponse }
+                } else { ?funding }
+              };
+              case null { null }
+            };
+            { s with submissionsCount = s.submissionsCount + 1; fundingInfo = updatedFunding }
           }
         }
       } else { s }
