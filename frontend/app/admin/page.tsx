@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Sidebar from '@/components/layout/sidebar'
 import { TopHeader } from '@/components/layout/top-header'
@@ -17,7 +17,7 @@ const tabConfigs: Record<TabType, { title: string; description: string }> = {
   polls: { title: 'Poll Management', description: 'Create polls and view results' },
 }
 
-export default function AdminDashboardPage() {
+function AdminDashboardContent() {
   const searchParams = useSearchParams()
   const [activeTab, setActiveTab] = useState<TabType>('projects')
 
@@ -55,5 +55,13 @@ export default function AdminDashboardPage() {
         </main>
       </div>
     </div>
+  )
+}
+
+export default function AdminDashboardPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <AdminDashboardContent />
+    </Suspense>
   )
 }

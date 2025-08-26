@@ -116,7 +116,7 @@ export default function PollResults() {
               <span>5 min ago</span>
             </div>
             <div className="flex items-center justify-between">
-              <span>Milestone: {Math.floor(featuredPoll.totalVotes / 50) * 50} votes reached</span>
+              <span>Milestone: {Math.floor((featuredPoll.totalVotes || 0) / 50) * 50} votes reached</span>
               <span>1 hour ago</span>
             </div>
           </div>

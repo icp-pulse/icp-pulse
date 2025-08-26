@@ -22,7 +22,7 @@ export async function createBackend({ canisterId, host }: CanisterConfig) {
     }
   }
   
-  return Actor.createActor(backendIDL, { agent, canisterId }) as unknown as import('./types').BackendService
+  return Actor.createActor(backendIDL as any, { agent, canisterId }) as unknown as import('./types').BackendService
 }
 
 export async function createBackendWithIdentity({ canisterId, host, identity }: CanisterConfig & { identity: Identity }) {
@@ -43,5 +43,5 @@ export async function createBackendWithIdentity({ canisterId, host, identity }: 
     }
   }
   
-  return Actor.createActor(backendIDL, { agent, canisterId }) as unknown as import('./types').BackendService
+  return Actor.createActor(backendIDL as any, { agent, canisterId }) as unknown as import('./types').BackendService
 }

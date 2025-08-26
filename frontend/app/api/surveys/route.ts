@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createBackend } from '@/lib/icp'
 
+export const runtime = 'nodejs'
+
 function nsToIso(ns: bigint | number): string {
   const n = typeof ns === 'number' ? BigInt(ns) : ns
   const ms = Number(n / 1_000_000n)
@@ -40,6 +42,7 @@ export async function GET(req: NextRequest) {
           const fullSurvey = await backend.get_survey(summary.id)
           if (fullSurvey && fullSurvey.length > 0) {
             const survey = fullSurvey[0]
+            if (!survey) continue
             surveys.push({
               id: Number(survey.id),
               title: survey.title,
@@ -48,7 +51,7 @@ export async function GET(req: NextRequest) {
               projectId: Number(survey.scopeId),
               createdBy: typeof survey.createdBy === 'string' 
                 ? survey.createdBy 
-                : survey.createdBy?.toString() || 'Unknown',
+                : (survey.createdBy as any)?.toString() || 'Unknown',
               createdAt: nsToIso(survey.createdAt),
               closesAt: nsToIso(survey.closesAt),
               submissionsCount: Number(survey.submissionsCount),
@@ -78,6 +81,7 @@ export async function GET(req: NextRequest) {
               const fullSurvey = await backend.get_survey(summary.id)
               if (fullSurvey && fullSurvey.length > 0) {
                 const survey = fullSurvey[0]
+                if (!survey) continue
                 surveys.push({
                   id: Number(survey.id),
                   title: survey.title,
@@ -86,7 +90,7 @@ export async function GET(req: NextRequest) {
                   projectId: Number(survey.scopeId),
                   createdBy: typeof survey.createdBy === 'string' 
                     ? survey.createdBy 
-                    : survey.createdBy?.toString() || 'Unknown',
+                    : (survey.createdBy as any)?.toString() || 'Unknown',
                   createdAt: nsToIso(survey.createdAt),
                   closesAt: nsToIso(survey.closesAt),
                   submissionsCount: Number(survey.submissionsCount),

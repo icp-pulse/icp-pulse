@@ -21,7 +21,7 @@ export default function PollCreator() {
   ]);
   const { toast } = useToast();
 
-  const form = useForm<InsertPoll>({
+  const form = useForm({
     resolver: zodResolver(insertPollSchema),
     defaultValues: {
       question: "",

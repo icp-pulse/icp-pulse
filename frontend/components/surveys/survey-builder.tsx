@@ -19,7 +19,7 @@ export default function SurveyBuilder() {
   const [questions, setQuestions] = useState<SurveyQuestion[]>([]);
   const { toast } = useToast();
 
-  const form = useForm<InsertSurvey>({
+  const form = useForm({
     resolver: zodResolver(insertSurveySchema),
     defaultValues: {
       title: "",

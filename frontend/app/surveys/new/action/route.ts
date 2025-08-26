@@ -57,14 +57,14 @@ export async function POST(req: NextRequest) {
     
     // Transform questions to backend format
     const backendQuestions = questions.map((q, index) => ({
-      type_: q.type,
+      type_: q.type as string,
       text: q.text,
       required: q.required,
-      choices: q.choices || [],
-      min: q.min ? BigInt(q.min) : undefined,
-      max: q.max ? BigInt(q.max) : undefined,
-      helpText: q.helpText || undefined,
-    }))
+      choices: q.choices?.length ? [q.choices] : [],
+      min: q.min !== undefined ? [BigInt(q.min)] : [],
+      max: q.max !== undefined ? [BigInt(q.max)] : [],
+      helpText: q.helpText?.trim() ? [q.helpText.trim()] : []
+    })) as { type_: string; text: string; required: boolean; choices: [] | [string[]]; min: [] | [bigint]; max: [] | [bigint]; helpText: [] | [string]; }[]
     
     // Create survey in backend
     const surveyId = await backend.create_survey(

@@ -1,6 +1,6 @@
 "use client"
 
-import { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { AuthClient } from '@dfinity/auth-client'
 import type { Identity } from '@dfinity/agent'
 
@@ -33,7 +33,7 @@ export function IcpAuthProvider({ children }: { children: React.ReactNode }) {
     })
   }, [])
 
-  const login = async (provider: 'ii' | 'nfid' = 'ii') => {
+  const login = useCallback(async (provider: 'ii' | 'nfid' = 'ii') => {
     if (!client) return
     const isLocal = process.env.NEXT_PUBLIC_DFX_NETWORK !== 'ic'
     const identityProvider = provider === 'nfid'
@@ -53,14 +53,14 @@ export function IcpAuthProvider({ children }: { children: React.ReactNode }) {
         }
       },
     })
-  }
+  }, [client])
 
-  const logout = async () => {
+  const logout = useCallback(async () => {
     if (!client) return
     await client.logout()
     setIdentity(null)
     setPrincipalText(null)
-  }
+  }, [client])
 
   const value: IcpAuthContextValue = useMemo(() => ({
     isAuthenticated: !!identity && !!principalText,
@@ -68,7 +68,7 @@ export function IcpAuthProvider({ children }: { children: React.ReactNode }) {
     identity,
     login,
     logout,
-  }), [identity, principalText])
+  }), [identity, principalText, login, logout])
 
   return (
     <IcpAuthContext.Provider value={value}>{children}</IcpAuthContext.Provider>

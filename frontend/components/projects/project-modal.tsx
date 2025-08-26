@@ -31,7 +31,7 @@ const owners = [
 export default function ProjectModal({ isOpen, onClose }: ProjectModalProps) {
   const { toast } = useToast();
 
-  const form = useForm<InsertProject>({
+  const form = useForm({
     resolver: zodResolver(insertProjectSchema),
     defaultValues: {
       name: "",

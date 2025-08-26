@@ -118,14 +118,14 @@ export default function NewSurveyPage({ params }: { params: { slug: string } }) 
       
       // Prepare questions for backend - using Candid optional format
       const backendQuestions = questions.map(q => ({
-        type_: q.type,
+        type_: q.type as string,
         text: q.text,
         required: q.required,
         choices: q.choices?.length ? [q.choices] : [],
         min: q.min !== undefined ? [BigInt(q.min)] : [],
         max: q.max !== undefined ? [BigInt(q.max)] : [],
         helpText: q.helpText?.trim() ? [q.helpText.trim()] : []
-      }))
+      })) as { type_: string; text: string; required: boolean; choices: [] | [string[]]; min: [] | [bigint]; max: [] | [bigint]; helpText: [] | [string]; }[]
       
       console.log('Sending survey data:', {
         scopeType: 'project',
@@ -293,7 +293,7 @@ export default function NewSurveyPage({ params }: { params: { slug: string } }) 
           <CardContent className="space-y-4">
             {questions.length === 0 ? (
               <p className="text-muted-foreground text-center py-8">
-                No questions added yet. Click "Add Question" to get started.
+                No questions added yet. Click &quot;Add Question&quot; to get started.
               </p>
             ) : (
               questions.map((question, index) => (
