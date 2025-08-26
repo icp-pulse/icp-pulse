@@ -6,6 +6,8 @@ const nextConfig = {
   images: {
     unoptimized: true
   },
+  // Allow dynamic routes with fallback
+  generateBuildId: () => 'build',
   // Remove server-side features for static export
   // experimental: {
   //   serverActions: {

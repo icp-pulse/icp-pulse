@@ -35,6 +35,13 @@ export default function NewSurveyPage({ params }: { params: { slug: string } }) 
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
+  // Get minimum datetime (current time + 1 minute)
+  const getMinDateTime = () => {
+    const now = new Date()
+    now.setMinutes(now.getMinutes() + 1) // Add 1 minute buffer
+    return now.toISOString().slice(0, 16) // Format for datetime-local input
+  }
+
   useEffect(() => {
     const loadProject = async () => {
       try {
@@ -44,7 +51,7 @@ export default function NewSurveyPage({ params }: { params: { slug: string } }) 
         const backend = await createBackend({ canisterId, host })
         
         const projects = await backend.list_projects(0n, 100n)
-        const foundProject = projects.find(p => p.slug === params.slug)
+        const foundProject = projects.find((p: any) => p.slug === params.slug)
         
         if (!foundProject) {
           setError('Project not found')
@@ -94,6 +101,16 @@ export default function NewSurveyPage({ params }: { params: { slug: string } }) 
       return
     }
 
+    // Validate closing date
+    if (closesAt) {
+      const closingDate = new Date(closesAt)
+      const now = new Date()
+      if (closingDate <= now) {
+        setError('Survey closing date must be in the future')
+        return
+      }
+    }
+
     // Validate questions
     const invalidQuestion = questions.find(q => 
       !q.text.trim() || 
@@ -114,18 +131,26 @@ export default function NewSurveyPage({ params }: { params: { slug: string } }) 
       const backend = await createBackend({ canisterId, host })
       
       // Convert datetime-local to nanoseconds timestamp
-      const closesAtNs = closesAt ? BigInt(new Date(closesAt).getTime() * 1_000_000) : BigInt(Date.now() + 30 * 24 * 60 * 60 * 1000) * BigInt(1_000_000) // Default to 30 days from now
+      let closesAtDate = closesAt ? new Date(closesAt) : new Date()
+      const now = new Date()
+      
+      // If no closesAt provided or it's in the past, set it to 30 days from now
+      if (!closesAt || closesAtDate <= now) {
+        closesAtDate = new Date(now.getTime() + (30 * 24 * 60 * 60 * 1000)) // 30 days from now
+      }
+      
+      const closesAtNs = BigInt(closesAtDate.getTime() * 1_000_000)
       
       // Prepare questions for backend - using Candid optional format
       const backendQuestions = questions.map(q => ({
-        type_: q.type as string,
+        qType: q.type as string,
         text: q.text,
         required: q.required,
         choices: q.choices?.length ? [q.choices] : [],
         min: q.min !== undefined ? [BigInt(q.min)] : [],
         max: q.max !== undefined ? [BigInt(q.max)] : [],
         helpText: q.helpText?.trim() ? [q.helpText.trim()] : []
-      })) as { type_: string; text: string; required: boolean; choices: [] | [string[]]; min: [] | [bigint]; max: [] | [bigint]; helpText: [] | [string]; }[]
+      })) as { qType: string; text: string; required: boolean; choices: [] | [string[]]; min: [] | [bigint]; max: [] | [bigint]; helpText: [] | [string]; }[]
       
       console.log('Sending survey data:', {
         scopeType: 'project',
@@ -144,9 +169,11 @@ export default function NewSurveyPage({ params }: { params: { slug: string } }) 
         title,
         description,
         closesAtNs,
-        BigInt(rewardFund),
+        BigInt(Math.floor(parseFloat(rewardFund || '0') * 100)), // Convert decimal to cents
         allowAnonymous,
-        backendQuestions
+        backendQuestions,
+        false, // fundingEnabled - default to false for this old form
+        [] // rewardPerResponse - empty optional
       )
       
       console.log('Survey created with ID:', surveyId)
@@ -246,9 +273,11 @@ export default function NewSurveyPage({ params }: { params: { slug: string } }) 
                 <Input
                   id="closesAt"
                   type="datetime-local"
+                  min={getMinDateTime()}
                   value={closesAt}
                   onChange={(e) => setClosesAt(e.target.value)}
                 />
+                <p className="text-xs text-gray-500 mt-1">Survey must close in the future</p>
               </div>
               
               <div>
@@ -258,10 +287,11 @@ export default function NewSurveyPage({ params }: { params: { slug: string } }) 
                 <Input
                   id="rewardFund"
                   type="number"
+                  step="0.01"
                   min="0"
                   value={rewardFund}
                   onChange={(e) => setRewardFund(e.target.value)}
-                  placeholder="0"
+                  placeholder="0.00"
                 />
               </div>
             </div>

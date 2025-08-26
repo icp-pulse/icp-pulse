@@ -22,10 +22,19 @@ const schema = z.object({
   title: z.string().min(2, 'Title must be at least 2 characters'),
   description: z.string().min(2, 'Description must be at least 2 characters'),
   projectId: z.string().min(1, 'Please select a project'),
-  expiresAt: z.string().min(1, 'Please set an expiry date'),
+  expiresAt: z.string().min(1, 'Please set an expiry date').refine((dateStr) => {
+    if (!dateStr) return false
+    const selectedDate = new Date(dateStr)
+    const now = new Date()
+    return selectedDate > now
+  }, 'Expiry date must be in the future'),
   allowAnonymous: z.boolean().default(false),
   allowMultiple: z.boolean().default(false),
   options: z.array(optionSchema).min(2, 'At least two options are required'),
+  // Funding fields
+  fundingEnabled: z.boolean().default(false),
+  totalFundICP: z.number().min(0).optional(),
+  rewardPerVote: z.number().min(0).optional(),
 })
 
 type FormValues = z.infer<typeof schema>
@@ -48,12 +57,26 @@ async function createPollAction(values: FormValues, identity: any) {
   const backend = await createBackendWithIdentity({ canisterId, host, identity })
   
   // Convert form values to backend format
-  const { title, description, projectId, expiresAt, allowAnonymous, allowMultiple, options } = values
+  const { title, description, projectId, expiresAt, allowAnonymous, allowMultiple, options, fundingEnabled, totalFundICP, rewardPerVote } = values
   
   const backendOptions = options.map(opt => opt.text)
-  const expiresAtNs = new Date(expiresAt).getTime() * 1_000_000
+  
+  // Convert to nanoseconds and ensure it's in the future
+  const expiresAtDate = new Date(expiresAt)
+  const now = new Date()
+  
+  // If no expiresAt provided or it's in the past, set it to 7 days from now
+  if (!expiresAt || expiresAtDate <= now) {
+    expiresAtDate.setTime(now.getTime() + (7 * 24 * 60 * 60 * 1000)) // 7 days from now
+  }
+  
+  const expiresAtNs = expiresAtDate.getTime() * 1_000_000
   
   try {
+    // Calculate funding parameters
+    const rewardFundLegacy = fundingEnabled ? Math.floor((totalFundICP || 0) * 100) : 0 // Convert decimal to integer (cents)
+    const rewardPerVoteE8s = fundingEnabled && rewardPerVote ? BigInt(Math.floor(rewardPerVote * 100_000_000)) : null
+    
     const pollId = await backend.create_poll(
       'project',
       BigInt(projectId),
@@ -61,7 +84,9 @@ async function createPollAction(values: FormValues, identity: any) {
       description,
       backendOptions,
       BigInt(expiresAtNs),
-      BigInt(0) // rewardFund
+      BigInt(rewardFundLegacy), // legacy rewardFund for backward compatibility
+      fundingEnabled,
+      rewardPerVoteE8s ? [rewardPerVoteE8s] : [] // Optional parameter as array
     )
     
     return { success: true, pollId }
@@ -77,14 +102,24 @@ export default function NewPollPage() {
   const [projects, setProjects] = useState<Project[]>([])
   const { identity } = useIcpAuth()
   const router = useRouter()
+  
+  // Get minimum datetime (current time + 1 minute)
+  const getMinDateTime = () => {
+    const now = new Date()
+    now.setMinutes(now.getMinutes() + 1) // Add 1 minute buffer
+    return now.toISOString().slice(0, 16) // Format for datetime-local input
+  }
 
-  const { register, handleSubmit, formState: { errors }, control, setValue } = useForm({
+  const { register, handleSubmit, formState: { errors }, control, setValue, watch } = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
       options: [
         { text: '' },
         { text: '' }
-      ]
+      ],
+      fundingEnabled: false,
+      totalFundICP: 0,
+      rewardPerVote: 0,
     }
   })
 
@@ -122,6 +157,11 @@ export default function NewPollPage() {
       remove(index)
     }
   }
+
+  const fundingEnabled = watch('fundingEnabled')
+  const totalFundICP = watch('totalFundICP') || 0
+  const rewardPerVote = watch('rewardPerVote') || 0
+  const maxVotes = rewardPerVote > 0 ? Math.floor(totalFundICP / rewardPerVote) : 0
 
   return (
     <div className="max-w-4xl mx-auto p-6 space-y-6">
@@ -202,10 +242,12 @@ export default function NewPollPage() {
                 <label className="block text-sm font-medium mb-2">Expires At</label>
                 <Input 
                   type="datetime-local"
+                  min={getMinDateTime()}
                   {...register('expiresAt')} 
                   className="w-full"
                 />
                 {errors.expiresAt && <p className="text-sm text-red-600 mt-1">{errors.expiresAt.message}</p>}
+                <p className="text-xs text-gray-500 mt-1">Poll must expire in the future</p>
               </div>
             </div>
 
@@ -234,6 +276,88 @@ export default function NewPollPage() {
                 </label>
               </div>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Funding Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Funding & Rewards</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <input
+                type="checkbox"
+                id="fundingEnabled"
+                {...register('fundingEnabled')}
+                className="rounded border-gray-300"
+              />
+              <label htmlFor="fundingEnabled" className="text-sm font-medium">
+                Enable ICP rewards for votes
+              </label>
+            </div>
+            
+            {fundingEnabled && (
+              <div className="space-y-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Total Fund (ICP)</label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      {...register('totalFundICP', { valueAsNumber: true })}
+                      placeholder="10.00"
+                      className="w-full"
+                    />
+                    {errors.totalFundICP && <p className="text-sm text-red-600 mt-1">{errors.totalFundICP.message}</p>}
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Reward per Vote (ICP)</label>
+                    <Input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      {...register('rewardPerVote', { valueAsNumber: true })}
+                      placeholder="0.25"
+                      className="w-full"
+                    />
+                    {errors.rewardPerVote && <p className="text-sm text-red-600 mt-1">{errors.rewardPerVote.message}</p>}
+                  </div>
+                </div>
+                
+                {totalFundICP > 0 && rewardPerVote > 0 && (
+                  <div className="bg-white dark:bg-gray-800 p-3 rounded border">
+                    <h4 className="font-medium text-sm mb-2">Funding Summary</h4>
+                    <div className="text-sm space-y-1">
+                      <div className="flex justify-between">
+                        <span>Total Fund:</span>
+                        <span className="font-mono">{totalFundICP.toFixed(2)} ICP</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Reward per Vote:</span>
+                        <span className="font-mono">{rewardPerVote.toFixed(2)} ICP</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Max Funded Votes:</span>
+                        <span className="font-mono">{maxVotes}</span>
+                      </div>
+                      <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400">
+                        <span>Total in e8s:</span>
+                        <span className="font-mono">{Math.floor(totalFundICP * 100_000_000).toLocaleString()}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                <div className="text-xs text-gray-600 dark:text-gray-400">
+                  <p>• Voters will receive ICP rewards directly to their wallets upon voting</p>
+                  <p>• Rewards are distributed automatically from your funded amount</p>
+                  <p>• Once the fund is depleted, no more rewards will be given</p>
+                </div>
+              </div>
+            )}
           </CardContent>
         </Card>
 

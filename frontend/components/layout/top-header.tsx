@@ -1,6 +1,7 @@
 import { LogOut, Menu, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
+import Link from "next/link";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -34,14 +35,14 @@ export function TopHeader({ isSidebarCollapsed, onSidebarToggle }: TopHeaderProp
             )}
           </Button>
           
-          <div className="flex items-center space-x-3">
+          <Link href="/" className="flex items-center space-x-3 hover:opacity-80 transition-opacity">
             <div className="w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
               <span className="text-sm font-bold text-white">ICP</span>
             </div>
             <div>
-              <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">ICP Admin</h1>
+              <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">ICP Pulse</h1>
             </div>
-          </div>
+          </Link>
         </div>
         
         <div className="flex items-center space-x-3">
