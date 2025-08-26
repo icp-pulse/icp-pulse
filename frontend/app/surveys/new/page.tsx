@@ -57,16 +57,25 @@ async function createSurveyAction(values: FormValues, identity: any) {
   
   const closesAtNs = new Date(closesAt).getTime() * 1_000_000
   
-  // Transform questions to backend format
-  const backendQuestions = questions.map(q => ({
-    type_: q.type as string,
-    text: q.text,
-    required: q.required,
-    choices: q.choices?.length ? [q.choices] : [],
-    min: q.min !== undefined ? [BigInt(q.min)] : [],
-    max: q.max !== undefined ? [BigInt(q.max)] : [],
-    helpText: q.helpText?.trim() ? [q.helpText.trim()] : []
-  })) as { type_: string; text: string; required: boolean; choices: [] | [string[]]; min: [] | [bigint]; max: [] | [bigint]; helpText: [] | [string]; }[]
+  // Transform questions to backend format  
+  const backendQuestions = questions.map(q => {
+    // Match exact field names from backend: qType (not the reserved word "type")
+    const question = {
+      qType: q.type,  // Use qType to avoid reserved keyword issues
+      text: q.text || '',
+      required: q.required ?? true,
+      choices: (q.choices && q.choices.length > 0) ? [q.choices] : [],
+      min: (q.min !== undefined && q.min !== null) ? [q.min] : [],
+      max: (q.max !== undefined && q.max !== null) ? [q.max] : [],
+      helpText: (q.helpText && q.helpText.trim()) ? [q.helpText.trim()] : []
+    }
+    
+    console.log('Transformed question:', q, '=>', question)
+    return question
+  })
+  
+  console.log('Final backend questions:', JSON.stringify(backendQuestions, (key, value) =>
+    typeof value === 'bigint' ? value.toString() : value, 2))
   
   try {
     const surveyId = await backend.create_survey(
@@ -77,7 +86,7 @@ async function createSurveyAction(values: FormValues, identity: any) {
       BigInt(closesAtNs),
       BigInt(0), // rewardFund
       allowAnonymous,
-      backendQuestions
+      backendQuestions as any
     )
     
     return { success: true, surveyId }

@@ -66,7 +66,7 @@ persistent actor class polls_surveys_backend() = this {
 
   type Question = {
     id : Nat;
-    type_ : QuestionType;
+    qType : QuestionType;
     text : Text;
     required : Bool;
     choices : ?[Text];
@@ -98,7 +98,7 @@ persistent actor class polls_surveys_backend() = this {
 
   type Submission = { id : Nat; surveyId : SurveyId; respondent : ?Principal; submittedAt : Int; answers : [Answer] };
 
-  type QuestionInput = { type_ : Text; text : Text; required : Bool; choices : ?[Text]; min : ?Nat; max : ?Nat; helpText : ?Text };
+  type QuestionInput = { qType : Text; text : Text; required : Bool; choices : ?[Text]; min : ?Nat; max : ?Nat; helpText : ?Text };
   type AnswerInput = { questionId : Nat; nat : ?Nat; nats : ?[Nat]; text : ?Text };
 
   // Stable counters and storage (use arrays to avoid HashMap requirements)
@@ -293,7 +293,7 @@ persistent actor class polls_surveys_backend() = this {
     let id = nextSurveyId; nextSurveyId += 1;
     let qs = Array.tabulate<Question>(questions.size(), func i {
       let qi = questions[i];
-      { id = i; type_ = toQuestionType(qi.type_); text = qi.text; required = qi.required; choices = qi.choices; min = qi.min; max = qi.max; helpText = qi.helpText }
+      { id = i; qType = toQuestionType(qi.qType); text = qi.text; required = qi.required; choices = qi.choices; min = qi.min; max = qi.max; helpText = qi.helpText }
     });
     let survey : Survey = { id = id; scopeType = toScopeType(scopeType); scopeId = scopeId; title = title; description = description; createdBy = msg.caller; createdAt = now(); closesAt = closesAt; status = #active; rewardFund = rewardFund; allowAnonymous = allowAnonymous; questions = qs; submissionsCount = 0 };
     surveys := Array.append(surveys, [survey]);
@@ -347,7 +347,7 @@ persistent actor class polls_surveys_backend() = this {
               for (a in answers.vals()) { if (a.questionId == q.id) { found := ?a } };
               switch (found) {
                 case (?a) {
-                  switch (q.type_) {
+                  switch (q.qType) {
                     case (#single) {
                       switch (a.nat, q.choices) {
                         case (?n, ?chs) { if (n >= chs.size()) { ok := false; return s } };
