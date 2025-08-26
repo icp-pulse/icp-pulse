@@ -11,6 +11,8 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Plus, Trash2, ArrowLeft } from 'lucide-react'
+import { useIcpAuth } from '@/components/IcpAuthProvider'
+import { useRouter } from 'next/navigation'
 
 const questionSchema = z.object({
   type: z.enum(['single', 'multi', 'likert', 'short', 'long', 'number', 'rating']),
@@ -38,25 +40,61 @@ interface Project {
   name: string
 }
 
-async function createSurveyAction(values: FormValues) {
-  const response = await fetch('/surveys/new/action', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(values),
-  })
-  if (!response.ok) {
-    const error = await response.text()
-    throw new Error(error || 'Failed to create survey')
+async function createSurveyAction(values: FormValues, identity: any) {
+  const { createBackendWithIdentity } = await import('@/lib/icp')
+  
+  if (!identity) {
+    throw new Error('Please login first')
   }
-  return response.json()
+
+  const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
+  const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
+  
+  const backend = await createBackendWithIdentity({ canisterId, host, identity })
+  
+  // Convert form values to backend format
+  const { title, description, projectId, closesAt, allowAnonymous, questions } = values
+  
+  const closesAtNs = new Date(closesAt).getTime() * 1_000_000
+  
+  // Transform questions to backend format
+  const backendQuestions = questions.map(q => ({
+    type_: q.type as string,
+    text: q.text,
+    required: q.required,
+    choices: q.choices?.length ? [q.choices] : [],
+    min: q.min !== undefined ? [BigInt(q.min)] : [],
+    max: q.max !== undefined ? [BigInt(q.max)] : [],
+    helpText: q.helpText?.trim() ? [q.helpText.trim()] : []
+  })) as { type_: string; text: string; required: boolean; choices: [] | [string[]]; min: [] | [bigint]; max: [] | [bigint]; helpText: [] | [string]; }[]
+  
+  try {
+    const surveyId = await backend.create_survey(
+      'project',
+      BigInt(projectId),
+      title,
+      description,
+      BigInt(closesAtNs),
+      BigInt(0), // rewardFund
+      allowAnonymous,
+      backendQuestions
+    )
+    
+    return { success: true, surveyId }
+  } catch (error) {
+    console.error('Error creating survey:', error)
+    throw new Error('Failed to create survey: ' + (error as Error).message)
+  }
 }
 
 export default function NewSurveyPage() {
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [projects, setProjects] = useState<Project[]>([])
+  const { identity } = useIcpAuth()
+  const router = useRouter()
 
-  const { register, handleSubmit, formState: { errors }, control, watch, setValue } = useForm({
+  const { register, handleSubmit, formState: { errors }, control, setValue, watch } = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
       questions: [{
@@ -77,18 +115,22 @@ export default function NewSurveyPage() {
   // Fetch projects for dropdown
   useEffect(() => {
     async function fetchProjects() {
+      if (!identity) return
+      
       try {
-        const response = await fetch('/api/projects')
-        if (response.ok) {
-          const projectData = await response.json()
-          setProjects(projectData)
-        }
+        const { createBackendWithIdentity } = await import('@/lib/icp')
+        const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
+        const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
+        const backend = await createBackendWithIdentity({ canisterId, host, identity })
+        
+        const projectData = await backend.list_projects(0n, 100n)
+        setProjects(projectData.map((p: any) => ({ id: p.id.toString(), name: p.name })))
       } catch (err) {
         console.error('Failed to fetch projects:', err)
       }
     }
     fetchProjects()
-  }, [])
+  }, [identity])
 
   const addQuestion = () => {
     append({
@@ -149,8 +191,8 @@ export default function NewSurveyPage() {
           setError(null)
           startTransition(async () => {
             try {
-              await createSurveyAction(values)
-              window.location.href = '/admin?tab=surveys'
+              await createSurveyAction(values, identity)
+              router.push('/admin?tab=surveys')
             } catch (e: any) {
               setError(e.message || 'Error creating survey')
             }

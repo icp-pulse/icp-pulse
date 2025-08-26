@@ -4,6 +4,11 @@
       "main": "backend/polls_surveys_backend.mo",
       "type": "motoko",
       "args": "--enhanced-orthogonal-persistence"
+    },
+    "polls_surveys_frontend": {
+      "source": ["frontend/dist"],
+      "type": "assets",
+      "workspace": "frontend"
     }
   },
   "output_env_file": ".env",

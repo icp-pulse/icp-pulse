@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-
+import { useIcpAuth } from '@/components/IcpAuthProvider'
 
 export default function PollAdmin() {
   const [searchQuery, setSearchQuery] = useState('')
@@ -15,21 +15,40 @@ export default function PollAdmin() {
   const [polls, setPolls] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { identity } = useIcpAuth()
 
-  // Fetch polls from API endpoint
+  // Fetch polls from ICP backend
   useEffect(() => {
     async function fetchPolls() {
+      if (!identity) {
+        setLoading(false)
+        return
+      }
+      
       try {
         setLoading(true)
         setError(null)
         
-        const response = await fetch('/api/polls')
-        if (!response.ok) {
-          throw new Error(`Failed to fetch polls: ${response.status}`)
+        const { createBackendWithIdentity } = await import('@/lib/icp')
+        const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
+        const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
+        const backend = await createBackendWithIdentity({ canisterId, host, identity })
+        
+        // First get all projects
+        const projects = await backend.list_projects(0n, 100n)
+        
+        // Then get polls for each project
+        const allPolls: any[] = []
+        for (const project of projects) {
+          try {
+            const projectPolls = await backend.list_polls_by_project(project.id, 0n, 100n)
+            allPolls.push(...projectPolls)
+          } catch (err) {
+            console.warn(`Failed to fetch polls for project ${project.id}:`, err)
+          }
         }
         
-        const apiPolls = await response.json()
-        setPolls(apiPolls)
+        setPolls(allPolls)
         
       } catch (err) {
         console.error('Error fetching polls:', err)
@@ -40,7 +59,7 @@ export default function PollAdmin() {
     }
 
     fetchPolls()
-  }, [])
+  }, [identity])
 
   const filteredPolls = polls.filter(poll => {
     const matchesSearch = (poll.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||

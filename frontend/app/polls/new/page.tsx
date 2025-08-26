@@ -11,6 +11,8 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Plus, Trash2, ArrowLeft } from 'lucide-react'
+import { useIcpAuth } from '@/components/IcpAuthProvider'
+import { useRouter } from 'next/navigation'
 
 const optionSchema = z.object({
   text: z.string().min(1, 'Option text is required'),
@@ -33,25 +35,50 @@ interface Project {
   name: string
 }
 
-async function createPollAction(values: FormValues) {
-  const response = await fetch('/polls/new/action', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(values),
-  })
-  if (!response.ok) {
-    const error = await response.text()
-    throw new Error(error || 'Failed to create poll')
+async function createPollAction(values: FormValues, identity: any) {
+  const { createBackendWithIdentity } = await import('@/lib/icp')
+  
+  if (!identity) {
+    throw new Error('Please login first')
   }
-  return response.json()
+
+  const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
+  const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
+  
+  const backend = await createBackendWithIdentity({ canisterId, host, identity })
+  
+  // Convert form values to backend format
+  const { title, description, projectId, expiresAt, allowAnonymous, allowMultiple, options } = values
+  
+  const backendOptions = options.map(opt => opt.text)
+  const expiresAtNs = new Date(expiresAt).getTime() * 1_000_000
+  
+  try {
+    const pollId = await backend.create_poll(
+      'project',
+      BigInt(projectId),
+      title,
+      description,
+      backendOptions,
+      BigInt(expiresAtNs),
+      BigInt(0) // rewardFund
+    )
+    
+    return { success: true, pollId }
+  } catch (error) {
+    console.error('Error creating poll:', error)
+    throw new Error('Failed to create poll: ' + (error as Error).message)
+  }
 }
 
 export default function NewPollPage() {
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [projects, setProjects] = useState<Project[]>([])
+  const { identity } = useIcpAuth()
+  const router = useRouter()
 
-  const { register, handleSubmit, formState: { errors }, control, watch, setValue } = useForm({
+  const { register, handleSubmit, formState: { errors }, control, setValue } = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
       options: [
@@ -69,18 +96,22 @@ export default function NewPollPage() {
   // Fetch projects for dropdown
   useEffect(() => {
     async function fetchProjects() {
+      if (!identity) return
+      
       try {
-        const response = await fetch('/api/projects')
-        if (response.ok) {
-          const projectData = await response.json()
-          setProjects(projectData)
-        }
+        const { createBackendWithIdentity } = await import('@/lib/icp')
+        const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
+        const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
+        const backend = await createBackendWithIdentity({ canisterId, host, identity })
+        
+        const projectData = await backend.list_projects(0n, 100n)
+        setProjects(projectData.map((p: any) => ({ id: p.id.toString(), name: p.name })))
       } catch (err) {
         console.error('Failed to fetch projects:', err)
       }
     }
     fetchProjects()
-  }, [])
+  }, [identity])
 
   const addOption = () => {
     append({ text: '' })
@@ -114,8 +145,8 @@ export default function NewPollPage() {
           setError(null)
           startTransition(async () => {
             try {
-              await createPollAction(values)
-              window.location.href = '/admin?tab=polls'
+              await createPollAction(values, identity)
+              router.push('/admin?tab=polls')
             } catch (e: any) {
               setError(e.message || 'Error creating poll')
             }

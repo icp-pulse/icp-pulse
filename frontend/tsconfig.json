@@ -26,10 +26,18 @@
     ],
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./*"],
-      "@components/*": ["./components/*"],
-      "@app/*": ["./app/*"],
-      "@lib/*": ["./lib/*"]
+      "@/*": [
+        "./*"
+      ],
+      "@components/*": [
+        "./components/*"
+      ],
+      "@app/*": [
+        "./app/*"
+      ],
+      "@lib/*": [
+        "./lib/*"
+      ]
     },
     "isolatedModules": true
   },
@@ -37,7 +45,8 @@
     "next-env.d.ts",
     "**/*.ts",
     "**/*.tsx",
-    ".next/types/**/*.ts"
+    ".next/types/**/*.ts",
+    "dist/types/**/*.ts"
   ],
   "exclude": [
     "node_modules"

@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useIcpAuth } from '@/components/IcpAuthProvider'
 
 export default function SurveyAdmin() {
   const [searchQuery, setSearchQuery] = useState('')
@@ -14,21 +15,40 @@ export default function SurveyAdmin() {
   const [surveys, setSurveys] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { identity } = useIcpAuth()
 
-  // Fetch surveys from API endpoint
+  // Fetch surveys from ICP backend
   useEffect(() => {
     async function fetchSurveys() {
+      if (!identity) {
+        setLoading(false)
+        return
+      }
+      
       try {
         setLoading(true)
         setError(null)
         
-        const response = await fetch('/api/surveys')
-        if (!response.ok) {
-          throw new Error(`Failed to fetch surveys: ${response.status}`)
+        const { createBackendWithIdentity } = await import('@/lib/icp')
+        const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
+        const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
+        const backend = await createBackendWithIdentity({ canisterId, host, identity })
+        
+        // First get all projects
+        const projects = await backend.list_projects(0n, 100n)
+        
+        // Then get surveys for each project
+        const allSurveys: any[] = []
+        for (const project of projects) {
+          try {
+            const projectSurveys = await backend.list_surveys_by_project(project.id, 0n, 100n)
+            allSurveys.push(...projectSurveys)
+          } catch (err) {
+            console.warn(`Failed to fetch surveys for project ${project.id}:`, err)
+          }
         }
         
-        const apiSurveys = await response.json()
-        setSurveys(apiSurveys)
+        setSurveys(allSurveys)
         
       } catch (err) {
         console.error('Error fetching surveys:', err)
@@ -39,7 +59,7 @@ export default function SurveyAdmin() {
     }
 
     fetchSurveys()
-  }, [])
+  }, [identity])
 
   const filteredSurveys = surveys.filter(survey => {
     const matchesSearch = survey.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
