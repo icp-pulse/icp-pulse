@@ -135,4 +135,4 @@ MIT License – free to use, modify, and distribute.
 
 ## 📬 Contact
 - Telegram: [@eastmaels](http://t.me/eastmaels) | [@muhammedadam123](http://t.me/muhammedadam123)  
-- DoraHacks Submission: [Link here]  
+- DoraHacks Submission: [TruePulse](https://dorahacks.io/buidl/31834/)  
