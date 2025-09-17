@@ -4,6 +4,7 @@ import { ThemeProvider } from 'next-themes'
 import { IcpAuthProvider } from '@/components/IcpAuthProvider'
 import { Providers } from '@/components/Providers'
 import { ConditionalLayout } from '@/components/layout/conditional-layout'
+import { AIChatbox } from '@/components/ai-chatbox'
 
 export const metadata: Metadata = {
   title: 'ICP Pulse',
@@ -20,6 +21,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
               <ConditionalLayout>
                 {children}
               </ConditionalLayout>
+              <AIChatbox />
             </IcpAuthProvider>
           </Providers>
         </ThemeProvider>
