@@ -79,6 +79,33 @@ Or manually edit `init.json` to replace:
 - `<CONTROLLER_PRINCIPAL>` - Principal that controls the ledger
 - `<YOUR_PRINCIPAL>` - Principal that receives initial token supply
 
+### ICRC-2 Approval Support
+
+The ledger supports ICRC-2 standard for approve/allowance functionality, which enables:
+- **`icrc2_approve`** - Grant spending allowances to other accounts
+- **`icrc2_transfer_from`** - Transfer tokens on behalf of another account (with allowance)
+- **`icrc2_allowance`** - Query current allowance between accounts
+
+**Current Status:** ICRC-2 is **enabled** by default in the configuration.
+
+**To toggle ICRC-2 support:**
+
+1. **Enable ICRC-2** (current setting):
+   ```json
+   "feature_flags": {
+     "icrc2": true
+   }
+   ```
+
+2. **Disable ICRC-2**:
+   ```json
+   "feature_flags": {
+     "icrc2": false
+   }
+   ```
+
+**Note:** ICRC-2 functionality is essential for the funding hub canister integration, as it uses `icrc2_transfer_from` to pull tokens from contributors with their approval.
+
 ## Deployment
 
 Deploy using the npm script:
