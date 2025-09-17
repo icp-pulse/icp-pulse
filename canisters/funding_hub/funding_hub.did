@@ -1,36 +1,25 @@
-type ContributionRecord = 
- record {
-   amount: nat;
-   contributor: principal;
-   projectId: text;
-   timestamp: int;
- };
-type FundingProject = 
- record {
-   createdAt: int;
-   creator: principal;
-   currentAmount: nat;
-   deadline: int;
-   description: text;
-   goalAmount: nat;
-   id: text;
-   isActive: bool;
-   title: text;
- };
-type Result = 
- variant {
-   err: text;
-   ok;
- };
-type Result_1 = 
- variant {
-   err: text;
-   ok: text;
- };
+type Account = record { owner: principal; subaccount: opt vec nat8 };
+type FundingStatus = variant { OPEN; FUNDED; FAILED; PAID; REFUNDED };
+type Outcome = variant { Success; Failure };
+
 service : {
-  contribute: (text, nat) -> (Result);
-  createProject: (text, text, nat, int) -> (Result_1);
-  getContributions: (text) -> (vec ContributionRecord) query;
-  getProject: (text) -> (opt FundingProject) query;
-  getProjects: () -> (vec FundingProject) query;
+  // one-time or lazy init of poll escrow
+  init_poll_escrow: (nat, principal, principal, opt vec nat8, opt nat) -> ();
+
+  // ICRC-2 pull
+  fund_poll: (nat, principal, nat) -> variant { Ok; Err: text };
+
+  // Close and resolve
+  close_poll: (nat, Outcome) -> variant { Ok; Err: text };
+
+  // Contributor-initiated refund
+  request_refund: (nat) -> variant { Ok; Err: text };
+
+  // Introspection
+  get_poll_state: (nat) -> 
+    opt record { creator: principal; token: principal; target: nat; funded: nat; status: FundingStatus };
+
+  // Event stream (ring buffer)
+  get_events: (nat, nat, nat) -> 
+    vec record { ts: nat64; kind: text; who: opt principal; amount: opt nat; token: opt principal };
 }
