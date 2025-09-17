@@ -9,6 +9,10 @@
       "source": ["frontend/dist"],
       "type": "assets",
       "workspace": "frontend"
+    },
+    "funding_hub": {
+      "main": "canisters/funding_hub/main.mo",
+      "type": "motoko"
     }
   },
   "output_env_file": ".env",

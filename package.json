@@ -4,7 +4,10 @@
     "build": "npm run build --workspaces --if-present",
     "prebuild": "npm run prebuild --workspaces --if-present",
     "dev": "npm run dev --workspaces --if-present",
-    "sync:env": "node scripts/sync-env.mjs"
+    "sync:env": "node scripts/sync-env.mjs",
+    "ic:start": "dfx start --background || true",
+    "ic:deploy:funding": "dfx deploy funding_hub",
+    "ic:stop": "dfx stop"
   },
   "type": "module",
   "workspaces": [

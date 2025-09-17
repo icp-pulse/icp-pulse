@@ -1,0 +1,36 @@
+type ContributionRecord = 
+ record {
+   amount: nat;
+   contributor: principal;
+   projectId: text;
+   timestamp: int;
+ };
+type FundingProject = 
+ record {
+   createdAt: int;
+   creator: principal;
+   currentAmount: nat;
+   deadline: int;
+   description: text;
+   goalAmount: nat;
+   id: text;
+   isActive: bool;
+   title: text;
+ };
+type Result = 
+ variant {
+   err: text;
+   ok;
+ };
+type Result_1 = 
+ variant {
+   err: text;
+   ok: text;
+ };
+service : {
+  contribute: (text, nat) -> (Result);
+  createProject: (text, text, nat, int) -> (Result_1);
+  getContributions: (text) -> (vec ContributionRecord) query;
+  getProject: (text) -> (opt FundingProject) query;
+  getProjects: () -> (vec FundingProject) query;
+}
