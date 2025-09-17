@@ -1,0 +1,70 @@
+[package]
+name = "ic-icrc1-ledger"
+authors.workspace = true
+description = "An ICRC-1 ledger implementation."
+documentation.workspace = true
+edition.workspace = true
+homepage.workspace = true
+license.workspace = true
+readme = "README.adoc"
+repository.workspace = true
+rust-version.workspace = true
+version.workspace = true
+
+[[bin]]
+name = "ic-icrc1-ledger"
+path = "src/main.rs"
+
+[lib]
+name = "ic_icrc1_ledger"
+path = "src/lib.rs"
+
+[dependencies]
+base64 = { workspace = true }
+candid = { workspace = true }
+ciborium = { workspace = true }
+hex = { workspace = true }
+ic-base-types = { path = "../../types/base_types" }
+ic-btc-interface = { path = "../../btc/interface" }
+ic-canister-log = { path = "../../monitoring/logger" }
+ic-canisters-http-types = { path = "../../rust_canisters/http_types" }
+ic-cdk = { workspace = true }
+ic-cdk-timers = { workspace = true }
+ic-crypto-sha2 = { path = "../../crypto/sha2" }
+ic-icrc1 = { path = "../" }
+ic-icrc1-tokens-u256 = { path = "../tokens_u256" }
+ic-icrc1-tokens-u64 = { path = "../tokens_u64" }
+ic-ledger-canister-core = { path = "../../ledger_canister_core" }
+ic-ledger-core = { path = "../../ledger_core" }
+ic-ledger-hash-of = { path = "../../ledger_hash_of" }
+ic-metrics-encoder = { path = "../../monitoring/metrics" }
+ic-stable-structures = { workspace = true }
+icrc-ledger-types = { path = "../types" }
+num-traits = { workspace = true }
+serde = { workspace = true }
+serde_bytes = { workspace = true }
+
+[dev-dependencies]
+assert_matches = { workspace = true }
+candid_parser = { workspace = true }
+ic-agent = { workspace = true }
+ic-canister-client-sender = { path = "../../canister_client/sender" }
+ic-icrc1-test-utils = { path = "../test_utils" }
+ic-ledger-canister-core = { path = "../../ledger_canister_core", features = ["test"] }
+ic-state-machine-tests = { path = "../../state_machine_tests" }
+maplit = "1.0.2"
+proptest = "1.0"
+serde_json = { workspace = true }
+
+[features]
+default = []
+u256-tokens = [
+    "ic-icrc1-tokens-u256/u256-tokens",
+    "icrc-ledger-types/u256-tokens",
+]
+
+[build-dependencies]
+ic-test-utilities-load-wasm = { path = "../../test_utilities/load_wasm" }
+
+[lints]
+workspace = true

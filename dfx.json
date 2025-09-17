@@ -13,6 +13,12 @@
     "funding_hub": {
       "main": "canisters/funding_hub/main.mo",
       "type": "motoko"
+    },
+    "mytoken_ledger": {
+      "type": "custom",
+      "candid": "canisters/mytoken_ledger/ledger.did",
+      "wasm": "canisters/mytoken_ledger/target/wasm32-unknown-unknown/release/ic-icrc1-ledger.wasm",
+      "build": "cd canisters/mytoken_ledger && cargo build --target wasm32-unknown-unknown --release"
     }
   },
   "output_env_file": ".env",
