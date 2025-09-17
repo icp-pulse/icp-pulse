@@ -1,0 +1,44 @@
+{
+  "Init": {
+    "token_name": "TruePulse Token",
+    "token_symbol": "TPULSE",
+    "decimals": 8,
+    "transfer_fee": 1000,
+    "minting_account": {
+      "owner": "<CONTROLLER_PRINCIPAL>",
+      "subaccount": null
+    },
+    "initial_balances": [
+      {
+        "account": {
+          "owner": "<YOUR_PRINCIPAL>",
+          "subaccount": null
+        },
+        "amount": 100000000000
+      }
+    ],
+    "metadata": [
+      ["icrc1:name", {"Text": "TruePulse Token"}],
+      ["icrc1:symbol", {"Text": "TPULSE"}],
+      ["icrc1:decimals", {"Nat": 8}],
+      ["icrc1:description", {"Text": "TruePulse ecosystem token for polls and surveys"}],
+      ["icrc1:logo", {"Text": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJMMTMuMDkgOC4yNkwyMCA5TDEzLjA5IDE1Ljc0TDEyIDIyTDEwLjkxIDE1Ljc0TDQgOUwxMC45MSA4LjI2TDEyIDJaIiBmaWxsPSIjNjM2NkYxIi8+Cjwvc3ZnPg=="}]
+    ],
+    "archive_options": {
+      "num_blocks_to_archive": 1000,
+      "trigger_threshold": 2000,
+      "max_transactions_per_response": 1000,
+      "max_message_size_bytes": 2097152,
+      "cycles_for_archive_creation": 10000000000000,
+      "node_max_memory_size_bytes": 3221225472,
+      "controller_id": "<CONTROLLER_PRINCIPAL>"
+    },
+    "maximum_number_of_accounts": null,
+    "accounts_overflow_trim_quantity": null,
+    "fee_collector_account": null,
+    "max_memo_length": 80,
+    "feature_flags": {
+      "icrc2": true
+    }
+  }
+}

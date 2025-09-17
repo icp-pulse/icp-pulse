@@ -7,6 +7,7 @@
     "sync:env": "node scripts/sync-env.mjs",
     "ic:start": "dfx start --background || true",
     "ic:deploy:funding": "dfx deploy funding_hub",
+    "ic:deploy:token": "dfx deploy mytoken_ledger --argument-file canisters/mytoken_ledger/init.json",
     "ic:stop": "dfx stop",
     "test:funding": "moc -r canisters/funding_hub/tests/funding_hub.test.mo"
   },

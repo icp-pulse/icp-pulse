@@ -55,24 +55,42 @@ This directory contains the ICRC-1 reference ledger implementation vendored from
 
 4. **Update dependencies** - Adjust the dependency paths in `Cargo.toml` to match your project structure
 
-## Deployment
+## Configuration
 
-The ledger can be deployed as a custom canister using dfx:
+The ledger initialization parameters are defined in `init.json`:
+
+- **Token Name:** TruePulse Token
+- **Symbol:** TPULSE  
+- **Decimals:** 8 (100,000,000 base units = 1 TPULSE)
+- **Transfer Fee:** 1,000 base units (0.00001 TPULSE)
+- **Initial Supply:** 1,000 TPULSE (to initial owner)
+- **Features:** ICRC-2 allowances enabled
+
+### Setup Principals
+
+Before deployment, update the principal placeholders:
 
 ```bash
-dfx deploy mytoken_ledger --argument '(variant { Init = record {
-  token_name = "My Token";
-  token_symbol = "MTK";
-  minting_account = record { owner = principal "your-principal-here" };
-  transfer_fee = 10000;
-  metadata = vec {};
-  initial_balances = vec {};
-  archive_options = record {
-    trigger_threshold = 2000;
-    num_blocks_to_archive = 1000;
-    controller_id = principal "your-principal-here";
-  };
-}})'
+cd canisters/mytoken_ledger
+./setup-principals.sh <controller_principal> <initial_owner_principal>
+```
+
+Or manually edit `init.json` to replace:
+- `<CONTROLLER_PRINCIPAL>` - Principal that controls the ledger
+- `<YOUR_PRINCIPAL>` - Principal that receives initial token supply
+
+## Deployment
+
+Deploy using the npm script:
+
+```bash
+npm run ic:deploy:token
+```
+
+Or directly with dfx:
+
+```bash
+dfx deploy mytoken_ledger --argument-file canisters/mytoken_ledger/init.json
 ```
 
 ## Documentation
