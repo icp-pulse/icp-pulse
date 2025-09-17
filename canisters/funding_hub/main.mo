@@ -6,13 +6,16 @@ import Result "mo:base/Result";
 import Principal "mo:base/Principal";
 import Array "mo:base/Array";
 import Blob "mo:base/Blob";
+import Nat "mo:base/Nat";
 import Nat8 "mo:base/Nat8";
 import Nat64 "mo:base/Nat64";
+import Nat32 "mo:base/Nat32";
+import Int "mo:base/Int";
 import Buffer "mo:base/Buffer";
 import Iter "mo:base/Iter";
-import SHA256 "mo:sha256/SHA256";
+import Hash "mo:base/Hash";
 
-actor FundingHub {
+persistent actor FundingHub {
     // ICRC-1/2 minimal interface types
     public type Account = { owner : Principal; subaccount : ?[Nat8] };
     public type TransferArgs = {
@@ -84,25 +87,39 @@ actor FundingHub {
     };
 
     // Storage
-    private stable var pollStates: [(Nat, PollState)] = [];
-    private stable var pollContributions: [(Nat, [Contribution])] = [];
-    private stable var pollEvents: [(Nat, [Event])] = [];
+    private var pollStates: [(Nat, PollState)] = [];
+    private var pollContributions: [(Nat, [Contribution])] = [];
+    private var pollEvents: [(Nat, [Event])] = [];
     
-    private var polls = Map.HashMap<Nat, PollState>(0, Nat.equal, func(x: Nat): Nat32 { Nat32.fromNat(x % (2**32)) });
-    private var contributions = Map.HashMap<Nat, [Contribution]>(0, Nat.equal, func(x: Nat): Nat32 { Nat32.fromNat(x % (2**32)) });
-    private var events = Map.HashMap<Nat, Buffer.Buffer<Event>>(0, Nat.equal, func(x: Nat): Nat32 { Nat32.fromNat(x % (2**32)) });
+    private transient var polls = Map.HashMap<Nat, PollState>(0, Nat.equal, func(x: Nat): Nat32 { Nat32.fromNat(x % (2**32)) });
+    private transient var contributions = Map.HashMap<Nat, [Contribution]>(0, Nat.equal, func(x: Nat): Nat32 { Nat32.fromNat(x % (2**32)) });
+    private transient var events = Map.HashMap<Nat, Buffer.Buffer<Event>>(0, Nat.equal, func(x: Nat): Nat32 { Nat32.fromNat(x % (2**32)) });
     
     // Re-entrancy guard
-    private var inProgress = Map.HashMap<Nat, Bool>(0, Nat.equal, func(x: Nat): Nat32 { Nat32.fromNat(x % (2**32)) });
+    private transient var inProgress = Map.HashMap<Nat, Bool>(0, Nat.equal, func(x: Nat): Nat32 { Nat32.fromNat(x % (2**32)) });
 
     // Constants
-    private let MAX_EVENTS_PER_POLL = 1000;
+    private transient let MAX_EVENTS_PER_POLL = 1000;
 
     // Utility functions
     private func generateEscrowSubaccount(pollId: Nat): [Nat8] {
-        let input = Text.encodeUtf8("poll:" # Nat.toText(pollId));
-        let hash = SHA256.sha256(Blob.toArray(input));
-        Array.take(hash, 32)
+        // Generate deterministic subaccount using hash of poll ID
+        let hashValue = Hash.hash(pollId);
+        let bytes = Array.init<Nat8>(32, 0);
+        
+        // Fill first 4 bytes with hash value
+        bytes[0] := Nat8.fromNat(Nat32.toNat((hashValue >> 24) % 256));
+        bytes[1] := Nat8.fromNat(Nat32.toNat((hashValue >> 16) % 256));
+        bytes[2] := Nat8.fromNat(Nat32.toNat((hashValue >> 8) % 256));
+        bytes[3] := Nat8.fromNat(Nat32.toNat(hashValue % 256));
+        
+        // Fill next 4 bytes with poll ID
+        bytes[4] := Nat8.fromNat((pollId / 16777216) % 256);
+        bytes[5] := Nat8.fromNat((pollId / 65536) % 256);
+        bytes[6] := Nat8.fromNat((pollId / 256) % 256);
+        bytes[7] := Nat8.fromNat(pollId % 256);
+        
+        Array.freeze(bytes)
     };
 
     private func addEvent(pollId: Nat, event: Event) {
@@ -114,7 +131,7 @@ actor FundingHub {
             };
             case (?buffer) {
                 if (buffer.size() >= MAX_EVENTS_PER_POLL) {
-                    ignore buffer.removeFirst();
+                    ignore buffer.removeLast();
                 };
                 buffer.add(event);
             };
@@ -174,7 +191,7 @@ actor FundingHub {
         addEvent(pollId, event);
     };
 
-    public func fund_poll(pollId: Nat, from: Principal, amount: Nat) : async { #Ok; #Err: Text } {
+    public shared (msg) func fund_poll(pollId: Nat, from: Principal, amount: Nat) : async { #Ok; #Err: Text } {
         let caller = msg.caller;
         
         // Re-entrancy guard
@@ -200,7 +217,7 @@ actor FundingHub {
 
                 // TODO: Read network fee via icrc1_fee() and validate amount > fee
                 let tokenActor: ICRC2 = actor(Principal.toText(poll.token));
-                let memo = Text.encodeUtf8("poll-" # Nat.toText(pollId));
+                let memoText = "poll-" # Nat.toText(pollId);
                 
                 let transferArgs: TransferFromArgs = {
                     spender_subaccount = null;
@@ -208,7 +225,7 @@ actor FundingHub {
                     to = { owner = Principal.fromActor(FundingHub); subaccount = ?poll.escrowSub };
                     amount = amount;
                     fee = null; // TODO: Set appropriate fee
-                    memo = ?Blob.toArray(memo);
+                    memo = ?Blob.toArray(Text.encodeUtf8(memoText));
                     created_at_time = ?Nat64.fromNat(Int.abs(Time.now()));
                 };
 
@@ -259,7 +276,7 @@ actor FundingHub {
         }
     };
 
-    public func close_poll(pollId: Nat, outcome: Outcome) : async { #Ok; #Err: Text } {
+    public shared (msg) func close_poll(pollId: Nat, outcome: Outcome) : async { #Ok; #Err: Text } {
         let caller = msg.caller;
         
         // Re-entrancy guard
@@ -299,7 +316,7 @@ actor FundingHub {
                             to = { owner = poll.creator; subaccount = null };
                             amount = poll.funded;
                             fee = null; // TODO: Set appropriate fee
-                            memo = ?Text.encodeUtf8("poll-success-" # Nat.toText(pollId)) |> Blob.toArray(_);
+                            memo = ?Blob.toArray(Text.encodeUtf8("poll-success-" # Nat.toText(pollId)));
                             created_at_time = ?Nat64.fromNat(Int.abs(Time.now()));
                         };
 
@@ -350,7 +367,7 @@ actor FundingHub {
         }
     };
 
-    public func request_refund(pollId: Nat) : async { #Ok; #Err: Text } {
+    public shared (msg) func request_refund(pollId: Nat) : async { #Ok; #Err: Text } {
         let caller = msg.caller;
         
         // Re-entrancy guard
@@ -400,7 +417,7 @@ actor FundingHub {
                     to = { owner = caller; subaccount = null };
                     amount = totalContribution;
                     fee = null; // TODO: Set appropriate fee
-                    memo = ?Text.encodeUtf8("poll-refund-" # Nat.toText(pollId)) |> Blob.toArray(_);
+                    memo = ?Blob.toArray(Text.encodeUtf8("poll-refund-" # Nat.toText(pollId)));
                     created_at_time = ?Nat64.fromNat(Int.abs(Time.now()));
                 };
 
