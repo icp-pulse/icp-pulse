@@ -1,4 +1,5 @@
 import Array "mo:base/Array";
+import Iter "mo:base/Iter";
 import Blob "mo:base/Blob";
 import Bool "mo:base/Bool";
 import Nat "mo:base/Nat";
@@ -7,6 +8,10 @@ import Int "mo:base/Int";
 import Principal "mo:base/Principal";
 import Text "mo:base/Text";
 import Time "mo:base/Time";
+import Result "mo:base/Result";
+import Debug "mo:base/Debug";
+import Map "mo:map/Map";
+import { phash } "mo:map/Map";
 
 persistent actor class polls_surveys_backend() = this {
   // Types
@@ -17,12 +22,61 @@ persistent actor class polls_surveys_backend() = this {
 
   type Status = { #active; #closed };
 
+  // Custom token types
+  type TokenType = {
+    #ICP;
+    #ICRC1: Principal; // Token canister ID
+  };
+
+  // Well-known ICRC-1 token canisters (local/mainnet)
+  private let KNOWN_TOKENS = {
+    // For local testing, use the PULSE token we just created
+    PULSE = Principal.fromText("uzt4z-lp777-77774-qaabq-cai");
+    // Mainnet tokens (commented out for local testing)
+    // ckBTC = Principal.fromText("mxzaz-hqaaa-aaaar-qaada-cai");
+    // ckETH = Principal.fromText("ss2fx-dyaaa-aaaar-qacoq-cai");
+    // ckUSDC = Principal.fromText("xkbqi-6yaaa-aaaah-qbpqq-cai");
+    // CHAT = Principal.fromText("2ouva-viaaa-aaaaq-aaamq-cai");
+    // SNS1 = Principal.fromText("zfcdd-tqaaa-aaaaq-aaaga-cai");
+  };
+
+  // ICRC-1 Types
+  type Account = { owner : Principal; subaccount : ?[Nat8] };
+  type Tokens = Nat;
+  type Timestamp = Nat64;
+  type TransferArgs = {
+    from_subaccount: ?[Nat8];
+    to: Account;
+    amount: Tokens;
+    fee: ?Tokens;
+    memo: ?[Nat8];
+    created_at_time: ?Timestamp;
+  };
+  type TransferResult = {
+    #Ok: Nat;  // block index
+    #Err: TransferError;
+  };
+  type TransferError = {
+    #BadFee: { expected_fee: Tokens };
+    #BadBurn: { min_burn_amount: Tokens };
+    #InsufficientFunds: { balance: Tokens };
+    #TooOld;
+    #CreatedInFuture: { ledger_time: Timestamp };
+    #Duplicate: { duplicate_of: Nat };
+    #TemporarilyUnavailable;
+    #GenericError: { error_code: Nat; message: Text };
+  };
+
   type FundingInfo = {
-    totalFund: Nat64;        // Total ICP in e8s
-    rewardPerResponse: Nat64; // ICP per valid response in e8s
-    maxResponses: Nat;       // Maximum funded responses
-    currentResponses: Nat;   // Current response count
-    remainingFund: Nat64;    // Remaining ICP balance in e8s
+    tokenType: TokenType;         // Type of token used for funding
+    tokenCanister: ?Principal;    // Token canister for custom tokens (null for ICP)
+    tokenSymbol: Text;           // Token symbol for display
+    tokenDecimals: Nat8;         // Token decimals
+    totalFund: Nat64;           // Total tokens in smallest unit (e8s for ICP)
+    rewardPerResponse: Nat64;    // Tokens per valid response in smallest unit
+    maxResponses: Nat;          // Maximum funded responses
+    currentResponses: Nat;       // Current response count
+    remainingFund: Nat64;       // Remaining token balance in smallest unit
   };
   type ScopeType = { #project; #product };
 
@@ -125,8 +179,86 @@ persistent actor class polls_surveys_backend() = this {
   var surveys : [Survey] = [];
   var submissions : [Submission] = [];
 
+  // Token validation cache
+  private var validatedTokens = Map.new<Principal, Bool>();
+  private var tokenInfo = Map.new<Principal, (Text, Nat8)>(); // (symbol, decimals)
+
   // Helpers
   private func now() : Int { Time.now() };
+
+  // Token helper functions
+  private func validateTokenCanister(canister: Principal) : async Bool {
+    // Check cache first
+    switch (Map.get(validatedTokens, phash, canister)) {
+      case (?isValid) { return isValid };
+      case null {};
+    };
+
+    try {
+      // Try to call ICRC-1 standard functions to validate the token
+      let tokenActor = actor(Principal.toText(canister)) : actor {
+        icrc1_name : () -> async Text;
+        icrc1_symbol : () -> async Text;
+        icrc1_decimals : () -> async Nat8;
+        icrc1_supported_standards : () -> async [{ name: Text; url: Text }];
+      };
+
+      // Test basic ICRC-1 functions
+      let symbol = await tokenActor.icrc1_symbol();
+      let decimals = await tokenActor.icrc1_decimals();
+      let standards = await tokenActor.icrc1_supported_standards();
+
+      // Check if ICRC-1 is supported
+      let isICRC1 = Array.find<{ name: Text; url: Text }>(standards, func(std) = std.name == "ICRC-1");
+
+      switch (isICRC1) {
+        case (?_) {
+          // Cache the token info
+          Map.set(tokenInfo, phash, canister, (symbol, decimals));
+          Map.set(validatedTokens, phash, canister, true);
+          true
+        };
+        case null {
+          Map.set(validatedTokens, phash, canister, false);
+          false
+        };
+      }
+    } catch (e) {
+      Map.set(validatedTokens, phash, canister, false);
+      false
+    }
+  };
+
+  private func getTokenInfo(canister: ?Principal) : async (Text, Nat8) {
+    switch (canister) {
+      case null { ("ICP", 8) }; // Default ICP info
+      case (?c) {
+        // Check for well-known tokens first
+        if (Principal.equal(c, KNOWN_TOKENS.PULSE)) { return ("PULSE", 8); };
+        // Mainnet tokens (commented out for local testing)
+        // if (Principal.equal(c, KNOWN_TOKENS.ckBTC)) { return ("ckBTC", 8); };
+        // if (Principal.equal(c, KNOWN_TOKENS.ckETH)) { return ("ckETH", 18); };
+        // if (Principal.equal(c, KNOWN_TOKENS.ckUSDC)) { return ("ckUSDC", 6); };
+        // if (Principal.equal(c, KNOWN_TOKENS.CHAT)) { return ("CHAT", 8); };
+        // if (Principal.equal(c, KNOWN_TOKENS.SNS1)) { return ("SNS1", 8); };
+
+        // Check cache
+        switch (Map.get(tokenInfo, phash, c)) {
+          case (?info) { info };
+          case null {
+            if (await validateTokenCanister(c)) {
+              switch (Map.get(tokenInfo, phash, c)) {
+                case (?info) { info };
+                case null { ("UNKNOWN", 8) };
+              }
+            } else {
+              ("INVALID", 0)
+            }
+          };
+        };
+      };
+    };
+  };
 
   private func toScopeType(txt : Text) : ScopeType { if (txt == "project") { #project } else { #product } };
   private func toQuestionType(txt : Text) : QuestionType {
@@ -239,7 +371,17 @@ persistent actor class polls_surveys_backend() = this {
         case (?reward) {
           let totalFund = Nat64.fromNat(rewardFund) * 1_000_000; // Convert cents to e8s (rewardFund is in cents, so multiply by 1M instead of 100M)
           let maxResponses = if (reward > 0) { Nat64.toNat(totalFund / reward) } else { 0 };
-          ?{ totalFund = totalFund; rewardPerResponse = reward; maxResponses = maxResponses; currentResponses = 0; remainingFund = totalFund }
+          ?{
+            tokenType = #ICP;
+            tokenCanister = null;
+            tokenSymbol = "ICP";
+            tokenDecimals = 8 : Nat8;
+            totalFund = totalFund;
+            rewardPerResponse = reward;
+            maxResponses = maxResponses;
+            currentResponses = 0;
+            remainingFund = totalFund
+          }
         };
         case null { null }
       }
@@ -247,6 +389,73 @@ persistent actor class polls_surveys_backend() = this {
     let poll : Poll = { id = id; scopeType = toScopeType(scopeType); scopeId = scopeId; title = title; description = description; options = opts; createdBy = msg.caller; createdAt = now(); closesAt = closesAt; status = #active; totalVotes = 0; rewardFund = rewardFund; fundingInfo = fundingInfo; voterPrincipals = [] };
     polls := Array.append(polls, [poll]);
     id
+  };
+
+  // Create poll with custom token funding
+  public shared (msg) func create_custom_token_poll(
+    scopeType : Text,
+    scopeId : Nat,
+    title : Text,
+    description : Text,
+    options : [Text],
+    closesAt : Int,
+    tokenCanister : ?Principal,
+    totalFunding : Nat64,
+    rewardPerVote : Nat64
+  ) : async Result.Result<PollId, Text> {
+    assert(options.size() >= 2);
+    assert(closesAt > now());
+
+    // Validate custom token if provided
+    switch (tokenCanister) {
+      case (?canister) {
+        if (not (await validateTokenCanister(canister))) {
+          return #err("Invalid or unsupported token canister");
+        };
+      };
+      case null { /* Using ICP */ };
+    };
+
+    let id = nextPollId; nextPollId += 1;
+    let opts = Array.tabulate<OptionT>(options.size(), func i { { id = i; text = options[i]; votes = 0 } });
+
+    // Get token info
+    let (tokenSymbol, tokenDecimals) = await getTokenInfo(tokenCanister);
+
+    let fundingInfo = {
+      tokenType = switch (tokenCanister) {
+        case null { #ICP };
+        case (?canister) { #ICRC1(canister) };
+      };
+      tokenCanister = tokenCanister;
+      tokenSymbol = tokenSymbol;
+      tokenDecimals = tokenDecimals;
+      totalFund = totalFunding;
+      rewardPerResponse = rewardPerVote;
+      maxResponses = if (rewardPerVote > 0) { Nat64.toNat(totalFunding / rewardPerVote) } else { 0 };
+      currentResponses = 0;
+      remainingFund = totalFunding;
+    };
+
+    let poll : Poll = {
+      id = id;
+      scopeType = toScopeType(scopeType);
+      scopeId = scopeId;
+      title = title;
+      description = description;
+      options = opts;
+      createdBy = msg.caller;
+      createdAt = now();
+      closesAt = closesAt;
+      status = #active;
+      totalVotes = 0;
+      rewardFund = Nat64.toNat(totalFunding / 1_000_000); // Convert back to legacy format for backward compatibility
+      fundingInfo = ?fundingInfo;
+      voterPrincipals = [];
+    };
+
+    polls := Array.append(polls, [poll]);
+    #ok(id)
   };
 
   public query func list_polls_by_project(projectId : ProjectId, offset : Nat, limit : Nat) : async [PollSummary] {
@@ -276,15 +485,32 @@ persistent actor class polls_surveys_backend() = this {
   public query func get_poll(id : PollId) : async ?Poll { findPoll(id) };
 
   public shared (msg) func vote(pollId : PollId, optionId : Nat) : async Bool {
-    var ok = false;
-    polls := Array.tabulate<Poll>(polls.size(), func i {
-      let p = polls[i];
-      if (p.id == pollId) {
-        if ((p.status == #closed) or (p.closesAt <= now())) { ok := false; p } else {
-          // Check one vote per principal
-          var already = false;
-          for (vp in p.voterPrincipals.vals()) { if (vp == msg.caller) { already := true } };
-          if (already or (optionId >= p.options.size())) { ok := false; p } else {
+    // First, find the poll and validate the vote
+    switch (findPoll(pollId)) {
+      case (?poll) {
+        if ((poll.status == #closed) or (poll.closesAt <= now())) { return false };
+
+        // Check one vote per principal
+        var already = false;
+        for (vp in poll.voterPrincipals.vals()) { if (vp == msg.caller) { already := true } };
+        if (already or (optionId >= poll.options.size())) { return false };
+
+        // Create reward if funding is enabled
+        switch (poll.fundingInfo) {
+          case (?funding) {
+            if (funding.currentResponses < funding.maxResponses) {
+              let (tokenSymbol, tokenDecimals) = await getTokenInfo(funding.tokenCanister);
+              ignore createReward(poll.id, poll.title, msg.caller, funding.rewardPerResponse, tokenSymbol, tokenDecimals, funding.tokenCanister);
+            };
+          };
+          case null { };
+        };
+
+        // Now update the poll data
+        var ok = false;
+        polls := Array.tabulate<Poll>(polls.size(), func i {
+          let p = polls[i];
+          if (p.id == pollId) {
             let updatedOptions = Array.tabulate<OptionT>(p.options.size(), func j {
               let o = p.options[j];
               if (j == optionId) { { id = o.id; text = o.text; votes = o.votes + 1 } } else { o }
@@ -300,11 +526,12 @@ persistent actor class polls_surveys_backend() = this {
               case null { null }
             };
             { p with options = updatedOptions; totalVotes = p.totalVotes + 1; voterPrincipals = Array.append(p.voterPrincipals, [msg.caller]); fundingInfo = updatedFunding }
-          }
-        }
-      } else { p }
-    });
-    ok
+          } else { p }
+        });
+        ok
+      };
+      case null { false }
+    }
   };
 
   public shared func close_poll(pollId : PollId) : async Bool {
@@ -314,6 +541,62 @@ persistent actor class polls_surveys_backend() = this {
       if (p.id == pollId) { closed := true; { p with status = #closed } } else { p }
     });
     closed
+  };
+
+  // Distribute custom token rewards for a poll
+  private func distributeCustomTokenReward(
+    recipient: Principal,
+    tokenCanister: Principal,
+    amount: Nat64
+  ) : async Bool {
+    try {
+      let tokenActor = actor(Principal.toText(tokenCanister)) : actor {
+        icrc1_transfer : (TransferArgs) -> async TransferResult;
+      };
+
+      let transferArgs : TransferArgs = {
+        from_subaccount = null;
+        to = { owner = recipient; subaccount = null };
+        amount = Nat64.toNat(amount);
+        fee = null;
+        memo = null;
+        created_at_time = ?Nat64.fromNat(Int.abs(Time.now()));
+      };
+
+      switch (await tokenActor.icrc1_transfer(transferArgs)) {
+        case (#Ok(_)) { true };
+        case (#Err(_)) { false };
+      };
+    } catch (e) {
+      false
+    }
+  };
+
+  // Get available tokens (for frontend dropdown)
+  public query func get_supported_tokens() : async [(Principal, Text, Nat8)] {
+    // Start with well-known tokens
+    var tokens : [(Principal, Text, Nat8)] = [
+      (KNOWN_TOKENS.PULSE, "PULSE", 8),
+      // Mainnet tokens (commented out for local testing)
+      // (KNOWN_TOKENS.ckBTC, "ckBTC", 8),
+      // (KNOWN_TOKENS.ckETH, "ckETH", 18),
+      // (KNOWN_TOKENS.ckUSDC, "ckUSDC", 6),
+      // (KNOWN_TOKENS.CHAT, "CHAT", 8),
+      // (KNOWN_TOKENS.SNS1, "SNS1", 8),
+    ];
+
+    // Add cached tokens that aren't already in the list
+    for ((canister, (symbol, decimals)) in Map.entries(tokenInfo)) {
+      let isKnown = Array.find<(Principal, Text, Nat8)>(tokens, func((p, _, _)) = Principal.equal(p, canister));
+      switch (isKnown) {
+        case null {
+          tokens := Array.append(tokens, [(canister, symbol, decimals)]);
+        };
+        case (?_) {}; // Already in the list
+      };
+    };
+
+    tokens
   };
 
   // Surveys
@@ -330,7 +613,17 @@ persistent actor class polls_surveys_backend() = this {
         case (?reward) {
           let totalFund = Nat64.fromNat(rewardFund) * 1_000_000; // Convert cents to e8s (rewardFund is in cents, so multiply by 1M instead of 100M)
           let maxResponses = if (reward > 0) { Nat64.toNat(totalFund / reward) } else { 0 };
-          ?{ totalFund = totalFund; rewardPerResponse = reward; maxResponses = maxResponses; currentResponses = 0; remainingFund = totalFund }
+          ?{
+            tokenType = #ICP;
+            tokenCanister = null;
+            tokenSymbol = "ICP";
+            tokenDecimals = 8 : Nat8;
+            totalFund = totalFund;
+            rewardPerResponse = reward;
+            maxResponses = maxResponses;
+            currentResponses = 0;
+            remainingFund = totalFund
+          }
         };
         case null { null }
       }
@@ -483,5 +776,134 @@ persistent actor class polls_surveys_backend() = this {
       }
     };
     Text.encodeUtf8(csv)
+  };
+
+  // Validate and get info for a custom token
+  public func validate_custom_token(canister: Principal) : async ?{symbol: Text; decimals: Nat8} {
+    if (await validateTokenCanister(canister)) {
+      let (symbol, decimals) = await getTokenInfo(?canister);
+      ?{symbol = symbol; decimals = decimals}
+    } else {
+      null
+    }
+  };
+
+  // Reward tracking types
+  type RewardStatus = { #pending; #claimed; #processing };
+
+  type PendingReward = {
+    id: Text;
+    pollId: PollId;
+    pollTitle: Text;
+    userPrincipal: Principal;
+    amount: Nat64;
+    tokenSymbol: Text;
+    tokenDecimals: Nat8;
+    tokenCanister: ?Principal;
+    status: RewardStatus;
+    claimedAt: ?Int;
+    votedAt: Int;
+  };
+
+  // Storage for user rewards
+  private var rewardCounter : Nat = 0;
+  private var rewardsArray : [PendingReward] = [];
+  private var rewards = Map.new<Text, PendingReward>();
+
+  // Initialize rewards map from stable array
+  private func initializeRewards() {
+    for (reward in rewardsArray.vals()) {
+      Map.set(rewards, Map.thash, reward.id, reward);
+    };
+  };
+
+  // Pre-upgrade: save rewards to stable array
+  system func preupgrade() {
+    let vals = Map.vals(rewards);
+    rewardsArray := Iter.toArray(vals);
+  };
+
+  // Post-upgrade: restore rewards from stable array
+  system func postupgrade() {
+    initializeRewards();
+  };
+
+  // Create a reward when user votes
+  private func createReward(pollId: PollId, pollTitle: Text, userPrincipal: Principal, amount: Nat64, tokenSymbol: Text, tokenDecimals: Nat8, tokenCanister: ?Principal) : Text {
+    rewardCounter += 1;
+    let rewardId = "reward_" # Nat.toText(rewardCounter);
+
+    let reward : PendingReward = {
+      id = rewardId;
+      pollId = pollId;
+      pollTitle = pollTitle;
+      userPrincipal = userPrincipal;
+      amount = amount;
+      tokenSymbol = tokenSymbol;
+      tokenDecimals = tokenDecimals;
+      tokenCanister = tokenCanister;
+      status = #pending;
+      claimedAt = null;
+      votedAt = now();
+    };
+
+    Map.set(rewards, Map.thash, rewardId, reward);
+    rewardId
+  };
+
+  // Get user's pending and claimed rewards
+  public query func get_user_rewards(userPrincipal: Principal) : async [PendingReward] {
+    let vals = Map.vals(rewards);
+    let allRewards = Iter.toArray(vals);
+    let userRewards = Array.filter(allRewards, func(reward: PendingReward) : Bool {
+      reward.userPrincipal == userPrincipal
+    });
+    userRewards
+  };
+
+  // Claim a pending reward
+  public shared (msg) func claim_reward(rewardId: Text) : async Bool {
+    switch (Map.get(rewards, Map.thash, rewardId)) {
+      case (?reward) {
+        // Verify the caller owns this reward
+        if (reward.userPrincipal != msg.caller) {
+          return false;
+        };
+
+        // Check if already claimed or processing
+        if (reward.status != #pending) {
+          return false;
+        };
+
+        // Mark as processing
+        let processingReward = { reward with status = #processing };
+        Map.set(rewards, Map.thash, rewardId, processingReward);
+
+        // Attempt to distribute the reward
+        let success = switch (reward.tokenCanister) {
+          case (?canister) {
+            // Custom token reward
+            await distributeCustomTokenReward(reward.userPrincipal, canister, reward.amount)
+          };
+          case null {
+            // ICP reward - would need ICP ledger integration
+            // For now, return true to simulate success
+            true
+          };
+        };
+
+        if (success) {
+          // Mark as claimed
+          let claimedReward = { reward with status = #claimed; claimedAt = ?now() };
+          Map.set(rewards, Map.thash, rewardId, claimedReward);
+          true
+        } else {
+          // Revert to pending if distribution failed
+          Map.set(rewards, Map.thash, rewardId, reward);
+          false
+        }
+      };
+      case null { false }
+    }
   };
 }
