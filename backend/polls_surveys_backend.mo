@@ -28,11 +28,11 @@ persistent actor class polls_surveys_backend() = this {
     #ICRC1: Principal; // Token canister ID
   };
 
-  // Well-known ICRC-1 token canisters (local/mainnet)
+  // Well-known ICRC-1 token canisters (mainnet)
   private let KNOWN_TOKENS = {
-    // For local testing, use the PULSE token we just created
-    PULSE = Principal.fromText("uzt4z-lp777-77774-qaabq-cai");
-    // Mainnet tokens (commented out for local testing)
+    // Start with our deployed PULSE token only
+    PULSE = Principal.fromText("zix77-6qaaa-aaaao-a4pwq-cai");
+    // Other mainnet tokens can be added after deployment verification
     // ckBTC = Principal.fromText("mxzaz-hqaaa-aaaar-qaada-cai");
     // ckETH = Principal.fromText("ss2fx-dyaaa-aaaar-qacoq-cai");
     // ckUSDC = Principal.fromText("xkbqi-6yaaa-aaaah-qbpqq-cai");
@@ -233,9 +233,9 @@ persistent actor class polls_surveys_backend() = this {
     switch (canister) {
       case null { ("ICP", 8) }; // Default ICP info
       case (?c) {
-        // Check for well-known tokens first
+        // Check for well-known mainnet tokens first
         if (Principal.equal(c, KNOWN_TOKENS.PULSE)) { return ("PULSE", 8); };
-        // Mainnet tokens (commented out for local testing)
+        // Other tokens commented out for initial deployment
         // if (Principal.equal(c, KNOWN_TOKENS.ckBTC)) { return ("ckBTC", 8); };
         // if (Principal.equal(c, KNOWN_TOKENS.ckETH)) { return ("ckETH", 18); };
         // if (Principal.equal(c, KNOWN_TOKENS.ckUSDC)) { return ("ckUSDC", 6); };
@@ -574,10 +574,10 @@ persistent actor class polls_surveys_backend() = this {
 
   // Get available tokens (for frontend dropdown)
   public query func get_supported_tokens() : async [(Principal, Text, Nat8)] {
-    // Start with well-known tokens
+    // Start with our deployed PULSE token only
     var tokens : [(Principal, Text, Nat8)] = [
       (KNOWN_TOKENS.PULSE, "PULSE", 8),
-      // Mainnet tokens (commented out for local testing)
+      // Other tokens commented out for initial deployment
       // (KNOWN_TOKENS.ckBTC, "ckBTC", 8),
       // (KNOWN_TOKENS.ckETH, "ckETH", 18),
       // (KNOWN_TOKENS.ckUSDC, "ckUSDC", 6),
