@@ -82,7 +82,12 @@ dfx ledger --network ic create-canister --amount AMOUNT
     "polls_surveys_frontend": {
       "type": "assets",
       "source": ["frontend/dist/"]
-    }
+    },
+    "tokenmania": {
+      "main": "backend/tokenmania.mo",
+      "type": "motoko",
+      "args": "--enhanced-orthogonal-persistence"
+    },
   },
   "networks": {
     "local": {

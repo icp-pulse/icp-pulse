@@ -10,7 +10,11 @@ export function useSupportedTokens() {
   return useQuery({
     queryKey: ['supported-tokens'],
     queryFn: async (): Promise<SupportedToken[]> => {
-      const backend = await createBackendWithIdentity(identity)
+      if (!identity) throw new Error('No identity available')
+
+      const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
+      const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
+      const backend = await createBackendWithIdentity({ canisterId, host, identity })
       return backend.get_supported_tokens()
     },
     enabled: isAuthenticated && !!identity,
@@ -26,9 +30,11 @@ export function useValidateToken(canister: string) {
   return useQuery({
     queryKey: ['validate-token', canister],
     queryFn: async (): Promise<TokenInfo | null> => {
-      if (!canister) return null
+      if (!canister || !identity) return null
 
-      const backend = await createBackendWithIdentity(identity)
+      const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
+      const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
+      const backend = await createBackendWithIdentity({ canisterId, host, identity })
       const result = await backend.validate_custom_token(canister)
 
       return result.length > 0 ? result[0] : null

@@ -23,6 +23,22 @@ export type AnswerInput = { questionId: bigint; nat: bigint | [] | null; nats: b
 export type SupportedToken = [string, string, number] // [Principal, Symbol, Decimals]
 export type TokenInfo = { symbol: string; decimals: number }
 
+// Reward types
+export type RewardStatus = { pending: null } | { claimed: null } | { processing: null }
+export type PendingReward = {
+  id: string
+  pollId: bigint
+  pollTitle: string
+  userPrincipal: string
+  amount: bigint
+  tokenSymbol: string
+  tokenDecimals: number
+  tokenCanister: string | null
+  status: RewardStatus
+  claimedAt: bigint | null
+  votedAt: bigint
+}
+
 export type BackendService = {
   create_project(name: string, description: string): Promise<bigint>
   list_projects(offset: bigint, limit: bigint): Promise<ProjectSummary[]>
@@ -34,7 +50,7 @@ export type BackendService = {
   get_product(id: bigint): Promise<[Product] | []>
   update_product(id: bigint, name: string, description: string, status: string): Promise<boolean>
 
-  create_poll(scopeType: string, scopeId: bigint, title: string, description: string, options: string[], closesAt: bigint, rewardFund: bigint): Promise<bigint>
+  create_poll(scopeType: string, scopeId: bigint, title: string, description: string, options: string[], closesAt: bigint, rewardFund: bigint, fundingEnabled: boolean, rewardPerVote: [] | [bigint]): Promise<bigint>
   create_custom_token_poll(scopeType: string, scopeId: bigint, title: string, description: string, options: string[], closesAt: bigint, tokenCanister: [string] | [], totalFunding: bigint, rewardPerVote: bigint): Promise<bigint>
   list_polls_by_project(projectId: bigint, offset: bigint, limit: bigint): Promise<PollSummary[]>
   list_polls_by_product(productId: bigint, offset: bigint, limit: bigint): Promise<PollSummary[]>
@@ -53,4 +69,8 @@ export type BackendService = {
   // Token functions
   get_supported_tokens(): Promise<SupportedToken[]>
   validate_custom_token(canister: string): Promise<[TokenInfo] | []>
+
+  // Reward functions
+  get_user_rewards(userPrincipal: string): Promise<PendingReward[]>
+  claim_reward(rewardId: string): Promise<boolean>
 }

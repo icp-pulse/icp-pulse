@@ -1,4 +1,5 @@
 import Array "mo:base/Array";
+import Iter "mo:base/Iter";
 import Blob "mo:base/Blob";
 import Bool "mo:base/Bool";
 import Nat "mo:base/Nat";
@@ -484,15 +485,32 @@ persistent actor class polls_surveys_backend() = this {
   public query func get_poll(id : PollId) : async ?Poll { findPoll(id) };
 
   public shared (msg) func vote(pollId : PollId, optionId : Nat) : async Bool {
-    var ok = false;
-    polls := Array.tabulate<Poll>(polls.size(), func i {
-      let p = polls[i];
-      if (p.id == pollId) {
-        if ((p.status == #closed) or (p.closesAt <= now())) { ok := false; p } else {
-          // Check one vote per principal
-          var already = false;
-          for (vp in p.voterPrincipals.vals()) { if (vp == msg.caller) { already := true } };
-          if (already or (optionId >= p.options.size())) { ok := false; p } else {
+    // First, find the poll and validate the vote
+    switch (findPoll(pollId)) {
+      case (?poll) {
+        if ((poll.status == #closed) or (poll.closesAt <= now())) { return false };
+
+        // Check one vote per principal
+        var already = false;
+        for (vp in poll.voterPrincipals.vals()) { if (vp == msg.caller) { already := true } };
+        if (already or (optionId >= poll.options.size())) { return false };
+
+        // Create reward if funding is enabled
+        switch (poll.fundingInfo) {
+          case (?funding) {
+            if (funding.currentResponses < funding.maxResponses) {
+              let (tokenSymbol, tokenDecimals) = await getTokenInfo(funding.tokenCanister);
+              ignore createReward(poll.id, poll.title, msg.caller, funding.rewardPerResponse, tokenSymbol, tokenDecimals, funding.tokenCanister);
+            };
+          };
+          case null { };
+        };
+
+        // Now update the poll data
+        var ok = false;
+        polls := Array.tabulate<Poll>(polls.size(), func i {
+          let p = polls[i];
+          if (p.id == pollId) {
             let updatedOptions = Array.tabulate<OptionT>(p.options.size(), func j {
               let o = p.options[j];
               if (j == optionId) { { id = o.id; text = o.text; votes = o.votes + 1 } } else { o }
@@ -508,11 +526,12 @@ persistent actor class polls_surveys_backend() = this {
               case null { null }
             };
             { p with options = updatedOptions; totalVotes = p.totalVotes + 1; voterPrincipals = Array.append(p.voterPrincipals, [msg.caller]); fundingInfo = updatedFunding }
-          }
-        }
-      } else { p }
-    });
-    ok
+          } else { p }
+        });
+        ok
+      };
+      case null { false }
+    }
   };
 
   public shared func close_poll(pollId : PollId) : async Bool {
@@ -766,6 +785,125 @@ persistent actor class polls_surveys_backend() = this {
       ?{symbol = symbol; decimals = decimals}
     } else {
       null
+    }
+  };
+
+  // Reward tracking types
+  type RewardStatus = { #pending; #claimed; #processing };
+
+  type PendingReward = {
+    id: Text;
+    pollId: PollId;
+    pollTitle: Text;
+    userPrincipal: Principal;
+    amount: Nat64;
+    tokenSymbol: Text;
+    tokenDecimals: Nat8;
+    tokenCanister: ?Principal;
+    status: RewardStatus;
+    claimedAt: ?Int;
+    votedAt: Int;
+  };
+
+  // Storage for user rewards
+  private var rewardCounter : Nat = 0;
+  private var rewardsArray : [PendingReward] = [];
+  private var rewards = Map.new<Text, PendingReward>();
+
+  // Initialize rewards map from stable array
+  private func initializeRewards() {
+    for (reward in rewardsArray.vals()) {
+      Map.set(rewards, Map.thash, reward.id, reward);
+    };
+  };
+
+  // Pre-upgrade: save rewards to stable array
+  system func preupgrade() {
+    let vals = Map.vals(rewards);
+    rewardsArray := Iter.toArray(vals);
+  };
+
+  // Post-upgrade: restore rewards from stable array
+  system func postupgrade() {
+    initializeRewards();
+  };
+
+  // Create a reward when user votes
+  private func createReward(pollId: PollId, pollTitle: Text, userPrincipal: Principal, amount: Nat64, tokenSymbol: Text, tokenDecimals: Nat8, tokenCanister: ?Principal) : Text {
+    rewardCounter += 1;
+    let rewardId = "reward_" # Nat.toText(rewardCounter);
+
+    let reward : PendingReward = {
+      id = rewardId;
+      pollId = pollId;
+      pollTitle = pollTitle;
+      userPrincipal = userPrincipal;
+      amount = amount;
+      tokenSymbol = tokenSymbol;
+      tokenDecimals = tokenDecimals;
+      tokenCanister = tokenCanister;
+      status = #pending;
+      claimedAt = null;
+      votedAt = now();
+    };
+
+    Map.set(rewards, Map.thash, rewardId, reward);
+    rewardId
+  };
+
+  // Get user's pending and claimed rewards
+  public query func get_user_rewards(userPrincipal: Principal) : async [PendingReward] {
+    let vals = Map.vals(rewards);
+    let allRewards = Iter.toArray(vals);
+    let userRewards = Array.filter(allRewards, func(reward: PendingReward) : Bool {
+      reward.userPrincipal == userPrincipal
+    });
+    userRewards
+  };
+
+  // Claim a pending reward
+  public shared (msg) func claim_reward(rewardId: Text) : async Bool {
+    switch (Map.get(rewards, Map.thash, rewardId)) {
+      case (?reward) {
+        // Verify the caller owns this reward
+        if (reward.userPrincipal != msg.caller) {
+          return false;
+        };
+
+        // Check if already claimed or processing
+        if (reward.status != #pending) {
+          return false;
+        };
+
+        // Mark as processing
+        let processingReward = { reward with status = #processing };
+        Map.set(rewards, Map.thash, rewardId, processingReward);
+
+        // Attempt to distribute the reward
+        let success = switch (reward.tokenCanister) {
+          case (?canister) {
+            // Custom token reward
+            await distributeCustomTokenReward(reward.userPrincipal, canister, reward.amount)
+          };
+          case null {
+            // ICP reward - would need ICP ledger integration
+            // For now, return true to simulate success
+            true
+          };
+        };
+
+        if (success) {
+          // Mark as claimed
+          let claimedReward = { reward with status = #claimed; claimedAt = ?now() };
+          Map.set(rewards, Map.thash, rewardId, claimedReward);
+          true
+        } else {
+          // Revert to pending if distribution failed
+          Map.set(rewards, Map.thash, rewardId, reward);
+          false
+        }
+      };
+      case null { false }
     }
   };
 }

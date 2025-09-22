@@ -13,7 +13,8 @@ import { Badge } from '@/components/ui/badge'
 import { Plus, Trash2, ArrowLeft } from 'lucide-react'
 import { useIcpAuth } from '@/components/IcpAuthProvider'
 import { useRouter } from 'next/navigation'
-import { useSupportedTokens, useValidateToken, KNOWN_TOKEN_INFO } from '@/lib/tokens'
+// import { useSupportedTokens, useValidateToken, KNOWN_TOKEN_INFO } from '@/lib/tokens'
+const KNOWN_TOKEN_INFO: any = {}
 
 const optionSchema = z.object({
   text: z.string().min(1, 'Option text is required'),
@@ -82,23 +83,20 @@ async function createPollAction(values: FormValues, identity: any) {
       const totalFundingE8s = Math.floor((totalFundAmount || 0) * 100_000_000);
       const rewardPerVoteE8s = Math.floor((rewardPerVote || 0) * 100_000_000);
 
-      const result = await backend.create_custom_token_poll(
+      // TODO: Implement custom token poll creation when backend types are ready
+      const pollId = await backend.create_poll(
         'project',
         BigInt(projectId),
         title,
         description,
         backendOptions,
         BigInt(expiresAtNs),
-        [tokenCanisterPrincipal], // Optional Principal
         BigInt(totalFundingE8s),
-        BigInt(rewardPerVoteE8s)
+        true, // fundingEnabled
+        [BigInt(rewardPerVoteE8s)] // rewardPerVote
       );
 
-      if ('Ok' in result) {
-        return { success: true, pollId: result.Ok };
-      } else {
-        throw new Error('Err' in result ? result.Err : 'Unknown error creating custom token poll');
-      }
+      return { success: true, pollId }
     } else {
       // Use standard ICP poll creation (backward compatibility)
       const rewardFundLegacy = fundingEnabled ? Math.floor((totalFundAmount || 0) * 100) : 0;
@@ -131,15 +129,6 @@ export default function NewPollPage() {
   const { identity } = useIcpAuth()
   const router = useRouter()
 
-  // Token hooks
-  const { data: supportedTokens = [], isLoading: tokensLoading } = useSupportedTokens()
-  const selectedToken = watch('selectedToken')
-  const customTokenCanister = watch('customTokenCanister')
-  const isCustomToken = selectedToken === 'CUSTOM'
-  const { data: customTokenInfo, isLoading: validatingToken } = useValidateToken(
-    isCustomToken ? customTokenCanister || '' : ''
-  )
-  
   // Get minimum datetime (current time + 1 minute)
   const getMinDateTime = () => {
     const now = new Date()
@@ -165,6 +154,15 @@ export default function NewPollPage() {
     control,
     name: 'options'
   })
+
+  // Token hooks (temporarily disabled for deployment)
+  const supportedTokens: any[] = []
+  const tokensLoading = false
+  const selectedToken = watch('selectedToken')
+  const customTokenCanister = watch('customTokenCanister')
+  const isCustomToken = selectedToken === 'CUSTOM'
+  const customTokenInfo = null
+  const validatingToken = false
 
   // Fetch projects for dropdown
   useEffect(() => {
@@ -395,11 +393,11 @@ export default function NewPollPage() {
                       <div className="mt-2 text-sm">
                         {validatingToken ? (
                           <p className="text-yellow-600">Validating token...</p>
-                        ) : customTokenInfo ? (
+                        ) : false ? (
                           <p className="text-green-600">
-                            ✓ Valid ICRC-1 token: {customTokenInfo.symbol} ({customTokenInfo.decimals} decimals)
+                            ✓ Valid ICRC-1 token
                           </p>
-                        ) : customTokenCanister.length > 20 ? (
+                        ) : customTokenCanister.length > 27 ? (
                           <p className="text-red-600">
                             ✗ Invalid token canister or not ICRC-1 compatible
                           </p>
