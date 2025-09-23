@@ -5,13 +5,22 @@ import { WalletBalance } from '@/components/WalletBalance'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Wallet, ArrowUpRight, ArrowDownLeft, RefreshCw, Copy, ExternalLink, AlertCircle } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Wallet, ArrowUpRight, ArrowDownLeft, RefreshCw, Copy, ExternalLink, AlertCircle, Send, QrCode } from 'lucide-react'
 import { analytics } from '@/lib/analytics'
 import Link from 'next/link'
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 
 export default function WalletPage() {
   const { identity, isAuthenticated, principalText } = useIcpAuth()
+  const [transferAmount, setTransferAmount] = useState('')
+  const [recipientAddress, setRecipientAddress] = useState('ues2k-6iwxj-nbezb-owlhg-nsem4-abqjc-74ocv-lsxps-ytjv4-2tphv-yqe')
+  const [isTransferring, setIsTransferring] = useState(false)
+  const [transferResult, setTransferResult] = useState<{ success: boolean; message: string } | null>(null)
+  const [showReceiveModal, setShowReceiveModal] = useState(false)
+  const [copySuccess, setCopySuccess] = useState(false)
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -28,6 +37,92 @@ export default function WalletPage() {
       button_name: 'copy_wallet_address',
       page: 'wallet'
     })
+  }
+
+  const copyReceiveAddress = () => {
+    if (principalText) {
+      navigator.clipboard.writeText(principalText)
+      setCopySuccess(true)
+      setTimeout(() => setCopySuccess(false), 2000)
+
+      analytics.track('button_clicked', {
+        button_name: 'copy_receive_address',
+        page: 'wallet'
+      })
+    }
+  }
+
+  const transferPulse = async () => {
+    if (!identity || !isAuthenticated || !transferAmount || !recipientAddress) {
+      setTransferResult({ success: false, message: 'Please fill in all fields' })
+      return
+    }
+
+    try {
+      setIsTransferring(true)
+      setTransferResult(null)
+
+      // Import tokenmania canister
+      const { createActor } = await import('../../../src/declarations/tokenmania')
+      const { HttpAgent } = await import('@dfinity/agent')
+
+      const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
+      const agent = HttpAgent.createSync({ host })
+
+      if (process.env.NEXT_PUBLIC_DFX_NETWORK === 'local') {
+        await agent.fetchRootKey()
+      }
+
+      agent.replaceIdentity(identity)
+
+      const tokenmaniaActor = createActor(process.env.NEXT_PUBLIC_TOKENMANIA_CANISTER_ID!, { agent })
+
+      // Convert amount to smallest unit (8 decimals)
+      const amountInSmallestUnit = BigInt(Math.floor(parseFloat(transferAmount) * 100_000_000))
+
+      // Import Principal to convert string to Principal
+      const { Principal } = await import('@dfinity/principal')
+
+      // Perform transfer
+      const result = await tokenmaniaActor.icrc1_transfer({
+        to: {
+          owner: Principal.fromText(recipientAddress),
+          subaccount: []
+        },
+        amount: amountInSmallestUnit,
+        fee: [],
+        memo: [],
+        created_at_time: [],
+        from_subaccount: []
+      })
+
+      if ('Ok' in result) {
+        setTransferResult({
+          success: true,
+          message: `Successfully transferred ${transferAmount} PULSE tokens! Transaction ID: ${result.Ok}`
+        })
+        setTransferAmount('')
+
+        analytics.track('button_clicked', {
+          button_name: 'transfer_pulse',
+          page: 'wallet'
+        })
+      } else {
+        setTransferResult({
+          success: false,
+          message: `Transfer failed: ${Object.keys(result.Err)[0]}`
+        })
+      }
+
+    } catch (error) {
+      console.error('Transfer error:', error)
+      setTransferResult({
+        success: false,
+        message: `Transfer failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      })
+    } finally {
+      setIsTransferring(false)
+    }
   }
 
   if (!isAuthenticated) {
@@ -72,7 +167,77 @@ export default function WalletPage() {
               <CardTitle className="text-lg">Quick Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <Button asChild className="w-full">
+              <Dialog open={showReceiveModal} onOpenChange={setShowReceiveModal}>
+                <DialogTrigger asChild>
+                  <Button className="w-full">
+                    <ArrowDownLeft className="h-4 w-4 mr-2" />
+                    Receive PULSE
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm">
+                  <DialogHeader>
+                    <DialogTitle>Receive PULSE Tokens</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="text-center">
+                      <p className="text-sm text-muted-foreground mb-4">
+                        Share your wallet address to receive PULSE tokens
+                      </p>
+
+                      {/* QR Code placeholder */}
+                      <div className="w-48 h-48 mx-auto mb-4 bg-gray-100 dark:bg-gray-800 rounded-lg flex items-center justify-center border-2 border-dashed border-gray-300 dark:border-gray-600">
+                        <div className="text-center">
+                          <QrCode className="h-12 w-12 mx-auto mb-2 text-gray-400" />
+                          <p className="text-xs text-gray-500">QR Code</p>
+                          <p className="text-xs text-gray-400">{principalText?.slice(0, 8)}...</p>
+                        </div>
+                      </div>
+
+                      {/* Address display */}
+                      <div className="space-y-2">
+                        <Label className="text-sm font-medium">Your Wallet Address</Label>
+                        <div className="flex items-center space-x-2">
+                          <Input
+                            value={principalText || ''}
+                            readOnly
+                            className="text-center font-mono text-xs"
+                          />
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={copyReceiveAddress}
+                            className="shrink-0"
+                          >
+                            {copySuccess ? (
+                              <>
+                                <AlertCircle className="h-4 w-4 mr-1 text-green-500" />
+                                Copied!
+                              </>
+                            ) : (
+                              <>
+                                <Copy className="h-4 w-4 mr-1" />
+                                Copy
+                              </>
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+
+                      {/* Instructions */}
+                      <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                        <p className="text-xs text-blue-700 dark:text-blue-300">
+                          <strong>How to receive PULSE:</strong><br />
+                          1. Share this address with the sender<br />
+                          2. They can use any ICRC-1 compatible wallet<br />
+                          3. Tokens will appear in your balance automatically
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+
+              <Button variant="outline" asChild className="w-full">
                 <Link href="/rewards">
                   <ArrowDownLeft className="h-4 w-4 mr-2" />
                   Claim Rewards
@@ -91,6 +256,58 @@ export default function WalletPage() {
                   <RefreshCw className="h-4 w-4 mr-2" />
                   View Dashboard
                 </Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* Transfer PULSE Tokens */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Transfer PULSE</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="amount">Amount (PULSE)</Label>
+                <Input
+                  id="amount"
+                  type="number"
+                  placeholder="Enter amount"
+                  value={transferAmount}
+                  onChange={(e) => setTransferAmount(e.target.value)}
+                  step="0.00000001"
+                  min="0"
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="recipient">Recipient Address</Label>
+                <Input
+                  id="recipient"
+                  type="text"
+                  placeholder="Principal ID"
+                  value={recipientAddress}
+                  onChange={(e) => setRecipientAddress(e.target.value)}
+                  className="font-mono text-xs"
+                />
+              </div>
+
+              {transferResult && (
+                <div className={`p-3 rounded-lg text-sm ${
+                  transferResult.success
+                    ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800'
+                    : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 border border-red-200 dark:border-red-800'
+                }`}>
+                  {transferResult.message}
+                </div>
+              )}
+
+              <Button
+                onClick={transferPulse}
+                disabled={isTransferring || !transferAmount || !recipientAddress}
+                className="w-full"
+              >
+                <Send className="h-4 w-4 mr-2" />
+                {isTransferring ? 'Transferring...' : 'Transfer PULSE'}
               </Button>
             </CardContent>
           </Card>
