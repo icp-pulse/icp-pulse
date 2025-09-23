@@ -4,12 +4,16 @@ import { useState, useEffect } from 'react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
+import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 import { useIcpAuth } from '@/components/IcpAuthProvider'
 import { useRouter } from 'next/navigation'
-import { Clock, Users, Vote, CheckCircle, BarChart3 } from 'lucide-react'
+import { Clock, Users, Vote, CheckCircle, BarChart3, Search, Filter, TrendingUp, Grid, List, Plus, ArrowUpDown, Flame, Star, Eye } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
+import { analytics } from '@/lib/analytics'
 
 // Use the actual backend types
 import type { Poll as BackendPoll, PollSummary } from '@/../../src/declarations/polls_surveys_backend/polls_surveys_backend.did'
@@ -23,10 +27,16 @@ interface Project {
 
 export default function PollsPage() {
   const [polls, setPolls] = useState<BackendPoll[]>([])
+  const [filteredPolls, setFilteredPolls] = useState<BackendPoll[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [votingPoll, setVotingPoll] = useState<bigint | null>(null)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [statusFilter, setStatusFilter] = useState('all')
+  const [projectFilter, setProjectFilter] = useState('all')
+  const [sortBy, setSortBy] = useState('recent')
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>('table')
   const { identity } = useIcpAuth()
   const router = useRouter()
 
@@ -67,13 +77,71 @@ export default function PollsPage() {
       }
       
       setPolls(allPolls)
+      setFilteredPolls(allPolls)
+
+      // Track page view
+      analytics.track('page_viewed', {
+        path: '/polls',
+        page_title: 'Browse Polls'
+      })
     } catch (err) {
       console.error('Error fetching data:', err)
       setError('Failed to load polls')
+
+      analytics.track('error_occurred', {
+        error_type: 'polls_load_failed',
+        error_message: err instanceof Error ? err.message : 'Unknown error',
+        component: 'PollsPage',
+        action: 'fetch_data'
+      })
     } finally {
       setLoading(false)
     }
   }
+
+  // Filter and sort polls
+  useEffect(() => {
+    let filtered = [...polls]
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      filtered = filtered.filter(poll =>
+        poll.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        poll.description.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+    }
+
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(poll => {
+        const isActive = 'active' in poll.status
+        return statusFilter === 'active' ? isActive : !isActive
+      })
+    }
+
+    // Apply project filter
+    if (projectFilter !== 'all') {
+      filtered = filtered.filter(poll => poll.scopeId.toString() === projectFilter)
+    }
+
+    // Apply sorting
+    filtered.sort((a, b) => {
+      switch (sortBy) {
+        case 'votes':
+          return Number(b.totalVotes) - Number(a.totalVotes)
+        case 'recent':
+          return Number(b.createdAt) - Number(a.createdAt)
+        case 'ending':
+          return Number(a.closesAt) - Number(b.closesAt)
+        case 'rewards':
+          return Number(b.rewardFund) - Number(a.rewardFund)
+        default:
+          return 0
+      }
+    })
+
+    setFilteredPolls(filtered)
+  }, [polls, searchQuery, statusFilter, projectFilter, sortBy])
 
   const handleVote = async (pollId: bigint, optionId: bigint) => {
     if (!identity || votingPoll) return
@@ -144,17 +212,37 @@ export default function PollsPage() {
     return totalVotes > 0n ? Math.round((Number(votes) / Number(totalVotes)) * 100) : 0
   }
 
+  const getTrendingPolls = () => {
+    return [...filteredPolls]
+      .sort((a, b) => Number(b.totalVotes) - Number(a.totalVotes))
+      .slice(0, 5)
+  }
+
+  const getPercentageChange = (poll: BackendPoll) => {
+    // Mock percentage change for demonstration
+    const changes = ['+12.5%', '+8.3%', '-2.1%', '+25.7%', '+4.2%', '-1.8%']
+    return changes[Number(poll.id) % changes.length]
+  }
+
+  const getVolumeChange = (poll: BackendPoll) => {
+    // Mock volume change for demonstration
+    const volumes = ['+127%', '+89%', '-15%', '+234%', '+67%', '-8%']
+    return volumes[Number(poll.id) % volumes.length]
+  }
+
   if (loading) {
     return (
-      <div className="max-w-6xl mx-auto p-6">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold">Polls</h1>
-          <p className="text-gray-600 dark:text-gray-400">Loading...</p>
-        </div>
-        <div className="animate-pulse space-y-4">
-          {[1, 2, 3].map(i => (
-            <div key={i} className="h-48 bg-gray-200 rounded-lg"></div>
-          ))}
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <div className="animate-pulse space-y-6">
+            <div className="h-8 bg-gray-200 rounded w-1/4"></div>
+            <div className="h-4 bg-gray-200 rounded w-1/2"></div>
+            <div className="space-y-4">
+              {[1, 2, 3, 4, 5].map(i => (
+                <div key={i} className="h-16 bg-gray-200 rounded"></div>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
     )
@@ -162,9 +250,9 @@ export default function PollsPage() {
 
   if (!identity) {
     return (
-      <div className="max-w-6xl mx-auto p-6">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold">Polls</h1>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <h1 className="text-3xl font-bold mb-4">Browse Polls</h1>
           <p className="text-gray-600 dark:text-gray-400">Please login to view and vote on polls.</p>
         </div>
       </div>
@@ -172,201 +260,465 @@ export default function PollsPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Polls</h1>
-          <p className="text-gray-600 dark:text-gray-400">
-            Vote on active polls and see results
-          </p>
-        </div>
-        <Button onClick={() => router.push('/polls/new')}>
-          Create Poll
-        </Button>
-      </div>
-
-      {/* Error Display */}
-      {error && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <p className="text-red-600">{error}</p>
-          <Button variant="ghost" onClick={() => setError(null)} className="mt-2">
-            Dismiss
-          </Button>
-        </div>
-      )}
-
-      {/* Polls List */}
-      {polls.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <Vote className="w-16 h-16 text-gray-400 mb-4" />
-            <h3 className="text-lg font-medium text-gray-600 mb-2">No Polls Available</h3>
-            <p className="text-gray-500 text-center mb-4">
-              There are no active polls at the moment. Check back later or create your own poll.
-            </p>
-            <Button onClick={() => router.push('/polls/new')}>
-              Create First Poll
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        {/* Header */}
+        <div className="mb-6">
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Browse Polls</h1>
+              <p className="text-gray-600 dark:text-gray-400 mt-1">
+                Discover and participate in community polls
+              </p>
+            </div>
+            <Button
+              onClick={() => router.push('/polls/new')}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Create Poll
             </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="grid gap-6">
-          {polls.map((poll) => {
-            const project = getProject(poll.scopeId)
-            const userVoted = hasUserVoted(poll)
-            const isActive = 'active' in poll.status
-            const timeLeft = formatTimeLeft(poll.closesAt)
-            const isVoting = votingPoll === poll.id
+          </div>
 
-            return (
-              <Card key={poll.id} className="overflow-hidden">
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center gap-3 mb-2">
-                        <CardTitle className="text-xl">{poll.title}</CardTitle>
-                        <Badge variant={isActive ? "default" : "secondary"}>
-                          {isActive ? 'Active' : 'Closed'}
-                        </Badge>
-                      </div>
-                      <p className="text-gray-600 dark:text-gray-400 mb-3">
-                        {poll.description}
-                      </p>
-                      <div className="flex items-center gap-4 text-sm text-gray-500">
-                        <div className="flex items-center gap-1">
-                          <Users className="w-4 h-4" />
-                          {Number(poll.totalVotes)} votes
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <Clock className="w-4 h-4" />
-                          {timeLeft}
-                        </div>
-                        {project && (
-                          <Badge variant="outline">
-                            {project.name}
-                          </Badge>
-                        )}
-                        {userVoted && (
-                          <Badge variant="secondary">
-                            You voted
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
+          {/* Tabs Navigation */}
+          <Tabs value="trending" className="w-full">
+            <div className="flex items-center justify-between mb-6">
+              <TabsList className="bg-transparent p-0 space-x-8">
+                <TabsTrigger
+                  value="trending"
+                  className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none pb-2"
+                >
+                  <Flame className="h-4 w-4 mr-2" />
+                  Trending
+                </TabsTrigger>
+                <TabsTrigger
+                  value="watchlist"
+                  className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none pb-2"
+                >
+                  <Star className="h-4 w-4 mr-2" />
+                  Watchlist
+                </TabsTrigger>
+                <TabsTrigger
+                  value="voted"
+                  className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none pb-2"
+                >
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Voted
+                </TabsTrigger>
+              </TabsList>
+
+              {/* Search and Filters */}
+              <div className="flex items-center gap-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                  <Input
+                    placeholder="Search by poll title or description"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-10 w-64 bg-white dark:bg-gray-800"
+                  />
+                </div>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-32 bg-white dark:bg-gray-800">
+                    <SelectValue placeholder="Status" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Status</SelectItem>
+                    <SelectItem value="active">Active</SelectItem>
+                    <SelectItem value="closed">Closed</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={projectFilter} onValueChange={setProjectFilter}>
+                  <SelectTrigger className="w-40 bg-white dark:bg-gray-800">
+                    <SelectValue placeholder="Project" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Projects</SelectItem>
+                    {projects.map(project => (
+                      <SelectItem key={project.id.toString()} value={project.id.toString()}>
+                        {project.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <TabsContent value="trending" className="space-y-6">
+              {/* Trending Polls Header */}
+              <div className="bg-white dark:bg-gray-800 rounded-lg p-6 shadow-sm border">
+                <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-orange-500" />
+                  Trending Polls
+                </h2>
+                <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                  Aggregated from {polls.length} active polls.
+                </p>
+
+                {/* Controls */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <Select value={sortBy} onValueChange={setSortBy}>
+                      <SelectTrigger className="w-40">
+                        <ArrowUpDown className="h-4 w-4 mr-2" />
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="votes">Top Volume</SelectItem>
+                        <SelectItem value="recent">Most Recent</SelectItem>
+                        <SelectItem value="ending">Ending Soon</SelectItem>
+                        <SelectItem value="rewards">Highest Rewards</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <span className="text-sm text-gray-500">
+                      {filteredPolls.length} polls
+                    </span>
                   </div>
-                </CardHeader>
-                
-                <CardContent>
-                  <div className="space-y-3">
-                    {poll.options.map((option, index) => {
-                      const percentage = getVotePercentage(option.votes, poll.totalVotes)
-                      
-                      return (
-                        <div key={option.id} className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3 flex-1">
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant={viewMode === 'table' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setViewMode('table')}
+                    >
+                      <List className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant={viewMode === 'grid' ? 'default' : 'outline'}
+                      size="sm"
+                      onClick={() => setViewMode('grid')}
+                    >
+                      <Grid className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Error Display */}
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                  <p className="text-red-600">{error}</p>
+                  <Button variant="ghost" onClick={() => setError(null)} className="mt-2">
+                    Dismiss
+                  </Button>
+                </div>
+              )}
+
+              {/* Polls Table/Grid */}
+              {filteredPolls.length === 0 ? (
+                <Card>
+                  <CardContent className="flex flex-col items-center justify-center py-16">
+                    <Vote className="w-16 h-16 text-gray-400 mb-4" />
+                    <h3 className="text-lg font-medium text-gray-600 mb-2">No Polls Found</h3>
+                    <p className="text-gray-500 text-center mb-4">
+                      {polls.length === 0
+                        ? "There are no active polls at the moment. Check back later or create your own poll."
+                        : "No polls match your current filters. Try adjusting your search criteria."
+                      }
+                    </p>
+                    <Button onClick={() => router.push('/polls/new')}>
+                      Create First Poll
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : viewMode === 'table' ? (
+                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border overflow-hidden">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-b bg-gray-50 dark:bg-gray-900/50">
+                        <TableHead className="w-12 text-center">#</TableHead>
+                        <TableHead>Poll</TableHead>
+                        <TableHead className="text-right">Votes (24h)</TableHead>
+                        <TableHead className="text-right">Total Votes</TableHead>
+                        <TableHead className="text-right">Volume Change</TableHead>
+                        <TableHead className="text-right">Rewards</TableHead>
+                        <TableHead className="text-right">Status</TableHead>
+                        <TableHead className="w-20"></TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredPolls.map((poll, index) => {
+                        const project = getProject(poll.scopeId)
+                        const userVoted = hasUserVoted(poll)
+                        const isActive = 'active' in poll.status
+                        const timeLeft = formatTimeLeft(poll.closesAt)
+                        const isVoting = votingPoll === poll.id
+                        const percentageChange = getPercentageChange(poll)
+                        const volumeChange = getVolumeChange(poll)
+
+                        return (
+                          <TableRow key={poll.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                            <TableCell className="text-center font-medium text-gray-500">
+                              {index + 1}
+                            </TableCell>
+                            <TableCell>
+                              <div className="flex items-center gap-3">
+                                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                                  <span className="text-white text-sm font-bold">
+                                    {poll.title.slice(0, 2).toUpperCase()}
+                                  </span>
+                                </div>
+                                <div>
+                                  <div className="font-medium text-gray-900 dark:text-gray-100">
+                                    {poll.title}
+                                  </div>
+                                  <div className="text-sm text-gray-500 flex items-center gap-2">
+                                    {project?.name && (
+                                      <Badge variant="outline" className="text-xs">
+                                        {project.name}
+                                      </Badge>
+                                    )}
+                                    {userVoted && (
+                                      <Badge variant="secondary" className="text-xs">
+                                        <CheckCircle className="h-3 w-3 mr-1" />
+                                        Voted
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="font-medium">{Number(poll.totalVotes)}</div>
+                              <div className={`text-sm ${percentageChange.startsWith('+') ? 'text-green-600' : 'text-red-600'}`}>
+                                {percentageChange}
+                              </div>
+                            </TableCell>
+                            <TableCell className="text-right font-medium">
+                              {Number(poll.totalVotes)}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <span className={`text-sm font-medium ${volumeChange.startsWith('+') ? 'text-green-600' : 'text-red-600'}`}>
+                                {volumeChange}
+                              </span>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              {Number(poll.rewardFund) > 0 ? (
+                                <div className="font-medium text-green-600">
+                                  {(Number(poll.rewardFund) / 100_000_000).toFixed(2)} ICP
+                                </div>
+                              ) : (
+                                <span className="text-gray-400">-</span>
+                              )}
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="space-y-1">
+                                <Badge variant={isActive ? "default" : "secondary"} className="text-xs">
+                                  {isActive ? 'Active' : 'Closed'}
+                                </Badge>
+                                <div className="text-xs text-gray-500">
+                                  {timeLeft}
+                                </div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
                               {isActive && !userVoted ? (
                                 <AlertDialog>
                                   <AlertDialogTrigger asChild>
                                     <Button
-                                      variant="outline"
                                       size="sm"
                                       disabled={isVoting}
-                                      className="min-w-fit"
+                                      className="bg-blue-600 hover:bg-blue-700"
                                     >
-                                      {isVoting ? 'Voting...' : 'Vote'}
+                                      <Vote className="h-4 w-4" />
                                     </Button>
                                   </AlertDialogTrigger>
                                   <AlertDialogContent>
                                     <AlertDialogHeader>
-                                      <AlertDialogTitle>Confirm Your Vote</AlertDialogTitle>
+                                      <AlertDialogTitle>Vote on: {poll.title}</AlertDialogTitle>
                                       <AlertDialogDescription>
-                                        Are you sure you want to vote for &quot;{option.text}&quot;? 
-                                        {poll.fundingInfo && poll.fundingInfo.length > 0 && (
-                                          <span className="block mt-2 text-blue-600 font-medium">
-                                            🎁 You&apos;ll receive {(Number(poll.fundingInfo[0]?.rewardPerResponse) / 100_000_000).toFixed(8)} ICP as a reward!
-                                          </span>
-                                        )}
-                                        <span className="block mt-2 text-sm text-gray-600">
-                                          You can only vote once on this poll.
-                                        </span>
+                                        Choose your option:
                                       </AlertDialogDescription>
                                     </AlertDialogHeader>
+                                    <div className="space-y-2">
+                                      {poll.options.map((option) => (
+                                        <Button
+                                          key={option.id}
+                                          variant="outline"
+                                          onClick={() => handleVote(poll.id, option.id)}
+                                          className="w-full justify-start"
+                                        >
+                                          {option.text}
+                                        </Button>
+                                      ))}
+                                    </div>
                                     <AlertDialogFooter>
                                       <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                      <AlertDialogAction 
-                                        onClick={() => handleVote(poll.id, option.id)}
-                                        className="bg-blue-600 hover:bg-blue-700"
-                                      >
-                                        Confirm Vote
-                                      </AlertDialogAction>
                                     </AlertDialogFooter>
                                   </AlertDialogContent>
                                 </AlertDialog>
                               ) : (
-                                <div className="w-16" />
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => router.push(`/results?pollId=${poll.id}`)}
+                                >
+                                  <Eye className="h-4 w-4" />
+                                </Button>
                               )}
-                              <span className="text-sm font-medium">{option.text}</span>
+                            </TableCell>
+                          </TableRow>
+                        )
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredPolls.map((poll) => {
+                    const project = getProject(poll.scopeId)
+                    const userVoted = hasUserVoted(poll)
+                    const isActive = 'active' in poll.status
+                    const timeLeft = formatTimeLeft(poll.closesAt)
+                    const isVoting = votingPoll === poll.id
+
+                    return (
+                      <Card key={poll.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+                        <CardHeader className="pb-3">
+                          <div className="flex items-center gap-3 mb-2">
+                            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
+                              <span className="text-white text-xs font-bold">
+                                {poll.title.slice(0, 2).toUpperCase()}
+                              </span>
                             </div>
-                            <div className="flex items-center gap-3">
-                              <span className="text-sm text-gray-500">
-                                {Number(option.votes)} votes
-                              </span>
-                              <span className="text-sm font-medium min-w-[3rem] text-right">
-                                {percentage}%
-                              </span>
+                            <div className="flex-1 min-w-0">
+                              <CardTitle className="text-sm truncate">{poll.title}</CardTitle>
+                              {project && (
+                                <p className="text-xs text-gray-500">{project.name}</p>
+                              )}
                             </div>
                           </div>
-                          {(userVoted || !isActive) && (
-                            <Progress value={percentage} className="h-2" />
+                          <div className="flex items-center justify-between text-xs">
+                            <Badge variant={isActive ? "default" : "secondary"}>
+                              {isActive ? 'Active' : 'Closed'}
+                            </Badge>
+                            {userVoted && (
+                              <Badge variant="outline">
+                                <CheckCircle className="h-3 w-3 mr-1" />
+                                Voted
+                              </Badge>
+                            )}
+                          </div>
+                        </CardHeader>
+                        <CardContent className="pt-0">
+                          <div className="flex items-center justify-between text-sm mb-3">
+                            <span className="text-gray-500">Total Votes</span>
+                            <span className="font-medium">{Number(poll.totalVotes)}</span>
+                          </div>
+                          <div className="flex items-center justify-between text-sm mb-4">
+                            <span className="text-gray-500">Time Left</span>
+                            <span className="font-medium">{timeLeft}</span>
+                          </div>
+                          {isActive && !userVoted ? (
+                            <Button
+                              size="sm"
+                              className="w-full bg-blue-600 hover:bg-blue-700"
+                              onClick={() => router.push(`/results?pollId=${poll.id}`)}
+                            >
+                              <Vote className="h-4 w-4 mr-2" />
+                              Vote Now
+                            </Button>
+                          ) : (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="w-full"
+                              onClick={() => router.push(`/results?pollId=${poll.id}`)}
+                            >
+                              <Eye className="h-4 w-4 mr-2" />
+                              View Results
+                            </Button>
                           )}
-                        </div>
-                      )
-                    })}
-                  </div>
+                        </CardContent>
+                      </Card>
+                    )
+                  })}
+                </div>
+              )}
+            </TabsContent>
 
-                  {/* Funding Info */}
-                  {poll.fundingInfo && poll.fundingInfo.length > 0 && (
-                    <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                      <h4 className="font-medium text-sm mb-2 text-blue-900 dark:text-blue-100">
-                        🎁 Rewards Available
-                      </h4>
-                      <div className="text-sm text-blue-800 dark:text-blue-200 space-y-1">
-                        <div className="flex justify-between">
-                          <span>Reward per vote:</span>
-                          <span className="font-mono">
-                            {(Number(poll.fundingInfo[0]?.rewardPerResponse) / 100_000_000).toFixed(8)} ICP
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>Remaining rewards:</span>
-                          <span className="font-mono">
-                            {Number(poll.fundingInfo[0]?.maxResponses) - Number(poll.fundingInfo[0]?.currentResponses)} of {Number(poll.fundingInfo[0]?.maxResponses)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* View Results Button */}
-                  <div className="mt-4 flex justify-end">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => router.push(`/results?pollId=${poll.id}`)}
-                      className="flex items-center gap-2"
-                    >
-                      <BarChart3 className="h-4 w-4" />
-                      View Results
-                    </Button>
-                  </div>
+            <TabsContent value="watchlist">
+              <Card>
+                <CardContent className="flex flex-col items-center justify-center py-16">
+                  <Star className="w-16 h-16 text-gray-400 mb-4" />
+                  <h3 className="text-lg font-medium text-gray-600 mb-2">Watchlist Coming Soon</h3>
+                  <p className="text-gray-500 text-center">
+                    Save your favorite polls to keep track of them easily.
+                  </p>
                 </CardContent>
               </Card>
-            )
-          })}
+            </TabsContent>
+
+            <TabsContent value="voted">
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-b bg-gray-50 dark:bg-gray-900/50">
+                      <TableHead>Poll</TableHead>
+                      <TableHead className="text-right">Your Vote</TableHead>
+                      <TableHead className="text-right">Total Votes</TableHead>
+                      <TableHead className="text-right">Status</TableHead>
+                      <TableHead className="w-20"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {filteredPolls.filter(poll => hasUserVoted(poll)).map((poll) => {
+                      const project = getProject(poll.scopeId)
+                      const isActive = 'active' in poll.status
+                      const timeLeft = formatTimeLeft(poll.closesAt)
+
+                      return (
+                        <TableRow key={poll.id} className="hover:bg-gray-50 dark:hover:bg-gray-800/50">
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-blue-600 rounded-full flex items-center justify-center">
+                                <CheckCircle className="h-4 w-4 text-white" />
+                              </div>
+                              <div>
+                                <div className="font-medium text-gray-900 dark:text-gray-100">
+                                  {poll.title}
+                                </div>
+                                {project && (
+                                  <div className="text-sm text-gray-500">{project.name}</div>
+                                )}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <Badge variant="secondary">Submitted</Badge>
+                          </TableCell>
+                          <TableCell className="text-right font-medium">
+                            {Number(poll.totalVotes)}
+                          </TableCell>
+                          <TableCell className="text-right">
+                            <div className="space-y-1">
+                              <Badge variant={isActive ? "default" : "secondary"} className="text-xs">
+                                {isActive ? 'Active' : 'Closed'}
+                              </Badge>
+                              <div className="text-xs text-gray-500">
+                                {timeLeft}
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => router.push(`/results?pollId=${poll.id}`)}
+                            >
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      )
+                    })}
+                  </TableBody>
+                </Table>
+              </div>
+            </TabsContent>
+          </Tabs>
         </div>
-      )}
+      </div>
     </div>
   )
 }

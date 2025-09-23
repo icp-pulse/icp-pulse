@@ -20,6 +20,18 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
             <div className="flex items-center justify-between">
               <a href="/" className="font-semibold text-lg" suppressHydrationWarning>ICP Pulse</a>
               <div className="flex items-center gap-2">
+                <a href="/dashboard" className="px-3 py-1.5 text-sm rounded bg-blue-100 hover:bg-blue-200 dark:bg-blue-900 dark:hover:bg-blue-800 transition-colors">
+                  Dashboard
+                </a>
+                <a href="/wallet" className="px-3 py-1.5 text-sm rounded bg-purple-100 hover:bg-purple-200 dark:bg-purple-900 dark:hover:bg-purple-800 transition-colors">
+                  Wallet
+                </a>
+                <a href="/polls" className="px-3 py-1.5 text-sm rounded bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 transition-colors">
+                  Polls
+                </a>
+                <a href="/rewards" className="px-3 py-1.5 text-sm rounded bg-green-100 hover:bg-green-200 dark:bg-green-900 dark:hover:bg-green-800 transition-colors">
+                  Rewards
+                </a>
                 <a href="/admin" className="px-3 py-1.5 text-sm rounded bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 transition-colors">
                   Admin
                 </a>
@@ -39,6 +51,18 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
       <header className="flex items-center justify-between py-2 gap-3">
         <a href="/" className="font-semibold">ICP Pulse</a>
         <div className="flex items-center gap-2">
+          <a href="/dashboard" className="px-3 py-1.5 text-sm rounded bg-blue-100 hover:bg-blue-200 dark:bg-blue-900 dark:hover:bg-blue-800 transition-colors">
+            Dashboard
+          </a>
+          <a href="/wallet" className="px-3 py-1.5 text-sm rounded bg-purple-100 hover:bg-purple-200 dark:bg-purple-900 dark:hover:bg-purple-800 transition-colors">
+            Wallet
+          </a>
+          <a href="/polls" className="px-3 py-1.5 text-sm rounded bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 transition-colors">
+            Polls
+          </a>
+          <a href="/rewards" className="px-3 py-1.5 text-sm rounded bg-green-100 hover:bg-green-200 dark:bg-green-900 dark:hover:bg-green-800 transition-colors">
+            Rewards
+          </a>
           <a href="/admin" className="px-3 py-1.5 text-sm rounded bg-gray-100 hover:bg-gray-200 dark:bg-gray-800 dark:hover:bg-gray-700 transition-colors">
             Admin
           </a>
