@@ -13,6 +13,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { generateId } from "@/lib/utils";
+import { analytics } from "@/lib/analytics";
 
 export default function PollCreator() {
   const [options, setOptions] = useState<PollOption[]>([
@@ -34,20 +35,37 @@ export default function PollCreator() {
 
   const createPollMutation = useMutation({
     mutationFn: (data: InsertPoll) => apiRequest("POST", "/api/polls", data),
-    onSuccess: () => {
+    onSuccess: (result, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/polls"] });
       toast({ title: "Poll created successfully" });
+
+      // Track poll creation
+      analytics.track('poll_created', {
+        poll_id: 'created',
+        project_id: 'unknown',
+        has_rewards: false,
+        option_count: options.filter(opt => opt.text.trim() !== "").length
+      });
+
       form.reset();
       setOptions([
         { id: generateId(), text: "", votes: 0 },
         { id: generateId(), text: "", votes: 0 },
       ]);
     },
-    onError: () => {
-      toast({ 
-        title: "Error", 
+    onError: (error, variables) => {
+      toast({
+        title: "Error",
         description: "Failed to create poll",
         variant: "destructive"
+      });
+
+      // Track error
+      analytics.track('error_occurred', {
+        error_type: 'poll_creation_failed',
+        error_message: error instanceof Error ? error.message : 'Unknown error',
+        component: 'PollCreator',
+        action: 'create_poll'
       });
     },
   });

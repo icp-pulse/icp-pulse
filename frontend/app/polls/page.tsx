@@ -8,7 +8,7 @@ import { Progress } from '@/components/ui/progress'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 import { useIcpAuth } from '@/components/IcpAuthProvider'
 import { useRouter } from 'next/navigation'
-import { Clock, Users, Vote, CheckCircle } from 'lucide-react'
+import { Clock, Users, Vote, CheckCircle, BarChart3 } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 
 // Use the actual backend types
@@ -348,6 +348,19 @@ export default function PollsPage() {
                       </div>
                     </div>
                   )}
+
+                  {/* View Results Button */}
+                  <div className="mt-4 flex justify-end">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => router.push(`/results?pollId=${poll.id}`)}
+                      className="flex items-center gap-2"
+                    >
+                      <BarChart3 className="h-4 w-4" />
+                      View Results
+                    </Button>
+                  </div>
                 </CardContent>
               </Card>
             )

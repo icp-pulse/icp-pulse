@@ -8,6 +8,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Coins, Gift, CheckCircle, Clock, AlertCircle } from 'lucide-react'
+import { analytics } from '@/lib/analytics'
 
 import type { PendingReward, RewardStatus } from '@/lib/types'
 
@@ -36,6 +37,10 @@ export default function RewardsPage() {
       if (isAuthenticated && identity) {
         try {
           setLoading(true)
+
+          // Track rewards page visit
+          analytics.track('rewards_page_viewed', {})
+
           const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
           const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
           const backend = await createBackendWithIdentity({ canisterId, host, identity })
@@ -61,6 +66,14 @@ export default function RewardsPage() {
           setRewards(displayRewards)
         } catch (error) {
           console.error('Failed to load rewards:', error)
+
+          // Track error
+          analytics.track('error_occurred', {
+            error_type: 'rewards_load_failed',
+            error_message: error instanceof Error ? error.message : 'Unknown error',
+            component: 'RewardsPage',
+            action: 'load_rewards'
+          })
         } finally {
           setLoading(false)
         }
@@ -106,6 +119,18 @@ export default function RewardsPage() {
       const success = await backend.claim_reward(rewardId)
 
       if (success) {
+        const claimedReward = rewards.find(r => r.id === rewardId)
+
+        // Track successful reward claim
+        if (claimedReward) {
+          analytics.track('reward_claimed', {
+            reward_id: rewardId,
+            poll_id: claimedReward.pollId,
+            amount: formatTokenAmount(claimedReward.amount, claimedReward.tokenDecimals),
+            token_symbol: claimedReward.tokenSymbol
+          })
+        }
+
         setRewards(prev => prev.map(reward =>
           reward.id === rewardId
             ? { ...reward, status: 'claimed' as const, claimedAt: Date.now() }
