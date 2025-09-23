@@ -41,9 +41,9 @@ export default function PollCreator() {
 
       // Track poll creation
       analytics.track('poll_created', {
-        poll_id: result?.id || 'unknown',
-        project_id: variables.projectId || 'unknown',
-        has_rewards: false, // Update based on your poll structure
+        poll_id: 'created',
+        project_id: 'unknown',
+        has_rewards: false,
         option_count: options.filter(opt => opt.text.trim() !== "").length
       });
 
