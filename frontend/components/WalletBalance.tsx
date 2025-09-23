@@ -137,19 +137,18 @@ export function WalletBalance({ compact = false, showRefresh = true }: WalletBal
         console.warn('Failed to get supported tokens:', error)
       }
 
-      // Add other common tokens and try to fetch their balances
-      const commonTokens = [
-        { symbol: 'ICP', decimals: 8, canisterId: 'rrkah-fqaaa-aaaaa-aaaaq-cai' },
+      // Add ICRC-1 compatible tokens (excluding ICP which uses legacy ledger)
+      const icrc1Tokens = [
         { symbol: 'ckBTC', decimals: 8, canisterId: 'mxzaz-hqaaa-aaaar-qaada-cai' },
         { symbol: 'ckETH', decimals: 18, canisterId: 'ss2fx-dyaaa-aaaar-qacoq-cai' },
         { symbol: 'ckUSDC', decimals: 6, canisterId: 'xkbqi-6qaaa-aaaah-qbpqq-cai' }
       ]
 
-      for (const token of commonTokens) {
+      // Fetch ICRC-1 token balances
+      for (const token of icrc1Tokens) {
         if (!tokenBalances.some(t => t.symbol === token.symbol)) {
           let balance = 0n
 
-          // Try to fetch real balance for ICRC-1 tokens
           try {
             const { Actor, HttpAgent } = await import('@dfinity/agent')
 
@@ -188,6 +187,17 @@ export function WalletBalance({ compact = false, showRefresh = true }: WalletBal
             usdValue: getTokenUSDValue(token.symbol)
           })
         }
+      }
+
+      // Add ICP with 0 balance (legacy ledger requires additional setup)
+      if (!tokenBalances.some(t => t.symbol === 'ICP')) {
+        tokenBalances.push({
+          symbol: 'ICP',
+          balance: 0n, // TODO: Implement ICP ledger balance fetching
+          decimals: 8,
+          canisterId: 'rrkah-fqaaa-aaaaa-aaaaq-cai',
+          usdValue: getTokenUSDValue('ICP')
+        })
       }
 
       // Sort tokens: PULSE first, then ICP, then others alphabetically
