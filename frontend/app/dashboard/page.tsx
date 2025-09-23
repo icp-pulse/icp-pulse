@@ -340,7 +340,7 @@ export default function ParticipantDashboard() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Vote className="h-5 w-5 text-blue-500" />
-                Polls You've Voted On ({votingHistory.length})
+                Polls You&apos;ve Voted On ({votingHistory.length})
               </CardTitle>
             </CardHeader>
             <CardContent>

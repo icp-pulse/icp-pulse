@@ -195,7 +195,7 @@ export default function WalletPage() {
                 </div>
                 <div>
                   <p className="font-medium">Reward Claimed</p>
-                  <p className="text-sm text-muted-foreground">Poll: "What features should we prioritize?"</p>
+                  <p className="text-sm text-muted-foreground">Poll: &quot;What features should we prioritize?&quot;</p>
                 </div>
               </div>
               <div className="text-right">
@@ -211,7 +211,7 @@ export default function WalletPage() {
                 </div>
                 <div>
                   <p className="font-medium">Poll Vote</p>
-                  <p className="text-sm text-muted-foreground">Voted on "Community governance model"</p>
+                  <p className="text-sm text-muted-foreground">Voted on &quot;Community governance model&quot;</p>
                 </div>
               </div>
               <div className="text-right">
