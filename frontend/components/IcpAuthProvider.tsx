@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { AuthClient } from '@dfinity/auth-client'
 import type { Identity } from '@dfinity/agent'
+import { analytics } from '@/lib/analytics'
 
 export type IcpAuthContextValue = {
   isAuthenticated: boolean
@@ -47,7 +48,12 @@ export function IcpAuthProvider({ children }: { children: React.ReactNode }) {
         setIdentity(id)
         try {
           const p = id.getPrincipal()
-          setPrincipalText(p.toText())
+          const principalText = p.toText()
+          setPrincipalText(principalText)
+
+          // Track login event
+          analytics.identify(principalText)
+          analytics.track('user_login', { method: 'internet_identity' })
         } catch {
           setPrincipalText(null)
         }
@@ -57,6 +63,11 @@ export function IcpAuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(async () => {
     if (!client) return
+
+    // Track logout event before clearing state
+    analytics.track('user_logout', {})
+    analytics.reset()
+
     await client.logout()
     setIdentity(null)
     setPrincipalText(null)
