@@ -75,6 +75,19 @@ persistent actor class Tokenmania() = this {
     #Ok("Token deleted");
   };
 
+  public shared ({ caller }) func update_logo(new_logo : Text) : async Result<Text, Text> {
+    if (not created) {
+      return #Err("Token not created");
+    };
+
+    if (not Principal.equal(caller, init.minting_account.owner)) {
+      return #Err("Only minting account can update logo");
+    };
+
+    logo := new_logo;
+    #Ok("Logo updated successfully");
+  };
+
   public shared ({ caller }) func create_token({
     token_name : Text;
     token_symbol : Text;
