@@ -1,3 +1,5 @@
+import type { Principal } from '@dfinity/principal'
+
 // TypeScript mirror of the candid interface (partial)
 export type Status = { active: null } | { closed: null }
 export type ScopeType = { project: null } | { product: null }
@@ -39,6 +41,21 @@ export type PendingReward = {
   votedAt: bigint
 }
 
+// Backend reward type (as received from canister)
+export type BackendPendingReward = {
+  id: string
+  pollId: bigint
+  pollTitle: string
+  userPrincipal: Principal
+  amount: bigint
+  tokenSymbol: string
+  tokenDecimals: number
+  tokenCanister: [] | [Principal]
+  status: RewardStatus
+  claimedAt: [] | [bigint]
+  votedAt: bigint
+}
+
 export type BackendService = {
   create_project(name: string, description: string): Promise<bigint>
   list_projects(offset: bigint, limit: bigint): Promise<ProjectSummary[]>
@@ -71,6 +88,6 @@ export type BackendService = {
   validate_custom_token(canister: string): Promise<[TokenInfo] | []>
 
   // Reward functions
-  get_user_rewards(userPrincipal: string): Promise<PendingReward[]>
+  get_user_rewards(userPrincipal: Principal): Promise<BackendPendingReward[]>
   claim_reward(rewardId: string): Promise<boolean>
 }

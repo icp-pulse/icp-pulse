@@ -55,6 +55,9 @@ export interface AnalyticsEvents {
   // Navigation events
   page_viewed: { path: string; page_title?: string }
 
+  // UI interaction events
+  button_clicked: { button_name: string; page?: string }
+
   // Error events
   error_occurred: {
     error_type: string
