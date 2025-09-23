@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useIcpAuth } from '@/components/IcpAuthProvider'
 import { createBackendWithIdentity } from '@/lib/icp'
 import { Button } from '@/components/ui/button'
@@ -46,7 +46,7 @@ export function WalletBalance({ compact = false, showRefresh = true }: WalletBal
     return trimmedRemainder ? `${quotient}.${trimmedRemainder}` : quotient.toString()
   }
 
-  const fetchBalances = async (isRetry: boolean = false) => {
+  const fetchBalances = useCallback(async (isRetry: boolean = false) => {
     if (!isAuthenticated || !identity) return
 
     try {
@@ -229,7 +229,7 @@ export function WalletBalance({ compact = false, showRefresh = true }: WalletBal
     } finally {
       setLoading(false)
     }
-  }
+  }, [isAuthenticated, identity, balances.length])
 
   const retryFetch = async () => {
     if (retryCount < 3) {
@@ -255,7 +255,7 @@ export function WalletBalance({ compact = false, showRefresh = true }: WalletBal
     if (isAuthenticated && identity) {
       fetchBalances()
     }
-  }, [isAuthenticated, identity])
+  }, [isAuthenticated, identity, fetchBalances])
 
   const calculateTotalUSD = () => {
     return balances.reduce((total, token) => {
