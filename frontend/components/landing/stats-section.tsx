@@ -142,7 +142,7 @@ export function StatsSection() {
   ]
 
   const rewardDistribution = [
-    { label: 'Total Pool Value', value: `$${formatTokenAmount(stats.funding.totalFundsAllocated)}`, color: 'text-teal-600' },
+    { label: 'Total Pool Value', value: `$${formatTokenAmount(stats.funding.totalFundsDisbursed)}`, color: 'text-teal-600' },
     { label: 'Avg Reward/Response', value: '$0.83', color: 'text-orange-600' },
     { label: 'Claims Processed', value: '99.7%', color: 'text-yellow-600' }
   ]
