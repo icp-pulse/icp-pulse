@@ -66,7 +66,7 @@ export default function ParticipantDashboard() {
 
           // Load rewards
           const backendRewards = await backend.get_user_rewards(userPrincipal)
-          const transformedRewards: PendingReward[] = backendRewards.map(reward => ({
+          const transformedRewards: PendingReward[] = backendRewards.map((reward: any) => ({
             id: reward.id,
             pollId: reward.pollId,
             pollTitle: reward.pollTitle,

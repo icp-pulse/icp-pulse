@@ -11,6 +11,7 @@ import {
   DollarSign,
   Activity
 } from 'lucide-react'
+import { createBackend } from '@/lib/icp'
 
 interface AnalyticsOverview {
   polls: {
@@ -46,13 +47,45 @@ export function StatsSection() {
   useEffect(() => {
     async function fetchStats() {
       try {
-        const apiUrl = process.env.NEXT_PUBLIC_INDEXER_API_URL || 'http://localhost:3001'
-        const response = await fetch(`${apiUrl}/api/overview`)
-        if (!response.ok) {
-          throw new Error('Failed to fetch statistics')
+        const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID
+        const network = process.env.NEXT_PUBLIC_DFX_NETWORK || 'ic'
+        const host = network === 'ic' ? 'https://icp-api.io' : 'http://127.0.0.1:4943'
+
+        if (!canisterId) {
+          throw new Error('Backend canister ID not configured')
         }
-        const data = await response.json()
-        setStats(data)
+
+        const backend = await createBackend({ canisterId, host })
+        const data = await backend.get_analytics_overview()
+
+        // Convert BigInt values to numbers
+        const convertedData: AnalyticsOverview = {
+          polls: {
+            total: Number(data.polls.total),
+            totalVotes: Number(data.polls.totalVotes),
+            averageVotesPerPoll: Number(data.polls.averageVotesPerPoll),
+          },
+          surveys: {
+            total: Number(data.surveys.total),
+            totalSubmissions: Number(data.surveys.totalSubmissions),
+            averageSubmissionsPerSurvey: Number(data.surveys.averageSubmissionsPerSurvey),
+          },
+          funding: {
+            totalFundsDisbursed: data.funding.totalFundsDisbursed,
+            disbursedByToken: data.funding.disbursedByToken.map((token: any) => ({
+              tokenSymbol: token.tokenSymbol,
+              amount: token.amount,
+              count: Number(token.count),
+            })),
+          },
+          engagement: {
+            uniqueVoters: Number(data.engagement.uniqueVoters),
+            uniqueRespondents: Number(data.engagement.uniqueRespondents),
+            totalUniqueUsers: Number(data.engagement.totalUniqueUsers),
+          },
+        }
+
+        setStats(convertedData)
       } catch (err) {
         console.error('Error fetching stats:', err)
         setError('Unable to load statistics')

@@ -60,16 +60,45 @@ export const idlFactory = ({ IDL: I = IDL }) => {
   const Survey = I.Record({ id: I.Nat, scopeType: ScopeType, scopeId: I.Nat, title: I.Text, description: I.Text, createdBy: I.Principal, createdAt: I.Int, closesAt: I.Int, status: Status, rewardFund: I.Nat, fundingInfo: I.Opt(FundingInfo), allowAnonymous: I.Bool, questions: I.Vec(Question), submissionsCount: I.Nat })
   const SurveySummary = I.Record({ id: I.Nat, scopeType: ScopeType, scopeId: I.Nat, title: I.Text, status: Status, submissionsCount: I.Nat })
 
-  const QuestionInput = I.Record({ 
+  const QuestionInput = I.Record({
     qType: I.Text,  // Use qType to avoid reserved keyword issues
-    text: I.Text, 
-    required: I.Bool, 
-    choices: I.Opt(I.Vec(I.Text)), 
-    min: I.Opt(I.Nat), 
-    max: I.Opt(I.Nat), 
-    helpText: I.Opt(I.Text) 
+    text: I.Text,
+    required: I.Bool,
+    choices: I.Opt(I.Vec(I.Text)),
+    min: I.Opt(I.Nat),
+    max: I.Opt(I.Nat),
+    helpText: I.Opt(I.Text)
   })
   const AnswerInput = I.Record({ questionId: I.Nat, nat: I.Opt(I.Nat), nats: I.Opt(I.Vec(I.Nat)), text: I.Opt(I.Text) })
+
+  // Analytics types
+  const TokenDistribution = I.Record({
+    tokenSymbol: I.Text,
+    amount: I.Text,
+    count: I.Nat,
+  })
+
+  const AnalyticsOverview = I.Record({
+    polls: I.Record({
+      total: I.Nat,
+      totalVotes: I.Nat,
+      averageVotesPerPoll: I.Nat,
+    }),
+    surveys: I.Record({
+      total: I.Nat,
+      totalSubmissions: I.Nat,
+      averageSubmissionsPerSurvey: I.Nat,
+    }),
+    funding: I.Record({
+      totalFundsDisbursed: I.Text,
+      disbursedByToken: I.Vec(TokenDistribution),
+    }),
+    engagement: I.Record({
+      uniqueVoters: I.Nat,
+      uniqueRespondents: I.Nat,
+      totalUniqueUsers: I.Nat,
+    }),
+  })
 
   return I.Service({
     create_project: I.Func([I.Text, I.Text], [I.Nat], []),
@@ -96,6 +125,9 @@ export const idlFactory = ({ IDL: I = IDL }) => {
     submit_survey: I.Func([I.Nat, I.Vec(AnswerInput)], [I.Bool], []),
     close_survey: I.Func([I.Nat], [I.Bool], []),
     export_survey_csv: I.Func([I.Nat], [I.Vec(I.Nat8)], ['query']),
+
+    // Analytics
+    get_analytics_overview: I.Func([], [AnalyticsOverview], ['query']),
   })
 }
 
