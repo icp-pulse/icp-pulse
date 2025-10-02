@@ -906,4 +906,142 @@ persistent actor class polls_surveys_backend() = this {
       case null { false }
     }
   };
+
+  // Analytics types
+  type TokenDistribution = {
+    tokenSymbol: Text;
+    amount: Text;
+    count: Nat;
+  };
+
+  type AnalyticsOverview = {
+    polls: {
+      total: Nat;
+      totalVotes: Nat;
+      averageVotesPerPoll: Nat;
+    };
+    surveys: {
+      total: Nat;
+      totalSubmissions: Nat;
+      averageSubmissionsPerSurvey: Nat;
+    };
+    funding: {
+      totalFundsDisbursed: Text;
+      disbursedByToken: [TokenDistribution];
+    };
+    engagement: {
+      uniqueVoters: Nat;
+      uniqueRespondents: Nat;
+      totalUniqueUsers: Nat;
+    };
+  };
+
+  // Get platform analytics overview
+  public query func get_analytics_overview() : async AnalyticsOverview {
+    // Calculate poll stats
+    let totalPolls = polls.size();
+    var totalVotes = 0;
+    for (poll in polls.vals()) {
+      for (option in poll.options.vals()) {
+        totalVotes += option.votes;
+      };
+    };
+    let avgVotesPerPoll = if (totalPolls > 0) { totalVotes / totalPolls } else { 0 };
+
+    // Calculate survey stats
+    let totalSurveys = surveys.size();
+    let totalSubmissions = submissions.size();
+    let avgSubmissionsPerSurvey = if (totalSurveys > 0) { totalSubmissions / totalSurveys } else { 0 };
+
+    // Calculate funding stats
+    var totalDisbursed : Nat64 = 0;
+    var tokenDistMap = Map.new<Text, (Nat64, Nat)>(); // (total amount, count)
+
+    // Calculate from claimed rewards
+    let allRewards = Iter.toArray(Map.vals(rewards));
+    for (reward in allRewards.vals()) {
+      if (reward.status == #claimed) {
+        totalDisbursed += reward.amount;
+
+        // Track by token
+        let key = reward.tokenSymbol;
+        switch (Map.get(tokenDistMap, Map.thash, key)) {
+          case (?existing) {
+            let (amt, cnt) = existing;
+            Map.set(tokenDistMap, Map.thash, key, (amt + reward.amount, cnt + 1));
+          };
+          case null {
+            Map.set(tokenDistMap, Map.thash, key, (reward.amount, 1));
+          };
+        };
+      };
+    };
+
+    // Convert token distribution map to array
+    let tokenDistArray = Array.map<(Text, (Nat64, Nat)), TokenDistribution>(
+      Iter.toArray(Map.entries(tokenDistMap)),
+      func((symbol, data)) : TokenDistribution {
+        let (amount, count) = data;
+        {
+          tokenSymbol = symbol;
+          amount = Nat64.toText(amount);
+          count = count;
+        }
+      }
+    );
+
+    // Calculate unique users (simplified - counts unique voters and respondents)
+    var uniqueVotersSet = Map.new<Principal, Bool>();
+    var uniqueRespondentsSet = Map.new<Principal, Bool>();
+
+    for (poll in polls.vals()) {
+      for (voter in poll.voterPrincipals.vals()) {
+        Map.set(uniqueVotersSet, phash, voter, true);
+      };
+    };
+
+    for (submission in submissions.vals()) {
+      switch (submission.respondent) {
+        case (?principal) {
+          Map.set(uniqueRespondentsSet, phash, principal, true);
+        };
+        case null {};
+      };
+    };
+
+    let uniqueVotersCount = Map.size(uniqueVotersSet);
+    let uniqueRespondentsCount = Map.size(uniqueRespondentsSet);
+
+    // Combine for total unique users
+    var totalUniqueSet = Map.new<Principal, Bool>();
+    for ((voter, _) in Map.entries(uniqueVotersSet)) {
+      Map.set(totalUniqueSet, phash, voter, true);
+    };
+    for ((respondent, _) in Map.entries(uniqueRespondentsSet)) {
+      Map.set(totalUniqueSet, phash, respondent, true);
+    };
+    let totalUniqueUsers = Map.size(totalUniqueSet);
+
+    {
+      polls = {
+        total = totalPolls;
+        totalVotes = totalVotes;
+        averageVotesPerPoll = avgVotesPerPoll;
+      };
+      surveys = {
+        total = totalSurveys;
+        totalSubmissions = totalSubmissions;
+        averageSubmissionsPerSurvey = avgSubmissionsPerSurvey;
+      };
+      funding = {
+        totalFundsDisbursed = Nat64.toText(totalDisbursed);
+        disbursedByToken = tokenDistArray;
+      };
+      engagement = {
+        uniqueVoters = uniqueVotersCount;
+        uniqueRespondents = uniqueRespondentsCount;
+        totalUniqueUsers = totalUniqueUsers;
+      };
+    }
+  };
 }

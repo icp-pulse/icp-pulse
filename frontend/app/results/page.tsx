@@ -56,7 +56,7 @@ function ResultsContent() {
 
           // Calculate chart data
           const totalVotes = Number(pollResult.totalVotes)
-          const data: ChartData[] = pollResult.options.map((option, index) => ({
+          const data: ChartData[] = pollResult.options.map((option: any, index: number) => ({
             name: option.text,
             value: Number(option.votes),
             percentage: totalVotes > 0 ? (Number(option.votes) / totalVotes) * 100 : 0,

@@ -49,7 +49,7 @@ export default function RewardsPage() {
           const backendRewards = await backend.get_user_rewards(userPrincipal)
 
           // Transform backend rewards to display format
-          const displayRewards: DisplayReward[] = backendRewards.map(reward => ({
+          const displayRewards: DisplayReward[] = backendRewards.map((reward: any) => ({
             id: reward.id,
             pollId: reward.pollId.toString(),
             pollTitle: reward.pollTitle,

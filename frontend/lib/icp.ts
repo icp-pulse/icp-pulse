@@ -1,18 +1,18 @@
 import { Actor, HttpAgent, type Identity } from '@dfinity/agent'
-import { idlFactory as backendIDL } from '../../src/declarations/polls_surveys_backend'
+import { idlFactory as customIDL } from './polls_surveys_backend.idl'
 
 export type CanisterConfig = { canisterId: string; host?: string }
 
-
+// Use custom IDL that includes analytics
 export async function createBackend({ canisterId, host }: CanisterConfig) {
   const isLocal = !!host && (host.includes('127.0.0.1') || host.includes('localhost'))
-  
+
   // Create agent with proper local development settings
-  const agent = new HttpAgent({ 
-    host, 
+  const agent = new HttpAgent({
+    host,
     verifyQuerySignatures: !isLocal
   }) as HttpAgent
-  
+
   // For local development, fetch the root key to avoid certificate issues
   if (isLocal) {
     try {
@@ -21,19 +21,19 @@ export async function createBackend({ canisterId, host }: CanisterConfig) {
       console.warn('Failed to fetch root key:', error)
     }
   }
-  
-  return Actor.createActor(backendIDL as any, { agent, canisterId }) as unknown as import('../../src/declarations/polls_surveys_backend/polls_surveys_backend.did')._SERVICE
+
+  return Actor.createActor(customIDL as any, { agent, canisterId }) as any
 }
 
 export async function createBackendWithIdentity({ canisterId, host, identity }: CanisterConfig & { identity: Identity }) {
   const isLocal = !!host && (host.includes('127.0.0.1') || host.includes('localhost'))
-  
-  const agent = new HttpAgent({ 
-    host, 
-    identity, 
-    verifyQuerySignatures: !isLocal 
+
+  const agent = new HttpAgent({
+    host,
+    identity,
+    verifyQuerySignatures: !isLocal
   }) as HttpAgent
-  
+
   // For local development, fetch the root key to avoid certificate issues
   if (isLocal) {
     try {
@@ -42,6 +42,6 @@ export async function createBackendWithIdentity({ canisterId, host, identity }: 
       console.warn('Failed to fetch root key:', error)
     }
   }
-  
-  return Actor.createActor(backendIDL as any, { agent, canisterId }) as unknown as import('../../src/declarations/polls_surveys_backend/polls_surveys_backend.did')._SERVICE
+
+  return Actor.createActor(customIDL as any, { agent, canisterId }) as any
 }
