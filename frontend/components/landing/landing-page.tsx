@@ -1,18 +1,19 @@
 "use client"
 
 import { ScrollReveal } from './scroll-reveal'
+import { StatsSection } from './stats-section'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
-import { 
-  Vote, 
-  FileText, 
-  FolderOpen, 
-  BarChart3, 
-  Users, 
-  Shield, 
-  Zap, 
+import {
+  Vote,
+  FileText,
+  FolderOpen,
+  BarChart3,
+  Users,
+  Shield,
+  Zap,
   Globe,
   ChevronDown,
   Check,
@@ -139,6 +140,9 @@ export function LandingPage() {
           </ScrollReveal>
         </div>
       </section>
+
+      {/* Statistics Section */}
+      <StatsSection />
 
       {/* Getting Started Section */}
       <section className="py-16 bg-white dark:bg-gray-900">
