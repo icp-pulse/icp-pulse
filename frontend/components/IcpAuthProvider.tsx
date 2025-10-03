@@ -23,13 +23,19 @@ export function IcpAuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     AuthClient.create().then(async (c) => {
       setClient(c)
-      const id = c.getIdentity()
-      setIdentity(id)
-      try {
-        const p = id.getPrincipal()
-        setPrincipalText(p.toText())
-      } catch {
-        setPrincipalText(null)
+
+      // Check if user is already authenticated from previous session
+      const isAuthenticated = await c.isAuthenticated()
+
+      if (isAuthenticated) {
+        const id = c.getIdentity()
+        setIdentity(id)
+        try {
+          const p = id.getPrincipal()
+          setPrincipalText(p.toText())
+        } catch {
+          setPrincipalText(null)
+        }
       }
     })
   }, [])
@@ -71,6 +77,12 @@ export function IcpAuthProvider({ children }: { children: React.ReactNode }) {
     await client.logout()
     setIdentity(null)
     setPrincipalText(null)
+
+    // Force clear all storage to remove corrupted auth
+    if (typeof window !== 'undefined') {
+      localStorage.clear()
+      sessionStorage.clear()
+    }
   }, [client])
 
   const value: IcpAuthContextValue = useMemo(() => ({

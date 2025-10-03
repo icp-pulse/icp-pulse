@@ -794,6 +794,11 @@ persistent actor class polls_surveys_backend() = this {
     respondents
   };
 
+  // Get all submissions for a survey
+  public query func get_survey_submissions(surveyId : SurveyId) : async [Submission] {
+    Array.filter<Submission>(submissions, func sub = sub.surveyId == surveyId)
+  };
+
   // Validate and get info for a custom token
   public func validate_custom_token(canister: Principal) : async ?{symbol: Text; decimals: Nat8} {
     if (await validateTokenCanister(canister)) {
