@@ -71,6 +71,16 @@ export const idlFactory = ({ IDL: I = IDL }) => {
   })
   const AnswerInput = I.Record({ questionId: I.Nat, nat: I.Opt(I.Nat), nats: I.Opt(I.Vec(I.Nat)), text: I.Opt(I.Text) })
 
+  const AnswerValue = I.Variant({ nat: I.Nat, nats: I.Vec(I.Nat), text: I.Text })
+  const Answer = I.Record({ questionId: I.Nat, value: AnswerValue })
+  const Submission = I.Record({
+    id: I.Nat,
+    surveyId: I.Nat,
+    respondent: I.Opt(I.Principal),
+    submittedAt: I.Int,
+    answers: I.Vec(Answer)
+  })
+
   // Analytics types
   const TokenDistribution = I.Record({
     tokenSymbol: I.Text,
@@ -125,6 +135,8 @@ export const idlFactory = ({ IDL: I = IDL }) => {
     submit_survey: I.Func([I.Nat, I.Vec(AnswerInput)], [I.Bool], []),
     close_survey: I.Func([I.Nat], [I.Bool], []),
     export_survey_csv: I.Func([I.Nat], [I.Vec(I.Nat8)], ['query']),
+    get_survey_respondents: I.Func([I.Nat], [I.Vec(I.Principal)], ['query']),
+    get_survey_submissions: I.Func([I.Nat], [I.Vec(Submission)], ['query']),
 
     // Analytics
     get_analytics_overview: I.Func([], [AnalyticsOverview], ['query']),

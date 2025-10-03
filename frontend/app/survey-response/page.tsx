@@ -153,9 +153,9 @@ function SurveyResponseContent() {
       // Convert answers to backend format (using Candid optional format)
       const formAnswers = Object.values(answers).map((answer: any) => {
         const { questionId, value, type } = answer
-        
-        const formAnswer: any = { 
-          questionId,
+
+        const formAnswer: any = {
+          questionId: Number(questionId),
           nat: [],
           nats: [],
           text: []
@@ -189,10 +189,17 @@ function SurveyResponseContent() {
         return formAnswer
       })
 
+      console.log('Survey ID:', surveyId)
+      console.log('Survey questions:', survey?.questions)
       console.log('Submitting answers:', formAnswers)
-      
+      console.log('Answer details:', JSON.stringify(formAnswers, (key, value) =>
+        typeof value === 'bigint' ? value.toString() : value
+      ))
+
       const result = await backend.submit_survey(BigInt(surveyId), formAnswers)
-      
+
+      console.log('Submit result:', result)
+
       if (result) {
         setSuccess(true)
         // Auto redirect after 3 seconds
@@ -200,7 +207,7 @@ function SurveyResponseContent() {
           router.push('/surveys')
         }, 3000)
       } else {
-        throw new Error('Failed to submit survey response')
+        throw new Error('Failed to submit survey response - backend returned false')
       }
     } catch (err: any) {
       console.error('Error submitting survey:', err)

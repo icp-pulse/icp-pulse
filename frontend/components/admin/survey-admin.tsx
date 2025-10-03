@@ -353,12 +353,12 @@ export default function SurveyAdmin() {
                 </Button>
                 <Dialog>
                   <DialogTrigger asChild>
-                    <Button variant="outline" size="sm" className="flex-1" onClick={() => handleViewParticipants(survey.id)}>
+                    <Button variant="outline" size="sm" className="flex-1" onClick={() => handleViewParticipants(survey.id.toString())}>
                       <Users className="w-4 h-4 mr-1" />
                       Participants
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+                  <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto bg-white dark:bg-gray-800">
                     <DialogHeader>
                       <DialogTitle>Survey Participants</DialogTitle>
                       <p className="text-sm text-gray-500">{survey.title}</p>
@@ -404,7 +404,7 @@ export default function SurveyAdmin() {
                     </div>
                   </DialogContent>
                 </Dialog>
-                <Button variant="outline" size="sm" className="flex-1">
+                <Button variant="outline" size="sm" className="flex-1" onClick={() => window.location.href = `/survey-results?surveyId=${survey.id}`}>
                   <BarChart3 className="w-4 h-4 mr-1" />
                   Results
                 </Button>
