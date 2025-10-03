@@ -143,6 +143,9 @@ export const idlFactory = ({ IDL: I = IDL }) => {
     get_survey_respondents: I.Func([I.Nat], [I.Vec(I.Principal)], ['query']),
     get_survey_submissions: I.Func([I.Nat], [I.Vec(Submission)], ['query']),
     update_survey_funding: I.Func([I.Nat, I.Nat64, I.Nat64], [I.Bool], []),
+    set_openai_api_key: I.Func([I.Text], [I.Bool], []),
+    has_openai_api_key: I.Func([], [I.Bool], ['query']),
+    generate_poll_options: I.Func([I.Text], [I.Opt(I.Vec(I.Text))], []),
 
     // Analytics
     get_analytics_overview: I.Func([], [AnalyticsOverview], ['query']),

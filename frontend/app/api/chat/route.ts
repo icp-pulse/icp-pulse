@@ -13,6 +13,35 @@ interface PollCreationRequest {
   rewardPerVote?: number
 }
 
+async function detectPollOptionsGeneration(message: string): Promise<string | null> {
+  // Simple pattern matching for poll option generation requests
+  const lowerMessage = message.toLowerCase()
+  const patterns = [
+    /generate.*options?.*(for|about|on)\s+(.+)/i,
+    /suggest.*options?.*(for|about|on)\s+(.+)/i,
+    /create.*options?.*(for|about|on)\s+(.+)/i,
+    /what.*options?.*(for|about|on)\s+(.+)/i,
+    /give.*options?.*(for|about|on)\s+(.+)/i,
+    /options?.*(for|about|on)\s+(.+)/i
+  ]
+
+  for (const pattern of patterns) {
+    const match = message.match(pattern)
+    if (match && match[2]) {
+      return match[2].trim()
+    }
+  }
+
+  // Also check if message is just a topic without specific keywords
+  if (lowerMessage.includes('poll') && lowerMessage.includes('option')) {
+    // Extract the topic - simple approach: take everything after "about" or "for"
+    const aboutMatch = message.match(/(?:about|for|on)\s+(.+)/i)
+    if (aboutMatch) return aboutMatch[1].trim()
+  }
+
+  return null
+}
+
 async function detectPollCreation(message: string): Promise<PollCreationRequest | null> {
   if (!process.env.OPENAI_API_KEY) return null
 
@@ -78,6 +107,28 @@ Only respond with the JSON or "NOT_A_POLL_REQUEST".`
   return null
 }
 
+async function generatePollOptionsInBackend(topic: string): Promise<{ success: boolean; options?: string[]; error?: string }> {
+  try {
+    // Get canister configuration
+    const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID || 'rdmx6-jaaaa-aaaah-qdrha-cai'
+    const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
+
+    const backend = await createBackend({ canisterId, host })
+
+    // Generate options using backend HTTPS outcall
+    const result = await backend.generate_poll_options(topic)
+
+    if (result && result.length > 0 && result[0]) {
+      return { success: true, options: result[0] }
+    } else {
+      return { success: false, error: 'Failed to generate options' }
+    }
+  } catch (error) {
+    console.error('Backend option generation error:', error)
+    return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
+  }
+}
+
 async function createPollInBackend(pollData: PollCreationRequest): Promise<{ success: boolean; pollId?: number; error?: string }> {
   try {
     // Get canister configuration
@@ -110,6 +161,28 @@ export async function POST(request: NextRequest) {
   try {
     const { message, messages } = await request.json()
 
+    // First, check if this is a poll options generation request
+    const optionsTopic = await detectPollOptionsGeneration(message)
+
+    if (optionsTopic) {
+      // Generate options using backend HTTPS outcall
+      const result = await generatePollOptionsInBackend(optionsTopic)
+
+      if (result.success && result.options) {
+        return NextResponse.json({
+          message: `Here are some poll options for "${optionsTopic}":\n\n${result.options.map((opt, i) => `${i + 1}. ${opt}`).join('\n')}\n\nYou can use these options in your poll or ask me to generate different ones!`,
+          optionsGenerated: true,
+          options: result.options,
+          topic: optionsTopic
+        })
+      } else {
+        return NextResponse.json({
+          message: `❌ Failed to generate options: ${result.error}\n\nPlease try again with a different topic or check that the OpenAI API is configured.`,
+          optionsGenerated: false
+        })
+      }
+    }
+
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json(
         { error: 'OpenAI API key not configured' },
@@ -117,7 +190,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // First, check if this is a poll creation request
+    // Next, check if this is a poll creation request
     const pollRequest = await detectPollCreation(message)
 
     if (pollRequest) {
