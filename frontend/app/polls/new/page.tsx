@@ -10,9 +10,10 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { Plus, Trash2, ArrowLeft } from 'lucide-react'
+import { Plus, Trash2, ArrowLeft, Sparkles } from 'lucide-react'
 import { useIcpAuth } from '@/components/IcpAuthProvider'
 import { useRouter } from 'next/navigation'
+import { AIChatbox } from '@/components/ai-chatbox'
 // import { useSupportedTokens, useValidateToken, KNOWN_TOKEN_INFO } from '@/lib/tokens'
 const KNOWN_TOKEN_INFO: any = {}
 
@@ -126,6 +127,8 @@ export default function NewPollPage() {
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [projects, setProjects] = useState<Project[]>([])
+  const [aiGenerating, setAiGenerating] = useState(false)
+  const [aiError, setAiError] = useState<string | null>(null)
   const { identity } = useIcpAuth()
   const router = useRouter()
 
@@ -191,6 +194,62 @@ export default function NewPollPage() {
   const removeOption = (index: number) => {
     if (fields.length > 2) {
       remove(index)
+    }
+  }
+
+  const handleOptionsGenerated = (options: string[]) => {
+    // Clear existing options
+    while (fields.length > 0) {
+      remove(0)
+    }
+    // Add generated options
+    options.forEach((optionText: string) => {
+      append({ text: optionText })
+    })
+    setAiError(null)
+  }
+
+  const generateOptionsWithAI = async () => {
+    const title = watch('title')
+    if (!title || title.length < 2) {
+      setAiError('Please enter a poll title first')
+      return
+    }
+
+    if (!identity) {
+      setAiError('Please login to use AI generation')
+      return
+    }
+
+    setAiGenerating(true)
+    setAiError(null)
+
+    try {
+      const { createBackendWithIdentity } = await import('@/lib/icp')
+      const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
+      const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
+      const backend = await createBackendWithIdentity({ canisterId, host, identity })
+
+      // Check if API key is configured in backend
+      const hasKey = await backend.has_openai_api_key()
+      if (!hasKey) {
+        setAiError('OpenAI API key not configured in backend. Please contact administrator.')
+        return
+      }
+
+      // Call backend to generate options
+      const result = await backend.generate_poll_options(title)
+
+      if (result && result.length > 0 && result[0]) {
+        handleOptionsGenerated(result[0])
+      } else {
+        setAiError('Failed to generate options. Please try again.')
+      }
+    } catch (err) {
+      console.error('Error generating options:', err)
+      setAiError(err instanceof Error ? err.message : 'Failed to generate options')
+    } finally {
+      setAiGenerating(false)
     }
   }
 
@@ -486,11 +545,28 @@ export default function NewPollPage() {
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle>Poll Options ({fields.length})</CardTitle>
-              <Button type="button" onClick={addOption} variant="outline">
-                <Plus className="w-4 h-4 mr-2" />
-                Add Option
-              </Button>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  onClick={generateOptionsWithAI}
+                  variant="outline"
+                  disabled={aiGenerating}
+                  className="border-blue-300 text-blue-700 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-400 dark:hover:bg-blue-900/20"
+                >
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  {aiGenerating ? 'Generating...' : 'AI Generate'}
+                </Button>
+                <Button type="button" onClick={addOption} variant="outline">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Add Option
+                </Button>
+              </div>
             </div>
+            {aiError && (
+              <div className="mt-2 text-sm text-red-600 bg-red-50 dark:bg-red-900/20 p-2 rounded">
+                {aiError}
+              </div>
+            )}
           </CardHeader>
           <CardContent className="space-y-4">
             {fields.map((field, index) => (
@@ -544,6 +620,9 @@ export default function NewPollPage() {
           </Button>
         </div>
       </form>
+
+      {/* AI Chatbox */}
+      <AIChatbox onOptionsGenerated={handleOptionsGenerated} />
     </div>
   )
 }

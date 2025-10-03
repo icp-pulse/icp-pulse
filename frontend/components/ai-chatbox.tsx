@@ -14,14 +14,21 @@ interface Message {
   timestamp: Date
   pollCreated?: boolean
   pollId?: number
+  optionsGenerated?: boolean
+  options?: string[]
+  topic?: string
 }
 
-export function AIChatbox() {
+interface AIChatboxProps {
+  onOptionsGenerated?: (options: string[]) => void
+}
+
+export function AIChatbox({ onOptionsGenerated }: AIChatboxProps = {}) {
   const [isOpen, setIsOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      content: 'Hello! How can I help you with ICP Pulse today?',
+      content: 'Hello! I can help you generate poll options. Just tell me what topic you want to create a poll about!',
       sender: 'ai',
       timestamp: new Date()
     }
@@ -72,10 +79,18 @@ export function AIChatbox() {
         sender: 'ai',
         timestamp: new Date(),
         pollCreated: data.pollCreated,
-        pollId: data.pollId
+        pollId: data.pollId,
+        optionsGenerated: data.optionsGenerated,
+        options: data.options,
+        topic: data.topic
       }
-      
+
       setMessages(prev => [...prev, aiResponse])
+
+      // If options were generated and callback provided, call it
+      if (data.optionsGenerated && data.options && onOptionsGenerated) {
+        onOptionsGenerated(data.options)
+      }
     } catch (error) {
       console.error('Error sending message:', error)
       const errorResponse: Message = {
@@ -146,6 +161,8 @@ export function AIChatbox() {
                         ? 'bg-blue-500 text-white'
                         : message.pollCreated
                         ? 'bg-green-100 text-green-900 dark:bg-green-900 dark:text-green-100 border border-green-200 dark:border-green-700'
+                        : message.optionsGenerated
+                        ? 'bg-purple-100 text-purple-900 dark:bg-purple-900 dark:text-purple-100 border border-purple-200 dark:border-purple-700'
                         : 'bg-gray-100 text-gray-900 dark:bg-gray-800 dark:text-gray-100'
                     }`}
                   >
@@ -158,6 +175,17 @@ export function AIChatbox() {
                           onClick={() => window.open(`/polls/${message.pollId}`, '_blank')}
                         >
                           View Poll
+                        </Button>
+                      </div>
+                    )}
+                    {message.optionsGenerated && message.options && onOptionsGenerated && (
+                      <div className="mt-2 pt-2 border-t border-purple-200 dark:border-purple-700">
+                        <Button
+                          size="sm"
+                          className="text-xs"
+                          onClick={() => onOptionsGenerated(message.options!)}
+                        >
+                          Use These Options
                         </Button>
                       </div>
                     )}
