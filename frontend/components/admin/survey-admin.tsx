@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { Plus, Search, Filter, MoreHorizontal, Edit, Trash2, Eye, FileText, Users, BarChart3 } from 'lucide-react'
+import { Plus, Search, Filter, MoreHorizontal, Edit, Trash2, Eye, FileText, Users, BarChart3, Gift } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
@@ -342,18 +342,14 @@ export default function SurveyAdmin() {
               </div>
 
               {/* Actions */}
-              <div className="flex gap-2 pt-2">
-                <Button variant="outline" size="sm" className="flex-1">
-                  <Eye className="w-4 h-4 mr-1" />
-                  View
-                </Button>
-                <Button variant="outline" size="sm" className="flex-1" onClick={() => window.location.href = `/surveys/${survey.id}/edit`}>
+              <div className="grid grid-cols-2 gap-2 pt-2">
+                <Button variant="outline" size="sm" onClick={() => window.location.href = `/surveys/${survey.id}/edit`}>
                   <Edit className="w-4 h-4 mr-1" />
                   Edit
                 </Button>
                 <Dialog>
                   <DialogTrigger asChild>
-                    <Button variant="outline" size="sm" className="flex-1" onClick={() => handleViewParticipants(survey.id.toString())}>
+                    <Button variant="outline" size="sm" onClick={() => handleViewParticipants(survey.id.toString())}>
                       <Users className="w-4 h-4 mr-1" />
                       Participants
                     </Button>
@@ -404,12 +400,13 @@ export default function SurveyAdmin() {
                     </div>
                   </DialogContent>
                 </Dialog>
-                <Button variant="outline" size="sm" className="flex-1" onClick={() => window.location.href = `/survey-results?surveyId=${survey.id}`}>
+                <Button variant="outline" size="sm" onClick={() => window.location.href = `/survey-rewards?surveyId=${survey.id}`}>
+                  <Gift className="w-4 h-4 mr-1" />
+                  Rewards
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => window.location.href = `/survey-results?surveyId=${survey.id}`}>
                   <BarChart3 className="w-4 h-4 mr-1" />
                   Results
-                </Button>
-                <Button variant="outline" size="sm" className="px-3">
-                  <Trash2 className="w-4 h-4" />
                 </Button>
               </div>
             </CardContent>

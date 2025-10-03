@@ -5,7 +5,12 @@ export const idlFactory = ({ IDL: I = IDL }) => {
   const Status = I.Variant({ active: I.Null, closed: I.Null })
   const ScopeType = I.Variant({ project: I.Null, product: I.Null })
 
+  const TokenType = I.Variant({ ICP: I.Null, ICRC1: I.Principal })
   const FundingInfo = I.Record({
+    tokenType: TokenType,
+    tokenCanister: I.Opt(I.Principal),
+    tokenSymbol: I.Text,
+    tokenDecimals: I.Nat8,
     totalFund: I.Nat64,
     rewardPerResponse: I.Nat64,
     maxResponses: I.Nat,
@@ -137,6 +142,7 @@ export const idlFactory = ({ IDL: I = IDL }) => {
     export_survey_csv: I.Func([I.Nat], [I.Vec(I.Nat8)], ['query']),
     get_survey_respondents: I.Func([I.Nat], [I.Vec(I.Principal)], ['query']),
     get_survey_submissions: I.Func([I.Nat], [I.Vec(Submission)], ['query']),
+    update_survey_funding: I.Func([I.Nat, I.Nat64, I.Nat64], [I.Bool], []),
 
     // Analytics
     get_analytics_overview: I.Func([], [AnalyticsOverview], ['query']),

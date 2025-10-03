@@ -799,6 +799,50 @@ persistent actor class polls_surveys_backend() = this {
     Array.filter<Submission>(submissions, func sub = sub.surveyId == surveyId)
   };
 
+  // Update survey funding
+  public shared(msg) func update_survey_funding(surveyId : SurveyId, totalFund : Nat64, rewardPerResponse : Nat64) : async Bool {
+    var updated = false;
+    surveys := Array.tabulate<Survey>(surveys.size(), func i {
+      let s = surveys[i];
+      if (s.id == surveyId and s.createdBy == msg.caller) {
+        // Calculate max responses
+        let maxResponses = Nat64.toNat(totalFund / rewardPerResponse);
+
+        // Get token info (use existing or default to ICP)
+        let (tokenSymbol, tokenDecimals) = switch (s.fundingInfo) {
+          case (?existing) { (existing.tokenSymbol, existing.tokenDecimals) };
+          case null { ("ICP", 8 : Nat8) };
+        };
+
+        // Get current responses count
+        let currentResponses = switch (s.fundingInfo) {
+          case (?existing) { existing.currentResponses };
+          case null { 0 };
+        };
+
+        // Calculate remaining fund
+        let usedFund = Nat64.fromNat(currentResponses) * rewardPerResponse;
+        let remainingFund : Nat64 = if (totalFund > usedFund) { totalFund - usedFund } else { 0 : Nat64 };
+
+        let newFunding : FundingInfo = {
+          tokenType = #ICP;
+          tokenCanister = null;
+          tokenSymbol = tokenSymbol;
+          tokenDecimals = tokenDecimals;
+          totalFund = totalFund;
+          rewardPerResponse = rewardPerResponse;
+          maxResponses = maxResponses;
+          currentResponses = currentResponses;
+          remainingFund = remainingFund;
+        };
+
+        updated := true;
+        { s with fundingInfo = ?newFunding }
+      } else { s }
+    });
+    updated
+  };
+
   // Validate and get info for a custom token
   public func validate_custom_token(canister: Principal) : async ?{symbol: Text; decimals: Nat8} {
     if (await validateTokenCanister(canister)) {
