@@ -778,6 +778,22 @@ persistent actor class polls_surveys_backend() = this {
     Text.encodeUtf8(csv)
   };
 
+  // Get list of respondents for a survey
+  public query func get_survey_respondents(surveyId : SurveyId) : async [Principal] {
+    var respondents : [Principal] = [];
+    for (sub in submissions.vals()) {
+      if (sub.surveyId == surveyId) {
+        switch (sub.respondent) {
+          case (?principal) {
+            respondents := Array.append(respondents, [principal]);
+          };
+          case null { };
+        };
+      };
+    };
+    respondents
+  };
+
   // Validate and get info for a custom token
   public func validate_custom_token(canister: Principal) : async ?{symbol: Text; decimals: Nat8} {
     if (await validateTokenCanister(canister)) {
