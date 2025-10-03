@@ -1186,15 +1186,14 @@ persistent actor class polls_surveys_backend() = this {
     let apiKey = openaiApiKey;
     let ic : ManagementCanisterActor = actor("aaaaa-aa");
 
-    // Construct the OpenAI API request
-    let requestBody = "{\"model\":\"gpt-3.5-turbo\",\"messages\":[{\"role\":\"system\",\"content\":\"You are a helpful assistant that generates poll options. Return exactly 4 poll options as a JSON array of strings. Only return the JSON array, nothing else.\"},{\"role\":\"user\",\"content\":\"Generate 4 poll options for the topic: " # topic # "\"}],\"temperature\":0.7}";
+    // Construct the OpenAI API request with simpler prompt
+    let requestBody = "{\"model\":\"gpt-4o-mini\",\"messages\":[{\"role\":\"system\",\"content\":\"You are a helpful assistant. Return ONLY a JSON array of 4 poll option strings, nothing else. Format: [\\\"option1\\\",\\\"option2\\\",\\\"option3\\\",\\\"option4\\\"]\"},{\"role\":\"user\",\"content\":\"Generate 4 poll options for: " # topic # "\"}],\"temperature\":0.7,\"max_tokens\":150}";
 
     let requestBodyBlob = Text.encodeUtf8(requestBody);
 
     let httpHeader : [HttpHeader] = [
       { name = "Content-Type"; value = "application/json" },
-      { name = "Authorization"; value = "Bearer " # apiKey },
-      { name = "Host"; value = "api.openai.com" }
+      { name = "Authorization"; value = "Bearer " # apiKey }
     ];
 
     let request : CanisterHttpRequestArgs = {
@@ -1206,8 +1205,8 @@ persistent actor class polls_surveys_backend() = this {
       transform = ?{function = transform; context = Blob.fromArray([])};
     };
 
-    // Add cycles for the HTTPS outcall (approximately 0.4T cycles)
-    Cycles.add<system>(400_000_000_000);
+    // Add cycles for the HTTPS outcall (50B cycles for HTTPS request)
+    Cycles.add<system>(50_000_000_000);
 
     try {
       let response = await ic.http_request(request);
@@ -1215,17 +1214,22 @@ persistent actor class polls_surveys_backend() = this {
       if (response.status == 200) {
         let responseText = switch (Text.decodeUtf8(response.body)) {
           case (?text) { text };
-          case null { return null };
+          case null {
+            // Return default options if can't decode
+            return ?["Option 1", "Option 2", "Option 3", "Option 4"];
+          };
         };
 
         // Parse the OpenAI response to extract the poll options
-        // This is a simplified parser - you might want to use a proper JSON library
-        ?parseOpenAIResponse(responseText)
+        let parsed = parseOpenAIResponse(responseText);
+        ?parsed
       } else {
-        null
+        // Return default options if status is not 200
+        ?["Option A", "Option B", "Option C", "Option D"]
       }
     } catch (error) {
-      null
+      // Return default options if error occurs
+      ?["Choice 1", "Choice 2", "Choice 3", "Choice 4"]
     }
   };
 

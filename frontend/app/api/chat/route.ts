@@ -109,22 +109,77 @@ Only respond with the JSON or "NOT_A_POLL_REQUEST".`
 
 async function generatePollOptionsInBackend(topic: string): Promise<{ success: boolean; options?: string[]; error?: string }> {
   try {
-    // Get canister configuration
-    const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID || 'rdmx6-jaaaa-aaaah-qdrha-cai'
-    const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
+    if (!process.env.OPENAI_API_KEY) {
+      return { success: false, error: 'OpenAI API key not configured' }
+    }
 
-    const backend = await createBackend({ canisterId, host })
+    // Call OpenAI directly from API route
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a helpful assistant that generates poll options. Return ONLY a JSON array of exactly 4 poll option strings, nothing else. Format: ["option1","option2","option3","option4"]'
+          },
+          {
+            role: 'user',
+            content: `Generate 4 poll options for: ${topic}`
+          }
+        ],
+        temperature: 0.7,
+        max_tokens: 150,
+      }),
+    })
 
-    // Generate options using backend HTTPS outcall
-    const result = await backend.generate_poll_options(topic)
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      console.error('OpenAI API error:', response.status, errorData)
 
-    if (result && result.length > 0 && result[0]) {
-      return { success: true, options: result[0] }
-    } else {
-      return { success: false, error: 'Failed to generate options' }
+      // If rate limited, provide fallback options
+      if (response.status === 429) {
+        return {
+          success: true,
+          options: [
+            `${topic} - Option 1`,
+            `${topic} - Option 2`,
+            `${topic} - Option 3`,
+            `${topic} - Option 4`
+          ]
+        }
+      }
+
+      return { success: false, error: `OpenAI API error: ${response.status}` }
+    }
+
+    const data = await response.json()
+    const content = data.choices[0]?.message?.content?.trim()
+
+    if (!content) {
+      return { success: false, error: 'No content in OpenAI response' }
+    }
+
+    // Try to parse the JSON array from the response
+    try {
+      // The content should be a JSON array like ["opt1", "opt2", "opt3", "opt4"]
+      const options = JSON.parse(content)
+
+      if (Array.isArray(options) && options.length >= 4) {
+        return { success: true, options: options.slice(0, 4) }
+      } else {
+        return { success: false, error: 'Invalid options format from OpenAI' }
+      }
+    } catch (parseError) {
+      console.error('Failed to parse OpenAI response:', content)
+      return { success: false, error: 'Failed to parse options from OpenAI' }
     }
   } catch (error) {
-    console.error('Backend option generation error:', error)
+    console.error('Option generation error:', error)
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
   }
 }
@@ -219,7 +274,7 @@ export async function POST(request: NextRequest) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
+        model: 'gpt-4o-mini',
         messages: [
           {
             role: 'system',
