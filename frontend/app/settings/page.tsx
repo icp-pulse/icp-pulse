@@ -23,10 +23,6 @@ function SettingsContent() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
   const [activeTab, setActiveTab] = useState<'projects' | 'surveys' | 'polls'>('projects')
 
-  useEffect(() => {
-    checkApiKey()
-  }, [identity])
-
   const checkApiKey = async () => {
     if (!identity) {
       setChecking(false)
@@ -47,6 +43,11 @@ function SettingsContent() {
       setChecking(false)
     }
   }
+
+  useEffect(() => {
+    checkApiKey()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [identity])
 
   const handleSave = async () => {
     if (!identity || !apiKey.trim()) {
@@ -186,7 +187,7 @@ function SettingsContent() {
                     <ol className="text-sm text-blue-800 dark:text-blue-200 space-y-1 list-decimal list-inside">
                       <li>Visit <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="underline">OpenAI API Keys</a></li>
                       <li>Sign in or create an account</li>
-                      <li>Click "Create new secret key"</li>
+                      <li>Click &quot;Create new secret key&quot;</li>
                       <li>Copy the key and paste it above</li>
                     </ol>
                   </div>
