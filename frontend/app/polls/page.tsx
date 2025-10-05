@@ -32,6 +32,8 @@ export default function PollsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [votingPoll, setVotingPoll] = useState<bigint | null>(null)
+  const [votingOption, setVotingOption] = useState<bigint | null>(null)
+  const [openVoteDialog, setOpenVoteDialog] = useState<bigint | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [projectFilter, setProjectFilter] = useState('all')
@@ -144,18 +146,22 @@ export default function PollsPage() {
   }, [polls, searchQuery, statusFilter, projectFilter, sortBy])
 
   const handleVote = async (pollId: bigint, optionId: bigint) => {
-    if (!identity || votingPoll) return
-    
+    if (!isAuthenticated || votingPoll) return
+
     try {
       setVotingPoll(pollId)
+      setVotingOption(optionId)
       const { createBackendWithIdentity } = await import('@/lib/icp')
       const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
       const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
       const backend = await createBackendWithIdentity({ canisterId, host, identity })
-      
+
       const success = await backend.vote(pollId, optionId)
-      
+
       if (success) {
+        // Close the dialog
+        setOpenVoteDialog(null)
+
         // Refresh the poll data
         await fetchData()
         toast({
@@ -183,6 +189,7 @@ export default function PollsPage() {
       })
     } finally {
       setVotingPoll(null)
+      setVotingOption(null)
     }
   }
 
@@ -513,7 +520,7 @@ export default function PollsPage() {
                             </TableCell>
                             <TableCell>
                               {isActive && !userVoted ? (
-                                <AlertDialog>
+                                <AlertDialog open={openVoteDialog === poll.id} onOpenChange={(open) => setOpenVoteDialog(open ? poll.id : null)}>
                                   <AlertDialogTrigger asChild>
                                     <Button
                                       size="sm"
@@ -531,16 +538,23 @@ export default function PollsPage() {
                                       </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <div className="space-y-2">
-                                      {poll.options.map((option) => (
-                                        <Button
-                                          key={option.id}
-                                          variant="outline"
-                                          onClick={() => handleVote(poll.id, option.id)}
-                                          className="w-full justify-start"
-                                        >
-                                          {option.text}
-                                        </Button>
-                                      ))}
+                                      {poll.options.map((option) => {
+                                        const isVotingThis = votingOption === option.id
+                                        return (
+                                          <Button
+                                            key={option.id}
+                                            variant="outline"
+                                            onClick={() => handleVote(poll.id, option.id)}
+                                            disabled={!!votingPoll}
+                                            className="w-full justify-start"
+                                          >
+                                            {isVotingThis && (
+                                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
+                                            )}
+                                            {option.text}
+                                          </Button>
+                                        )
+                                      })}
                                     </div>
                                     <AlertDialogFooter>
                                       <AlertDialogCancel>Cancel</AlertDialogCancel>
