@@ -13,23 +13,6 @@ import { analytics } from '@/lib/analytics'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 
-// Plug wallet type definitions
-declare global {
-  interface Window {
-    ic?: {
-      plug?: {
-        isConnected: () => Promise<boolean>
-        createAgent: (args?: { whitelist?: string[], host?: string }) => Promise<boolean>
-        requestBalance?: () => Promise<any[]>
-        createActor?: (args: { canisterId: string, interfaceFactory: any }) => Promise<any>
-        disconnect: () => Promise<boolean>
-        agent: any
-        principalId: string
-      }
-    }
-  }
-}
-
 export default function WalletPage() {
   const { identity, isAuthenticated, principalText } = useIcpAuth()
   const [transferAmount, setTransferAmount] = useState('')

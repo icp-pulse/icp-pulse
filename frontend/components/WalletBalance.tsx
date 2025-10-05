@@ -113,10 +113,19 @@ export function WalletBalance({ compact = false, showRefresh = true }: WalletBal
               whitelist: [pulseCanisterId],
               host
             })
-            pulseActor = await window.ic.plug.createActor({
-              canisterId: pulseCanisterId,
-              interfaceFactory: (await import('../../src/declarations/tokenmania')).idlFactory
-            })
+            if (window.ic.plug.createActor) {
+              pulseActor = await window.ic.plug.createActor({
+                canisterId: pulseCanisterId,
+                interfaceFactory: (await import('../../src/declarations/tokenmania')).idlFactory
+              })
+            } else {
+              // Fallback if createActor not available
+              const { Actor } = await import('@dfinity/agent')
+              pulseActor = Actor.createActor(
+                (await import('../../src/declarations/tokenmania')).idlFactory,
+                { agent: window.ic.plug.agent, canisterId: pulseCanisterId }
+              )
+            }
           } else if (identity) {
             // Use regular agent for II/NFID
             const { HttpAgent } = await import('@dfinity/agent')
@@ -162,6 +171,11 @@ export function WalletBalance({ compact = false, showRefresh = true }: WalletBal
 
       // Get supported tokens from backend for other tokens
       try {
+        // Skip if no identity available (Plug wallet doesn't provide Identity object)
+        if (!identity) {
+          throw new Error('No identity available')
+        }
+
         const backendCanisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
         const backend = await createBackendWithIdentity({ canisterId: backendCanisterId, host, identity })
         const supportedTokens = await backend.get_supported_tokens()
