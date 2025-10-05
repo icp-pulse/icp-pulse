@@ -69,6 +69,8 @@ persistent actor class polls_surveys_backend() = this {
     #GenericError: { error_code: Nat; message: Text };
   };
 
+  type FundingType = { #SelfFunded; #Crowdfunded };
+
   type FundingInfo = {
     tokenType: TokenType;         // Type of token used for funding
     tokenCanister: ?Principal;    // Token canister for custom tokens (null for ICP)
@@ -79,6 +81,8 @@ persistent actor class polls_surveys_backend() = this {
     maxResponses: Nat;          // Maximum funded responses
     currentResponses: Nat;       // Current response count
     remainingFund: Nat64;       // Remaining token balance in smallest unit
+    fundingType: FundingType;    // Self-funded or crowdfunded
+    contributors: [(Principal, Nat64)]; // List of contributors and their amounts
   };
   type ScopeType = { #project; #product };
 
@@ -363,11 +367,17 @@ persistent actor class polls_surveys_backend() = this {
   };
 
   // Polls
-  public shared (msg) func create_poll(scopeType : Text, scopeId : Nat, title : Text, description : Text, options : [Text], closesAt : Int, rewardFund : Nat, fundingEnabled : Bool, rewardPerVote : ?Nat64) : async PollId {
+  public shared (msg) func create_poll(scopeType : Text, scopeId : Nat, title : Text, description : Text, options : [Text], closesAt : Int, rewardFund : Nat, fundingEnabled : Bool, rewardPerVote : ?Nat64, fundingType : ?Text) : async PollId {
     assert(options.size() >= 2);
     assert(closesAt > now());
     let id = nextPollId; nextPollId += 1;
     let opts = Array.tabulate<OptionT>(options.size(), func i { { id = i; text = options[i]; votes = 0 } });
+
+    let funding_type = switch (fundingType) {
+      case (?ft) { if (ft == "crowdfunded") { #Crowdfunded } else { #SelfFunded } };
+      case null { #SelfFunded };
+    };
+
     let fundingInfo = if (fundingEnabled) {
       switch (rewardPerVote) {
         case (?reward) {
@@ -382,7 +392,9 @@ persistent actor class polls_surveys_backend() = this {
             rewardPerResponse = reward;
             maxResponses = maxResponses;
             currentResponses = 0;
-            remainingFund = totalFund
+            remainingFund = totalFund;
+            fundingType = funding_type;
+            contributors = [];
           }
         };
         case null { null }
@@ -403,7 +415,8 @@ persistent actor class polls_surveys_backend() = this {
     closesAt : Int,
     tokenCanister : ?Principal,
     totalFunding : Nat64,
-    rewardPerVote : Nat64
+    rewardPerVote : Nat64,
+    fundingType : Text
   ) : async Result.Result<PollId, Text> {
     assert(options.size() >= 2);
     assert(closesAt > now());
@@ -424,6 +437,8 @@ persistent actor class polls_surveys_backend() = this {
     // Get token info
     let (tokenSymbol, tokenDecimals) = await getTokenInfo(tokenCanister);
 
+    let funding_type = if (fundingType == "crowdfunded") { #Crowdfunded } else { #SelfFunded };
+
     let fundingInfo = {
       tokenType = switch (tokenCanister) {
         case null { #ICP };
@@ -437,6 +452,8 @@ persistent actor class polls_surveys_backend() = this {
       maxResponses = if (rewardPerVote > 0) { Nat64.toNat(totalFunding / rewardPerVote) } else { 0 };
       currentResponses = 0;
       remainingFund = totalFunding;
+      fundingType = funding_type;
+      contributors = [];
     };
 
     let poll : Poll = {
@@ -458,6 +475,109 @@ persistent actor class polls_surveys_backend() = this {
 
     polls := Array.append(polls, [poll]);
     #ok(id)
+  };
+
+  // Fund a crowdfunded poll with PULSE tokens
+  public shared (msg) func fund_poll(pollId : PollId, amount : Nat64) : async Result.Result<Text, Text> {
+    // Find the poll
+    let pollOpt = findPoll(pollId);
+    switch (pollOpt) {
+      case null { return #err("Poll not found") };
+      case (?poll) {
+        // Check if poll has funding info
+        switch (poll.fundingInfo) {
+          case null { return #err("Poll does not accept funding") };
+          case (?info) {
+            // Check if poll is crowdfunded
+            switch (info.fundingType) {
+              case (#SelfFunded) { return #err("Poll is self-funded and does not accept contributions") };
+              case (#Crowdfunded) {
+                // Check if poll is still active
+                if (poll.status != #active) {
+                  return #err("Poll is closed and cannot accept funding");
+                };
+
+                // Transfer tokens from contributor to this canister
+                let tokenCanister = switch (info.tokenCanister) {
+                  case (?canister) { canister };
+                  case null { return #err("Invalid token configuration") };
+                };
+
+                // Use ICRC-2 transfer_from to pull tokens from the user's wallet
+                // Note: User must approve this canister first via icrc2_approve
+                try {
+                  let tokenActor = actor(Principal.toText(tokenCanister)) : actor {
+                    icrc2_transfer_from : ({
+                      from : { owner : Principal; subaccount : ?Blob };
+                      to : { owner : Principal; subaccount : ?Blob };
+                      amount : Nat;
+                      fee : ?Nat;
+                      memo : ?Blob;
+                      created_at_time : ?Nat64;
+                    }) -> async { #Ok : Nat; #Err : { #BadFee : { expected_fee : Nat }; #BadBurn : { min_burn_amount : Nat }; #InsufficientFunds : { balance : Nat }; #InsufficientAllowance : { allowance : Nat }; #TooOld; #CreatedInFuture : { ledger_time : Nat64 }; #Duplicate : { duplicate_of : Nat }; #TemporarilyUnavailable; #GenericError : { error_code : Nat; message : Text } } };
+                  };
+
+                  let transferArgs = {
+                    from = { owner = msg.caller; subaccount = null };
+                    to = { owner = Principal.fromActor(this); subaccount = null };
+                    amount = Nat64.toNat(amount);
+                    fee = null;
+                    memo = null;
+                    created_at_time = ?Nat64.fromNat(Int.abs(Time.now()));
+                  };
+
+                  switch (await tokenActor.icrc2_transfer_from(transferArgs)) {
+                    case (#Ok(_)) {
+                      // Transfer successful, now update the poll's funding info
+                      polls := Array.tabulate<Poll>(polls.size(), func i {
+                        let p = polls[i];
+                        if (p.id == pollId) {
+                          switch (p.fundingInfo) {
+                            case (?fi) {
+                              let newContributors = Array.append(fi.contributors, [(msg.caller, amount)]);
+                              let newTotalFund = fi.totalFund + amount;
+                              let newRemainingFund = fi.remainingFund + amount;
+                              let newMaxResponses = if (fi.rewardPerResponse > 0) {
+                                Nat64.toNat(newTotalFund / fi.rewardPerResponse)
+                              } else { fi.maxResponses };
+
+                              let newFundingInfo = {
+                                fi with
+                                totalFund = newTotalFund;
+                                remainingFund = newRemainingFund;
+                                maxResponses = newMaxResponses;
+                                contributors = newContributors;
+                              };
+
+                              { p with fundingInfo = ?newFundingInfo }
+                            };
+                            case null { p }
+                          }
+                        } else { p }
+                      });
+
+                      #ok("Successfully contributed " # Nat64.toText(amount) # " " # info.tokenSymbol # " to poll")
+                    };
+                    case (#Err(error)) {
+                      let errorMsg = switch (error) {
+                        case (#InsufficientFunds { balance }) { "Insufficient funds. Balance: " # Nat.toText(balance) };
+                        case (#InsufficientAllowance { allowance }) { "Insufficient allowance. Please approve this canister first. Current allowance: " # Nat.toText(allowance) };
+                        case (#BadFee { expected_fee }) { "Bad fee. Expected: " # Nat.toText(expected_fee) };
+                        case (#GenericError { message; error_code }) { "Error " # Nat.toText(error_code) # ": " # message };
+                        case _ { "Token transfer failed" };
+                      };
+                      #err(errorMsg)
+                    };
+                  };
+                } catch (e) {
+                  #err("Failed to communicate with token canister")
+                };
+              };
+            };
+          };
+        };
+      };
+    }
   };
 
   public query func list_polls_by_project(projectId : ProjectId, offset : Nat, limit : Nat) : async [PollSummary] {
@@ -624,7 +744,9 @@ persistent actor class polls_surveys_backend() = this {
             rewardPerResponse = reward;
             maxResponses = maxResponses;
             currentResponses = 0;
-            remainingFund = totalFund
+            remainingFund = totalFund;
+            fundingType = #SelfFunded;
+            contributors = [];
           }
         };
         case null { null }
@@ -836,6 +958,8 @@ persistent actor class polls_surveys_backend() = this {
           maxResponses = maxResponses;
           currentResponses = currentResponses;
           remainingFund = remainingFund;
+          fundingType = #SelfFunded;
+          contributors = [];
         };
 
         updated := true;

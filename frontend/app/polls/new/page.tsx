@@ -36,6 +36,7 @@ const schema = z.object({
   options: z.array(optionSchema).min(2, 'At least two options are required'),
   // Funding fields
   fundingEnabled: z.boolean().default(false),
+  fundingType: z.enum(['self-funded', 'crowdfunded']).default('self-funded'),
   selectedToken: z.string().default('ICP'), // Either 'ICP' or a token principal
   customTokenCanister: z.string().optional(),
   totalFundAmount: z.number().min(0).optional(),
@@ -62,7 +63,7 @@ async function createPollAction(values: FormValues, identity: any) {
   const backend = await createBackendWithIdentity({ canisterId, host, identity })
   
   // Convert form values to backend format
-  const { title, description, projectId, expiresAt, allowAnonymous, allowMultiple, options, fundingEnabled, selectedToken, customTokenCanister, totalFundAmount, rewardPerVote } = values
+  const { title, description, projectId, expiresAt, allowAnonymous, allowMultiple, options, fundingEnabled, fundingType, selectedToken, customTokenCanister, totalFundAmount, rewardPerVote } = values
   
   const backendOptions = options.map(opt => opt.text)
   
@@ -94,7 +95,8 @@ async function createPollAction(values: FormValues, identity: any) {
         BigInt(expiresAtNs),
         BigInt(totalFundingE8s),
         true, // fundingEnabled
-        [BigInt(rewardPerVoteE8s)] // rewardPerVote
+        [BigInt(rewardPerVoteE8s)], // rewardPerVote
+        [fundingType] // Pass funding type
       );
 
       return { success: true, pollId }
@@ -112,7 +114,8 @@ async function createPollAction(values: FormValues, identity: any) {
         BigInt(expiresAtNs),
         BigInt(rewardFundLegacy),
         fundingEnabled,
-        rewardPerVoteE8s ? [rewardPerVoteE8s] : []
+        rewardPerVoteE8s ? [rewardPerVoteE8s] : [],
+        [fundingType] // Pass funding type
       );
 
       return { success: true, pollId };
@@ -147,6 +150,7 @@ export default function NewPollPage() {
         { text: '' }
       ],
       fundingEnabled: false,
+      fundingType: 'self-funded',
       selectedToken: 'ICP',
       totalFundAmount: 0,
       rewardPerVote: 0,
@@ -409,6 +413,30 @@ export default function NewPollPage() {
 
             {fundingEnabled && (
               <div className="space-y-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                {/* Funding Type Selection */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Funding Type</label>
+                  <Select onValueChange={(value: 'self-funded' | 'crowdfunded') => setValue('fundingType', value)} value={watch('fundingType')}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select funding type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="self-funded">
+                        <div>
+                          <div className="font-medium">Self-Funded</div>
+                          <div className="text-xs text-muted-foreground">You fund the entire reward pool yourself</div>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="crowdfunded">
+                        <div>
+                          <div className="font-medium">Crowdfunded</div>
+                          <div className="text-xs text-muted-foreground">Open for community contributions</div>
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 {/* Token Selection */}
                 <div>
                   <label className="block text-sm font-medium mb-2">Select Token</label>
