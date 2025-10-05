@@ -83,7 +83,19 @@ persistent actor class polls_surveys_backend() = this {
     remainingFund: Nat64;       // Remaining token balance in smallest unit
     fundingType: FundingType;    // Self-funded or crowdfunded
     contributors: [(Principal, Nat64)]; // List of contributors and their amounts
+    pendingClaims: [(Principal, Nat64)]; // Unclaimed rewards: (user, amount)
   };
+
+  type ClaimableReward = {
+    pollId: PollId;
+    pollTitle: Text;
+    amount: Nat64;
+    tokenSymbol: Text;
+    tokenDecimals: Nat8;
+    tokenCanister: ?Principal;
+    pollClosed: Bool;
+  };
+
   type ScopeType = { #project; #product };
 
   type Project = {
@@ -395,6 +407,7 @@ persistent actor class polls_surveys_backend() = this {
             remainingFund = totalFund;
             fundingType = funding_type;
             contributors = [];
+            pendingClaims = [];
           }
         };
         case null { null }
@@ -454,6 +467,7 @@ persistent actor class polls_surveys_backend() = this {
       remainingFund = totalFunding;
       fundingType = funding_type;
       contributors = [];
+      pendingClaims = [];
     };
 
     let poll : Poll = {

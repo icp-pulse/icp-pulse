@@ -175,7 +175,7 @@ export function PollCrowdfunding({ pollId, fundingInfo, onContribute }: PollCrow
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-green-600">
-              {rewardPerVote.toFixed(2)}
+              {rewardPerVote.toFixed(6)}
             </div>
             <div className="text-xs text-gray-500 mt-1">
               Per Vote ({tokenSymbol})
