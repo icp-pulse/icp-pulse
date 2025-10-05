@@ -9,6 +9,24 @@ import { Badge } from '@/components/ui/badge'
 import { Wallet, RefreshCw, Eye, EyeOff, TrendingUp, Coins, AlertCircle } from 'lucide-react'
 import { analytics } from '@/lib/analytics'
 
+// Plug wallet type definitions (same as IcpAuthProvider)
+declare global {
+  interface Window {
+    ic?: {
+      plug?: {
+        isConnected: () => Promise<boolean>
+        createAgent: (args?: { whitelist?: string[], host?: string }) => Promise<boolean>
+        requestConnect: (args?: { whitelist?: string[], host?: string }) => Promise<boolean>
+        requestBalance?: () => Promise<any[]>
+        disconnect: () => Promise<boolean>
+        createActor?: (args: { canisterId: string, interfaceFactory: any }) => Promise<any>
+        agent: any
+        principalId: string
+      }
+    }
+  }
+}
+
 interface TokenBalance {
   symbol: string
   balance: bigint
@@ -47,7 +65,10 @@ export function WalletBalance({ compact = false, showRefresh = true }: WalletBal
   }
 
   const fetchBalances = useCallback(async (isRetry: boolean = false) => {
-    if (!isAuthenticated || !identity) return
+    if (!isAuthenticated || !principalText) return
+
+    // Check if using Plug wallet
+    const isPlugWallet = !identity && typeof window !== 'undefined' && window.ic?.plug?.isConnected
 
     try {
       setLoading(true)
@@ -64,8 +85,18 @@ export function WalletBalance({ compact = false, showRefresh = true }: WalletBal
       })
 
       const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
-      const userPrincipal = identity.getPrincipal()
       const tokenBalances: TokenBalance[] = []
+
+      // Get user principal based on auth method
+      let userPrincipal: any
+      if (isPlugWallet && window.ic?.plug) {
+        const { Principal } = await import('@dfinity/principal')
+        userPrincipal = Principal.fromText(window.ic.plug.principalId)
+      } else if (identity) {
+        userPrincipal = identity.getPrincipal()
+      } else {
+        return // Can't proceed without principal
+      }
 
       // Get PULSE token balance using the tokenmania canister
       try {
@@ -73,19 +104,42 @@ export function WalletBalance({ compact = false, showRefresh = true }: WalletBal
         if (pulseCanisterId) {
           // Import the tokenmania actor types and factory
           const { createActor } = await import('../../src/declarations/tokenmania')
-          const { HttpAgent } = await import('@dfinity/agent')
 
-          // Create the tokenmania actor with the user's identity
-          const agent = HttpAgent.createSync({ host })
+          let pulseActor: any
 
-          if (process.env.NEXT_PUBLIC_DFX_NETWORK === 'local') {
-            await agent.fetchRootKey()
+          // Use Plug agent if connected via Plug
+          if (isPlugWallet && window.ic?.plug) {
+            await window.ic.plug.createAgent({
+              whitelist: [pulseCanisterId],
+              host
+            })
+            if (window.ic.plug.createActor) {
+              pulseActor = await window.ic.plug.createActor({
+                canisterId: pulseCanisterId,
+                interfaceFactory: (await import('../../src/declarations/tokenmania')).idlFactory
+              })
+            } else {
+              // Fallback if createActor not available
+              const { Actor } = await import('@dfinity/agent')
+              pulseActor = Actor.createActor(
+                (await import('../../src/declarations/tokenmania')).idlFactory,
+                { agent: window.ic.plug.agent, canisterId: pulseCanisterId }
+              )
+            }
+          } else if (identity) {
+            // Use regular agent for II/NFID
+            const { HttpAgent } = await import('@dfinity/agent')
+            const agent = HttpAgent.createSync({ host })
+
+            if (process.env.NEXT_PUBLIC_DFX_NETWORK === 'local') {
+              await agent.fetchRootKey()
+            }
+
+            agent.replaceIdentity(identity)
+            pulseActor = createActor(pulseCanisterId, { agent })
+          } else {
+            throw new Error('No valid authentication method')
           }
-
-          agent.replaceIdentity(identity)
-
-          // Create the properly typed actor
-          const pulseActor = createActor(pulseCanisterId, { agent })
 
           // Use the tokenmania interface to get PULSE balance
           const balance = await pulseActor.icrc1_balance_of({
@@ -117,6 +171,11 @@ export function WalletBalance({ compact = false, showRefresh = true }: WalletBal
 
       // Get supported tokens from backend for other tokens
       try {
+        // Skip if no identity available (Plug wallet doesn't provide Identity object)
+        if (!identity) {
+          throw new Error('No identity available')
+        }
+
         const backendCanisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
         const backend = await createBackendWithIdentity({ canisterId: backendCanisterId, host, identity })
         const supportedTokens = await backend.get_supported_tokens()
@@ -141,7 +200,7 @@ export function WalletBalance({ compact = false, showRefresh = true }: WalletBal
       const icrc1Tokens = [
         { symbol: 'ckBTC', decimals: 8, canisterId: 'mxzaz-hqaaa-aaaar-qaada-cai' },
         { symbol: 'ckETH', decimals: 18, canisterId: 'ss2fx-dyaaa-aaaar-qacoq-cai' },
-        { symbol: 'ckUSDC', decimals: 6, canisterId: 'xkbqi-6qaaa-aaaah-qbpqq-cai' }
+        { symbol: 'ckUSDC', decimals: 6, canisterId: 'xevnm-gaaaa-aaaar-qafnq-cai' }
       ]
 
       // Fetch ICRC-1 token balances
@@ -150,31 +209,84 @@ export function WalletBalance({ compact = false, showRefresh = true }: WalletBal
           let balance = 0n
 
           try {
-            const { Actor, HttpAgent } = await import('@dfinity/agent')
+            let icrc1Actor: any
 
-            const agent = HttpAgent.createSync({ host })
-            if (process.env.NEXT_PUBLIC_DFX_NETWORK === 'local') {
-              await agent.fetchRootKey()
-            }
-            agent.replaceIdentity(identity)
+            if (isPlugWallet && window.ic?.plug) {
+              // Use Plug wallet - create actor for the token
+              try {
+                await window.ic.plug.createAgent({
+                  whitelist: [token.canisterId],
+                  host
+                })
 
-            // Create a generic ICRC-1 actor interface
-            const icrc1Actor = Actor.createActor(
-              ({ IDL }) => IDL.Service({
-                icrc1_balance_of: IDL.Func([
-                  IDL.Record({
-                    owner: IDL.Principal,
-                    subaccount: IDL.Opt(IDL.Vec(IDL.Nat8))
+                if (window.ic.plug.createActor) {
+                  icrc1Actor = await window.ic.plug.createActor({
+                    canisterId: token.canisterId,
+                    interfaceFactory: ({ IDL }: any) => IDL.Service({
+                      icrc1_balance_of: IDL.Func([
+                        IDL.Record({
+                          owner: IDL.Principal,
+                          subaccount: IDL.Opt(IDL.Vec(IDL.Nat8))
+                        })
+                      ], [IDL.Nat], ['query'])
+                    })
                   })
-                ], [IDL.Nat], ['query'])
-              }),
-              { agent, canisterId: token.canisterId }
-            ) as { icrc1_balance_of: (args: { owner: any; subaccount: any[] }) => Promise<bigint> }
 
-            balance = await icrc1Actor.icrc1_balance_of({
-              owner: userPrincipal,
-              subaccount: []
-            })
+                  balance = await icrc1Actor.icrc1_balance_of({
+                    owner: userPrincipal,
+                    subaccount: []
+                  })
+                } else {
+                  // Fallback to regular Actor if createActor is not available
+                  const { Actor } = await import('@dfinity/agent')
+                  icrc1Actor = Actor.createActor(
+                    ({ IDL }: any) => IDL.Service({
+                      icrc1_balance_of: IDL.Func([
+                        IDL.Record({
+                          owner: IDL.Principal,
+                          subaccount: IDL.Opt(IDL.Vec(IDL.Nat8))
+                        })
+                      ], [IDL.Nat], ['query'])
+                    }),
+                    { agent: window.ic.plug.agent, canisterId: token.canisterId }
+                  )
+
+                  balance = await icrc1Actor.icrc1_balance_of({
+                    owner: userPrincipal,
+                    subaccount: []
+                  })
+                }
+              } catch (plugError) {
+                console.warn(`Failed to fetch ${token.symbol} balance with Plug:`, plugError)
+              }
+            } else if (identity) {
+              // Use regular agent for II/NFID
+              const { Actor, HttpAgent } = await import('@dfinity/agent')
+
+              const agent = HttpAgent.createSync({ host })
+              if (process.env.NEXT_PUBLIC_DFX_NETWORK === 'local') {
+                await agent.fetchRootKey()
+              }
+              agent.replaceIdentity(identity)
+
+              // Create a generic ICRC-1 actor interface
+              icrc1Actor = Actor.createActor(
+                ({ IDL }) => IDL.Service({
+                  icrc1_balance_of: IDL.Func([
+                    IDL.Record({
+                      owner: IDL.Principal,
+                      subaccount: IDL.Opt(IDL.Vec(IDL.Nat8))
+                    })
+                  ], [IDL.Nat], ['query'])
+                }),
+                { agent, canisterId: token.canisterId }
+              ) as { icrc1_balance_of: (args: { owner: any; subaccount: any[] }) => Promise<bigint> }
+
+              balance = await icrc1Actor.icrc1_balance_of({
+                owner: userPrincipal,
+                subaccount: []
+              })
+            }
           } catch (error) {
             console.warn(`Failed to fetch ${token.symbol} balance:`, error)
           }
@@ -232,14 +344,14 @@ export function WalletBalance({ compact = false, showRefresh = true }: WalletBal
           { symbol: 'ICP', balance: 0n, decimals: 8, canisterId: 'rrkah-fqaaa-aaaaa-aaaaq-cai', usdValue: getTokenUSDValue('ICP') },
           { symbol: 'ckBTC', balance: 0n, decimals: 8, canisterId: 'mxzaz-hqaaa-aaaar-qaada-cai', usdValue: getTokenUSDValue('ckBTC') },
           { symbol: 'ckETH', balance: 0n, decimals: 18, canisterId: 'ss2fx-dyaaa-aaaar-qacoq-cai', usdValue: getTokenUSDValue('ckETH') },
-          { symbol: 'ckUSDC', balance: 0n, decimals: 6, canisterId: 'xkbqi-6qaaa-aaaah-qbpqq-cai', usdValue: getTokenUSDValue('ckUSDC') }
+          { symbol: 'ckUSDC', balance: 0n, decimals: 6, canisterId: 'xevnm-gaaaa-aaaar-qafnq-cai', usdValue: getTokenUSDValue('ckUSDC') }
         ]
         setBalances(fallbackTokens)
       }
     } finally {
       setLoading(false)
     }
-  }, [isAuthenticated, identity, balances.length])
+  }, [isAuthenticated, identity, principalText, balances.length])
 
   const retryFetch = async () => {
     if (retryCount < 3) {
@@ -262,10 +374,10 @@ export function WalletBalance({ compact = false, showRefresh = true }: WalletBal
   }
 
   useEffect(() => {
-    if (isAuthenticated && identity) {
+    if (isAuthenticated && principalText) {
       fetchBalances()
     }
-  }, [isAuthenticated, identity, fetchBalances])
+  }, [isAuthenticated, principalText, fetchBalances])
 
   const calculateTotalUSD = () => {
     return balances.reduce((total, token) => {
