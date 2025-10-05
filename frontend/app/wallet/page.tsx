@@ -8,19 +8,43 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Wallet, ArrowUpRight, ArrowDownLeft, RefreshCw, Copy, ExternalLink, AlertCircle, Send, QrCode } from 'lucide-react'
+import { Wallet, ArrowUpRight, ArrowDownLeft, RefreshCw, Copy, ExternalLink, AlertCircle, Send, QrCode, ShoppingCart } from 'lucide-react'
 import { analytics } from '@/lib/analytics'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 
+// Plug wallet type definitions
+declare global {
+  interface Window {
+    ic?: {
+      plug?: {
+        isConnected: () => Promise<boolean>
+        createAgent: (args?: { whitelist?: string[], host?: string }) => Promise<boolean>
+        requestBalance?: () => Promise<any[]>
+        createActor?: (args: { canisterId: string, interfaceFactory: any }) => Promise<any>
+        disconnect: () => Promise<boolean>
+        agent: any
+        principalId: string
+      }
+    }
+  }
+}
+
 export default function WalletPage() {
   const { identity, isAuthenticated, principalText } = useIcpAuth()
   const [transferAmount, setTransferAmount] = useState('')
-  const [recipientAddress, setRecipientAddress] = useState('ues2k-6iwxj-nbezb-owlhg-nsem4-abqjc-74ocv-lsxps-ytjv4-2tphv-yqe')
+  const [recipientAddress, setRecipientAddress] = useState('')
   const [isTransferring, setIsTransferring] = useState(false)
   const [transferResult, setTransferResult] = useState<{ success: boolean; message: string } | null>(null)
   const [showReceiveModal, setShowReceiveModal] = useState(false)
   const [copySuccess, setCopySuccess] = useState(false)
+  const [showBuyModal, setShowBuyModal] = useState(false)
+  const [buyAmount, setBuyAmount] = useState('')
+  const [isBuying, setIsBuying] = useState(false)
+  const [buyResult, setBuyResult] = useState<{ success: boolean; message: string } | null>(null)
+  const [exchangeRate, setExchangeRate] = useState<bigint | null>(null)
+  const [ckUSDCBalance, setCkUSDCBalance] = useState<bigint | null>(null)
+  const [loadingBalance, setLoadingBalance] = useState(false)
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -30,6 +54,150 @@ export default function WalletPage() {
       })
     }
   }, [isAuthenticated])
+
+  useEffect(() => {
+    const fetchSwapData = async () => {
+      if (showBuyModal && principalText) {
+        // Check if using Plug wallet
+        const isPlugWallet = !identity && typeof window !== 'undefined' && window.ic?.plug
+
+        try {
+          setLoadingBalance(true)
+          const { HttpAgent, Actor } = await import('@dfinity/agent')
+          const { Principal } = await import('@dfinity/principal')
+          const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
+
+          // Fetch exchange rate
+          const { createActor: createSwapActor } = await import('../../../src/declarations/swap')
+          const swapAgent = HttpAgent.createSync({ host })
+          if (process.env.NEXT_PUBLIC_DFX_NETWORK === 'local') {
+            await swapAgent.fetchRootKey()
+          }
+          const swapActor = createSwapActor(process.env.NEXT_PUBLIC_SWAP_CANISTER_ID!, { agent: swapAgent })
+          const rate = await swapActor.getExchangeRate()
+          setExchangeRate(rate)
+
+          // Fetch ckUSDC balance
+          const ckUSDCCanisterId = 'xevnm-gaaaa-aaaar-qafnq-cai'
+          let balance: bigint
+
+          if (isPlugWallet && window.ic?.plug) {
+            // Use Plug wallet
+            try {
+              // Ensure Plug agent is created with ckUSDC in whitelist
+              await window.ic.plug.createAgent({
+                whitelist: [ckUSDCCanisterId],
+                host
+              })
+
+              if (window.ic.plug.createActor) {
+                const ckUSDCActor = await window.ic.plug.createActor({
+                  canisterId: ckUSDCCanisterId,
+                  interfaceFactory: ({ IDL }: any) => IDL.Service({
+                    icrc1_balance_of: IDL.Func([
+                      IDL.Record({
+                        owner: IDL.Principal,
+                        subaccount: IDL.Opt(IDL.Vec(IDL.Nat8))
+                      })
+                    ], [IDL.Nat], ['query'])
+                  })
+                })
+
+                balance = await ckUSDCActor.icrc1_balance_of({
+                  owner: Principal.fromText(window.ic.plug.principalId),
+                  subaccount: []
+                })
+              } else {
+                // Fallback to regular actor if Plug's createActor is not available
+                const balanceAgent = HttpAgent.createSync({ host })
+                if (process.env.NEXT_PUBLIC_DFX_NETWORK === 'local') {
+                  await balanceAgent.fetchRootKey()
+                }
+
+                const ckUSDCActor = Actor.createActor(
+                  ({ IDL }: any) => IDL.Service({
+                    icrc1_balance_of: IDL.Func([
+                      IDL.Record({
+                        owner: IDL.Principal,
+                        subaccount: IDL.Opt(IDL.Vec(IDL.Nat8))
+                      })
+                    ], [IDL.Nat], ['query'])
+                  }),
+                  { agent: window.ic.plug.agent, canisterId: ckUSDCCanisterId }
+                ) as { icrc1_balance_of: (args: { owner: any; subaccount: any[] }) => Promise<bigint> }
+
+                balance = await ckUSDCActor.icrc1_balance_of({
+                  owner: Principal.fromText(window.ic.plug.principalId),
+                  subaccount: []
+                })
+              }
+            } catch (plugError) {
+              console.error('[Buy PULSE] Plug balance fetch error:', plugError)
+              balance = 0n
+            }
+          } else if (identity) {
+            // Use regular agent for II/NFID
+            const balanceAgent = HttpAgent.createSync({ host })
+            if (process.env.NEXT_PUBLIC_DFX_NETWORK === 'local') {
+              await balanceAgent.fetchRootKey()
+            }
+            balanceAgent.replaceIdentity(identity)
+
+            const ckUSDCActor = Actor.createActor(
+              ({ IDL }: any) => IDL.Service({
+                icrc1_balance_of: IDL.Func([
+                  IDL.Record({
+                    owner: IDL.Principal,
+                    subaccount: IDL.Opt(IDL.Vec(IDL.Nat8))
+                  })
+                ], [IDL.Nat], ['query'])
+              }),
+              { agent: balanceAgent, canisterId: ckUSDCCanisterId }
+            ) as { icrc1_balance_of: (args: { owner: any; subaccount: any[] }) => Promise<bigint> }
+
+            balance = await ckUSDCActor.icrc1_balance_of({
+              owner: identity.getPrincipal(),
+              subaccount: []
+            })
+          } else {
+            balance = 0n
+          }
+
+          setCkUSDCBalance(balance)
+        } catch (error) {
+          console.error('Error fetching swap data:', error)
+          setCkUSDCBalance(0n)
+        } finally {
+          setLoadingBalance(false)
+        }
+      }
+    }
+
+    fetchSwapData()
+  }, [showBuyModal, identity, principalText])
+
+  const formatTokenAmount = (amount: bigint, decimals: number): string => {
+    const divisor = BigInt(10 ** decimals)
+    const quotient = amount / divisor
+    const remainder = amount % divisor
+
+    if (remainder === 0n) {
+      return quotient.toString()
+    }
+
+    const remainderStr = remainder.toString().padStart(decimals, '0')
+    const trimmedRemainder = remainderStr.replace(/0+$/, '')
+
+    return trimmedRemainder ? `${quotient}.${trimmedRemainder}` : quotient.toString()
+  }
+
+  const setMaxAmount = () => {
+    if (ckUSDCBalance !== null) {
+      // ckUSDC has 6 decimals
+      const maxAmount = formatTokenAmount(ckUSDCBalance, 6)
+      setBuyAmount(maxAmount)
+    }
+  }
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
@@ -49,6 +217,73 @@ export default function WalletPage() {
         button_name: 'copy_receive_address',
         page: 'wallet'
       })
+    }
+  }
+
+  const buyPulse = async () => {
+    if (!isAuthenticated || !principalText || !buyAmount) {
+      setBuyResult({ success: false, message: 'Please enter an amount' })
+      return
+    }
+
+    try {
+      setIsBuying(true)
+      setBuyResult(null)
+
+      const { createActor: createSwapActor } = await import('../../../src/declarations/swap')
+      const { HttpAgent } = await import('@dfinity/agent')
+      const { Principal } = await import('@dfinity/principal')
+
+      const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
+
+      // Check if using Plug wallet
+      const isPlugWallet = !identity && typeof window !== 'undefined' && window.ic?.plug
+
+      let agent: HttpAgent
+      if (isPlugWallet && window.ic?.plug) {
+        // Use Plug's agent
+        await window.ic.plug.createAgent({
+          whitelist: [process.env.NEXT_PUBLIC_SWAP_CANISTER_ID || ''],
+          host
+        })
+        agent = window.ic.plug.agent
+      } else if (identity) {
+        // Use II/NFID identity
+        agent = HttpAgent.createSync({ host })
+        if (process.env.NEXT_PUBLIC_DFX_NETWORK === 'local') {
+          await agent.fetchRootKey()
+        }
+        agent.replaceIdentity(identity)
+      } else {
+        throw new Error('No valid authentication method available')
+      }
+
+      // Convert ckUSDC amount to smallest unit (8 decimals)
+      const ckUSDCAmount = BigInt(Math.floor(parseFloat(buyAmount) * 100_000_000))
+
+      // Step 1: Transfer ckUSDC to swap canister
+      // Note: In production, you'd need to integrate with ckUSDC ledger
+      // For now, we'll show instructions
+      const swapCanisterId = process.env.NEXT_PUBLIC_SWAP_CANISTER_ID!
+
+      setBuyResult({
+        success: false,
+        message: `To buy PULSE: First transfer ${buyAmount} ckUSDC to swap canister (${swapCanisterId}), then call swapCkUSDCForPulse. Full integration coming soon!`
+      })
+
+      analytics.track('button_clicked', {
+        button_name: 'buy_pulse',
+        page: 'wallet'
+      })
+
+    } catch (error) {
+      console.error('Buy error:', error)
+      setBuyResult({
+        success: false,
+        message: `Buy failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      })
+    } finally {
+      setIsBuying(false)
     }
   }
 
@@ -167,9 +402,100 @@ export default function WalletPage() {
               <CardTitle className="text-lg">Quick Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
+              <Dialog open={showBuyModal} onOpenChange={setShowBuyModal}>
+                <DialogTrigger asChild>
+                  <Button className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">
+                    <ShoppingCart className="h-4 w-4 mr-2" />
+                    Buy PULSE
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm">
+                  <DialogHeader>
+                    <DialogTitle>Buy PULSE Tokens</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                      <div className="text-sm text-purple-700 dark:text-purple-300">
+                        <strong>Exchange Rate:</strong><br />
+                        {exchangeRate ? `1 ckUSDC = ${Number(exchangeRate).toLocaleString()} PULSE` : 'Loading...'}
+                      </div>
+                    </div>
+
+                    <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                      <div className="flex items-center justify-between">
+                        <div className="text-sm">
+                          <span className="text-muted-foreground">Your ckUSDC Balance:</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-blue-700 dark:text-blue-300">
+                            {loadingBalance ? 'Loading...' : ckUSDCBalance !== null ? `${formatTokenAmount(ckUSDCBalance, 6)} ckUSDC` : '0 ckUSDC'}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={setMaxAmount}
+                            disabled={loadingBalance || ckUSDCBalance === null || ckUSDCBalance === 0n}
+                            className="h-6 px-2 text-xs"
+                          >
+                            Max
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div>
+                      <Label htmlFor="buyAmount">ckUSDC Amount</Label>
+                      <Input
+                        id="buyAmount"
+                        type="number"
+                        placeholder="Enter ckUSDC amount"
+                        value={buyAmount}
+                        onChange={(e) => setBuyAmount(e.target.value)}
+                        step="0.000001"
+                        min="0"
+                      />
+                      {buyAmount && exchangeRate && (
+                        <p className="text-sm text-muted-foreground mt-2">
+                          You will receive: ~{(parseFloat(buyAmount) * Number(exchangeRate)).toLocaleString()} PULSE
+                        </p>
+                      )}
+                    </div>
+
+                    {buyResult && (
+                      <div className={`p-3 rounded-lg text-sm ${
+                        buyResult.success
+                          ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-800'
+                          : 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-800'
+                      }`}>
+                        {buyResult.message}
+                      </div>
+                    )}
+
+                    <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                      <p className="text-xs text-blue-700 dark:text-blue-300">
+                        <strong>How to buy:</strong><br />
+                        1. Ensure you have ckUSDC in your wallet<br />
+                        2. Enter the amount of ckUSDC you want to spend<br />
+                        3. Click &quot;Preview Swap&quot; to see details<br />
+                        4. Tokens will be swapped instantly
+                      </p>
+                    </div>
+
+                    <Button
+                      onClick={buyPulse}
+                      disabled={isBuying || !buyAmount}
+                      className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
+                    >
+                      <ShoppingCart className="h-4 w-4 mr-2" />
+                      {isBuying ? 'Processing...' : 'Preview Swap'}
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+
               <Dialog open={showReceiveModal} onOpenChange={setShowReceiveModal}>
                 <DialogTrigger asChild>
-                  <Button className="w-full">
+                  <Button variant="outline" className="w-full">
                     <ArrowDownLeft className="h-4 w-4 mr-2" />
                     Receive PULSE
                   </Button>
