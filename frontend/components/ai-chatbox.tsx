@@ -110,9 +110,9 @@ export function AIChatbox() {
       </Button>
 
       {/* Chatbox */}
-      <Card className={`fixed bottom-6 right-6 w-80 h-96 shadow-xl transition-all duration-300 ease-in-out z-40 ${
-        isOpen 
-          ? 'scale-100 opacity-100 translate-y-0' 
+      <Card className={`fixed bottom-6 right-6 w-80 h-96 shadow-xl transition-all duration-300 ease-in-out z-40 bg-white dark:bg-gray-900 ${
+        isOpen
+          ? 'scale-100 opacity-100 translate-y-0'
           : 'scale-95 opacity-0 translate-y-4 pointer-events-none'
       }`}>
         <div className="flex flex-col h-full">
