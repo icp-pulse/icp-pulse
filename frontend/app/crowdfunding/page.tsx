@@ -31,15 +31,15 @@ export default function CrowdfundingPage() {
   const [sortBy, setSortBy] = useState('newest')
   const [projectFilter, setProjectFilter] = useState('all')
   const [selectedItem, setSelectedItem] = useState<BackendPoll | null>(null)
-  const { identity } = useIcpAuth()
+  const { identity, isAuthenticated } = useIcpAuth()
   const router = useRouter()
 
   useEffect(() => {
     fetchData()
-  }, [identity]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [identity, isAuthenticated]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchData = async () => {
-    if (!identity) return
+    if (!isAuthenticated) return
 
     try {
       setLoading(true)
@@ -191,7 +191,7 @@ export default function CrowdfundingPage() {
     )
   }
 
-  if (!identity) {
+  if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
         <div className="max-w-7xl mx-auto px-4 py-6">

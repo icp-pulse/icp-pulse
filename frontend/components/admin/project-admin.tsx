@@ -288,7 +288,12 @@ export default function ProjectAdmin() {
                   <Eye className="w-4 h-4 mr-1" />
                   View
                 </Button>
-                <Button variant="outline" size="sm" className="flex-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => window.location.href = `/projects/edit/${project.id}`}
+                >
                   <Edit className="w-4 h-4 mr-1" />
                   Edit
                 </Button>

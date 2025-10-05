@@ -24,7 +24,7 @@ function SettingsContent() {
   const [activeTab, setActiveTab] = useState<'projects' | 'surveys' | 'polls'>('projects')
 
   const checkApiKey = async () => {
-    if (!identity) {
+    if (!isAuthenticated) {
       setChecking(false)
       return
     }
@@ -47,7 +47,7 @@ function SettingsContent() {
   useEffect(() => {
     checkApiKey()
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [identity])
+  }, [identity, isAuthenticated])
 
   const handleSave = async () => {
     if (!identity || !apiKey.trim()) {

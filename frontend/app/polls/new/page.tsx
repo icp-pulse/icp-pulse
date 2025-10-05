@@ -49,16 +49,17 @@ interface Project {
   name: string
 }
 
-async function createPollAction(values: FormValues, identity: any) {
+async function createPollAction(values: FormValues, identity: any, isAuthenticated: boolean) {
   const { createBackendWithIdentity } = await import('@/lib/icp')
-  
-  if (!identity) {
+  const { Principal } = await import('@dfinity/principal')
+
+  if (!isAuthenticated) {
     throw new Error('Please login first')
   }
 
   const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
   const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
-  
+
   const backend = await createBackendWithIdentity({ canisterId, host, identity })
   
   // Convert form values to backend format
@@ -83,7 +84,7 @@ async function createPollAction(values: FormValues, identity: any) {
     // Check if using PULSE or other supported tokens (not ICP)
     if (fundingEnabled && selectedToken !== 'ICP') {
       // Using PULSE or other supported token
-      const tokenCanisterPrincipal = selectedToken
+      const tokenCanisterPrincipal = Principal.fromText(selectedToken)
 
       const totalFundingE8s = BigInt(Math.floor((totalFundAmount || 0) * 100_000_000));
       const rewardPerVoteE8s = BigInt(Math.floor((rewardPerVote || 0) * 100_000_000));
@@ -223,7 +224,7 @@ export default function NewPollPage() {
       return
     }
 
-    if (!identity) {
+    if (!isAuthenticated) {
       setAiError('Please login to use AI generation')
       return
     }
@@ -306,7 +307,7 @@ export default function NewPollPage() {
           setError(null)
           startTransition(async () => {
             try {
-              await createPollAction(values, identity)
+              await createPollAction(values, identity, isAuthenticated)
               router.push('/admin?tab=polls')
             } catch (e: any) {
               setError(e.message || 'Error creating poll')

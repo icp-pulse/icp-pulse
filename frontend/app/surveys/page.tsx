@@ -66,11 +66,11 @@ export default function SurveysPage() {
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [projectFilter, setProjectFilter] = useState<string>('all')
-  const { identity } = useIcpAuth()
+  const { identity, isAuthenticated } = useIcpAuth()
 
   useEffect(() => {
     async function fetchData() {
-      if (!identity) return
+      if (!isAuthenticated) return
 
       try {
         const { createBackendWithIdentity } = await import('@/lib/icp')
@@ -131,7 +131,7 @@ export default function SurveysPage() {
     }
 
     fetchData()
-  }, [identity])
+  }, [identity, isAuthenticated])
 
   const filteredSurveys = surveys.filter(survey => {
     const matchesSearch = survey.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
