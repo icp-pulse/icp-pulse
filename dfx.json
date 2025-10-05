@@ -10,6 +10,11 @@
       "type": "motoko",
       "args": "--enhanced-orthogonal-persistence"
     },
+    "swap": {
+      "main": "backend/swap.mo",
+      "type": "motoko",
+      "args": "--enhanced-orthogonal-persistence"
+    },
     "polls_surveys_frontend": {
       "source": ["frontend/dist"],
       "type": "assets",

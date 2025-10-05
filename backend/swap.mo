@@ -1,0 +1,307 @@
+import Principal "mo:base/Principal";
+import Result "mo:base/Result";
+import Nat "mo:base/Nat";
+
+persistent actor class SwapCanister() = this {
+
+  // Type definitions for ICRC1 token interface
+  public type Account = {
+    owner : Principal;
+    subaccount : ?Blob;
+  };
+
+  public type TransferArg = {
+    from_subaccount : ?Blob;
+    to : Account;
+    amount : Nat;
+    fee : ?Nat;
+    memo : ?Blob;
+    created_at_time : ?Nat64;
+  };
+
+  public type TransferError = {
+    #BadFee : { expected_fee : Nat };
+    #BadBurn : { min_burn_amount : Nat };
+    #InsufficientFunds : { balance : Nat };
+    #TooOld;
+    #CreatedInFuture : { ledger_time : Nat64 };
+    #Duplicate : { duplicate_of : Nat };
+    #TemporarilyUnavailable;
+    #GenericError : { error_code : Nat; message : Text };
+  };
+
+  public type TransferResult = Result.Result<Nat, TransferError>;
+
+  public type ICRC1Interface = actor {
+    icrc1_transfer : (TransferArg) -> async TransferResult;
+    icrc1_balance_of : (Account) -> async Nat;
+  };
+
+  // State variables
+  private var owner : Principal = Principal.fromText("aaaaa-aa");
+  private var pulseTokenCanister : ?Principal = null;
+  private var ckUSDCTokenCanister : ?Principal = null;
+
+  // Exchange rate: 10000 PULSE = 1 ckUSDC (stored as PULSE per ckUSDC)
+  private var pulsePerCkUSDC : Nat = 10_000;
+
+  // Track if canister is initialized
+  private var initialized : Bool = false;
+
+  // Initialize the swap canister with token canisters
+  public shared ({ caller }) func initialize(
+    _pulseCanister : Principal,
+    _ckUSDCCanister : Principal
+  ) : async Result.Result<Text, Text> {
+    if (initialized) {
+      return #err("Canister already initialized");
+    };
+
+    if (Principal.isAnonymous(caller)) {
+      return #err("Anonymous principals cannot initialize");
+    };
+
+    owner := caller;
+    pulseTokenCanister := ?_pulseCanister;
+    ckUSDCTokenCanister := ?_ckUSDCCanister;
+    initialized := true;
+
+    #ok("Swap canister initialized successfully");
+  };
+
+  // Update exchange rate (only owner)
+  public shared ({ caller }) func updateExchangeRate(newRate : Nat) : async Result.Result<Text, Text> {
+    if (not Principal.equal(caller, owner)) {
+      return #err("Only owner can update exchange rate");
+    };
+
+    if (newRate == 0) {
+      return #err("Exchange rate must be greater than 0");
+    };
+
+    pulsePerCkUSDC := newRate;
+    #ok("Exchange rate updated successfully");
+  };
+
+  // Swap ckUSDC for PULSE
+  public shared ({ caller }) func swapCkUSDCForPulse(ckUSDCAmount : Nat) : async Result.Result<Nat, Text> {
+    if (not initialized) {
+      return #err("Canister not initialized");
+    };
+
+    if (Principal.isAnonymous(caller)) {
+      return #err("Anonymous principals cannot swap");
+    };
+
+    if (ckUSDCAmount == 0) {
+      return #err("Amount must be greater than 0");
+    };
+
+    let pulseCanister = switch (pulseTokenCanister) {
+      case (null) { return #err("PULSE token canister not set") };
+      case (?canister) { canister };
+    };
+
+    switch (ckUSDCTokenCanister) {
+      case (null) { return #err("ckUSDC token canister not set") };
+      case (?_) {};
+    };
+
+    // Calculate PULSE amount to send
+    let pulseAmount = ckUSDCAmount * pulsePerCkUSDC;
+
+    // Check if swap canister has enough PULSE
+    let pulseLedger : ICRC1Interface = actor (Principal.toText(pulseCanister));
+    let swapBalance = await pulseLedger.icrc1_balance_of({
+      owner = Principal.fromActor(this);
+      subaccount = null;
+    });
+
+    if (swapBalance < pulseAmount) {
+      return #err("Insufficient PULSE liquidity in swap canister");
+    };
+
+    // Step 1: Transfer ckUSDC from user to swap canister
+    // Note: User must first approve the swap canister to spend their ckUSDC
+    // For simplicity, we expect the user to transfer ckUSDC to this canister first
+    // In production, you'd use icrc2_transfer_from after user approves
+
+    // Step 2: Transfer PULSE to user
+    let transferResult = await pulseLedger.icrc1_transfer({
+      from_subaccount = null;
+      to = {
+        owner = caller;
+        subaccount = null;
+      };
+      amount = pulseAmount;
+      fee = null;
+      memo = null;
+      created_at_time = null;
+    });
+
+    switch (transferResult) {
+      case (#ok(_)) {
+        #ok(pulseAmount);
+      };
+      case (#err(_)) {
+        #err("PULSE transfer failed");
+      };
+    };
+  };
+
+  // Deposit PULSE liquidity (owner only)
+  public shared ({ caller }) func depositPulseLiquidity(_amount : Nat) : async Result.Result<Text, Text> {
+    if (not initialized) {
+      return #err("Canister not initialized");
+    };
+
+    if (not Principal.equal(caller, owner)) {
+      return #err("Only owner can deposit liquidity");
+    };
+
+    // Owner must transfer PULSE to this canister manually
+    // This function is for record keeping
+    #ok("Owner should transfer PULSE to canister: " # Principal.toText(Principal.fromActor(this)));
+  };
+
+  // Withdraw PULSE (owner only)
+  public shared ({ caller }) func withdrawPulse(amount : Nat) : async Result.Result<Nat, Text> {
+    if (not initialized) {
+      return #err("Canister not initialized");
+    };
+
+    if (not Principal.equal(caller, owner)) {
+      return #err("Only owner can withdraw");
+    };
+
+    let pulseCanister = switch (pulseTokenCanister) {
+      case (null) { return #err("PULSE token canister not set") };
+      case (?canister) { canister };
+    };
+
+    let pulseLedger : ICRC1Interface = actor (Principal.toText(pulseCanister));
+
+    let transferResult = await pulseLedger.icrc1_transfer({
+      from_subaccount = null;
+      to = {
+        owner = caller;
+        subaccount = null;
+      };
+      amount = amount;
+      fee = null;
+      memo = null;
+      created_at_time = null;
+    });
+
+    switch (transferResult) {
+      case (#ok(blockIndex)) {
+        #ok(blockIndex);
+      };
+      case (#err(_)) {
+        #err("Withdrawal failed");
+      };
+    };
+  };
+
+  // Withdraw ckUSDC (owner only)
+  public shared ({ caller }) func withdrawCkUSDC(amount : Nat) : async Result.Result<Nat, Text> {
+    if (not initialized) {
+      return #err("Canister not initialized");
+    };
+
+    if (not Principal.equal(caller, owner)) {
+      return #err("Only owner can withdraw");
+    };
+
+    let ckUSDCCanister = switch (ckUSDCTokenCanister) {
+      case (null) { return #err("ckUSDC token canister not set") };
+      case (?canister) { canister };
+    };
+
+    let ckUSDCLedger : ICRC1Interface = actor (Principal.toText(ckUSDCCanister));
+
+    let transferResult = await ckUSDCLedger.icrc1_transfer({
+      from_subaccount = null;
+      to = {
+        owner = caller;
+        subaccount = null;
+      };
+      amount = amount;
+      fee = null;
+      memo = null;
+      created_at_time = null;
+    });
+
+    switch (transferResult) {
+      case (#ok(blockIndex)) {
+        #ok(blockIndex);
+      };
+      case (#err(_)) {
+        #err("Withdrawal failed");
+      };
+    };
+  };
+
+  // Query functions
+  public query func getExchangeRate() : async Nat {
+    pulsePerCkUSDC;
+  };
+
+  public query func getOwner() : async Principal {
+    owner;
+  };
+
+  public query func getPulseCanister() : async ?Principal {
+    pulseTokenCanister;
+  };
+
+  public query func getCkUSDCCanister() : async ?Principal {
+    ckUSDCTokenCanister;
+  };
+
+  public query func isInitialized() : async Bool {
+    initialized;
+  };
+
+  public query func getCanisterPrincipal() : async Principal {
+    Principal.fromActor(this);
+  };
+
+  // Calculate how much PULSE user will receive for given ckUSDC amount
+  public query func calculatePulseAmount(ckUSDCAmount : Nat) : async Nat {
+    ckUSDCAmount * pulsePerCkUSDC;
+  };
+
+  // Calculate how much ckUSDC needed for desired PULSE amount
+  public query func calculateCkUSDCAmount(pulseAmount : Nat) : async Nat {
+    pulseAmount / pulsePerCkUSDC;
+  };
+
+  // Get PULSE balance of swap canister
+  public func getPulseBalance() : async Nat {
+    let pulseCanister = switch (pulseTokenCanister) {
+      case (null) { return 0 };
+      case (?canister) { canister };
+    };
+
+    let pulseLedger : ICRC1Interface = actor (Principal.toText(pulseCanister));
+    await pulseLedger.icrc1_balance_of({
+      owner = Principal.fromActor(this);
+      subaccount = null;
+    });
+  };
+
+  // Get ckUSDC balance of swap canister
+  public func getCkUSDCBalance() : async Nat {
+    let ckUSDCCanister = switch (ckUSDCTokenCanister) {
+      case (null) { return 0 };
+      case (?canister) { canister };
+    };
+
+    let ckUSDCLedger : ICRC1Interface = actor (Principal.toText(ckUSDCCanister));
+    await ckUSDCLedger.icrc1_balance_of({
+      owner = Principal.fromActor(this);
+      subaccount = null;
+    });
+  };
+};
