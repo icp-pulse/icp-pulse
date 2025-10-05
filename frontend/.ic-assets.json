@@ -16,5 +16,9 @@
     "headers": {
       "cache-control": "public, max-age=0, must-revalidate"
     }
+  },
+  {
+    "match": ".well-known",
+    "ignore": false
   }
 ]

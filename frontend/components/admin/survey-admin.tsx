@@ -1,12 +1,13 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { Plus, Search, Filter, MoreHorizontal, Edit, Trash2, Eye, FileText, Users, BarChart3 } from 'lucide-react'
+import { Plus, Search, Filter, MoreHorizontal, Edit, Trash2, Eye, FileText, Users, BarChart3, Gift } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { useIcpAuth } from '@/components/IcpAuthProvider'
 
 // Helper function to convert ICP Status variant to string
@@ -24,6 +25,9 @@ export default function SurveyAdmin() {
   const [surveys, setSurveys] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [selectedSurveyId, setSelectedSurveyId] = useState<string | null>(null)
+  const [respondents, setRespondents] = useState<any[]>([])
+  const [loadingRespondents, setLoadingRespondents] = useState(false)
   const { identity } = useIcpAuth()
 
   // Fetch surveys from ICP backend
@@ -100,6 +104,35 @@ export default function SurveyAdmin() {
     if (rate >= 80) return 'text-green-600'
     if (rate >= 60) return 'text-yellow-600'
     return 'text-red-600'
+  }
+
+  const fetchRespondents = async (surveyId: string) => {
+    if (!identity) return
+
+    setLoadingRespondents(true)
+    try {
+      const { createBackendWithIdentity } = await import('@/lib/icp')
+      const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
+      const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
+      const backend = await createBackendWithIdentity({ canisterId, host, identity })
+
+      const principals = await backend.get_survey_respondents(BigInt(surveyId))
+      setRespondents(principals.map((p: any) => p.toString()))
+    } catch (err) {
+      console.error('Error fetching respondents:', err)
+      setRespondents([])
+    } finally {
+      setLoadingRespondents(false)
+    }
+  }
+
+  const handleViewParticipants = (surveyId: string) => {
+    setSelectedSurveyId(surveyId)
+    fetchRespondents(surveyId)
+  }
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text)
   }
 
   return (
@@ -309,21 +342,71 @@ export default function SurveyAdmin() {
               </div>
 
               {/* Actions */}
-              <div className="flex gap-2 pt-2">
-                <Button variant="outline" size="sm" className="flex-1">
-                  <Eye className="w-4 h-4 mr-1" />
-                  View
-                </Button>
-                <Button variant="outline" size="sm" className="flex-1">
+              <div className="grid grid-cols-2 gap-2 pt-2">
+                <Button variant="outline" size="sm" onClick={() => window.location.href = `/surveys/${survey.id}/edit`}>
                   <Edit className="w-4 h-4 mr-1" />
                   Edit
                 </Button>
-                <Button variant="outline" size="sm" className="flex-1">
+                <Dialog>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm" onClick={() => handleViewParticipants(survey.id.toString())}>
+                      <Users className="w-4 h-4 mr-1" />
+                      Participants
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto bg-white dark:bg-gray-800">
+                    <DialogHeader>
+                      <DialogTitle>Survey Participants</DialogTitle>
+                      <p className="text-sm text-gray-500">{survey.title}</p>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      {loadingRespondents ? (
+                        <div className="text-center py-8">
+                          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                          <p className="text-sm text-gray-500">Loading participants...</p>
+                        </div>
+                      ) : respondents.length === 0 ? (
+                        <div className="text-center py-8">
+                          <Users className="w-12 h-12 text-gray-300 mx-auto mb-2" />
+                          <p className="text-sm text-gray-500">No participants yet</p>
+                        </div>
+                      ) : (
+                        <>
+                          <div className="flex items-center justify-between pb-2 border-b">
+                            <p className="text-sm font-medium">Total Participants: {respondents.length}</p>
+                          </div>
+                          <div className="space-y-2">
+                            {respondents.map((principal, index) => (
+                              <div key={index} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition-colors">
+                                <div className="flex items-center gap-3 flex-1 min-w-0">
+                                  <div className="flex-shrink-0 w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                                    <span className="text-xs font-medium text-blue-600">{index + 1}</span>
+                                  </div>
+                                  <code className="text-xs font-mono text-gray-700 truncate flex-1">{principal}</code>
+                                </div>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => copyToClipboard(principal)}
+                                  className="ml-2 flex-shrink-0"
+                                >
+                                  Copy
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </DialogContent>
+                </Dialog>
+                <Button variant="outline" size="sm" onClick={() => window.location.href = `/survey-rewards?surveyId=${survey.id}`}>
+                  <Gift className="w-4 h-4 mr-1" />
+                  Rewards
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => window.location.href = `/survey-results?surveyId=${survey.id}`}>
                   <BarChart3 className="w-4 h-4 mr-1" />
                   Results
-                </Button>
-                <Button variant="outline" size="sm" className="px-3">
-                  <Trash2 className="w-4 h-4" />
                 </Button>
               </div>
             </CardContent>

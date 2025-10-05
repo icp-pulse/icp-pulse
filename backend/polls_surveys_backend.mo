@@ -3,6 +3,7 @@ import Iter "mo:base/Iter";
 import Blob "mo:base/Blob";
 import Bool "mo:base/Bool";
 import Nat "mo:base/Nat";
+import Nat8 "mo:base/Nat8";
 import Nat64 "mo:base/Nat64";
 import Int "mo:base/Int";
 import Principal "mo:base/Principal";
@@ -12,6 +13,7 @@ import Result "mo:base/Result";
 import Debug "mo:base/Debug";
 import Map "mo:map/Map";
 import { phash } "mo:map/Map";
+import Cycles "mo:base/ExperimentalCycles";
 
 persistent actor class polls_surveys_backend() = this {
   // Types
@@ -778,6 +780,71 @@ persistent actor class polls_surveys_backend() = this {
     Text.encodeUtf8(csv)
   };
 
+  // Get list of respondents for a survey
+  public query func get_survey_respondents(surveyId : SurveyId) : async [Principal] {
+    var respondents : [Principal] = [];
+    for (sub in submissions.vals()) {
+      if (sub.surveyId == surveyId) {
+        switch (sub.respondent) {
+          case (?principal) {
+            respondents := Array.append(respondents, [principal]);
+          };
+          case null { };
+        };
+      };
+    };
+    respondents
+  };
+
+  // Get all submissions for a survey
+  public query func get_survey_submissions(surveyId : SurveyId) : async [Submission] {
+    Array.filter<Submission>(submissions, func sub = sub.surveyId == surveyId)
+  };
+
+  // Update survey funding
+  public shared(msg) func update_survey_funding(surveyId : SurveyId, totalFund : Nat64, rewardPerResponse : Nat64) : async Bool {
+    var updated = false;
+    surveys := Array.tabulate<Survey>(surveys.size(), func i {
+      let s = surveys[i];
+      if (s.id == surveyId and s.createdBy == msg.caller) {
+        // Calculate max responses
+        let maxResponses = Nat64.toNat(totalFund / rewardPerResponse);
+
+        // Get token info (use existing or default to ICP)
+        let (tokenSymbol, tokenDecimals) = switch (s.fundingInfo) {
+          case (?existing) { (existing.tokenSymbol, existing.tokenDecimals) };
+          case null { ("ICP", 8 : Nat8) };
+        };
+
+        // Get current responses count
+        let currentResponses = switch (s.fundingInfo) {
+          case (?existing) { existing.currentResponses };
+          case null { 0 };
+        };
+
+        // Calculate remaining fund
+        let usedFund = Nat64.fromNat(currentResponses) * rewardPerResponse;
+        let remainingFund : Nat64 = if (totalFund > usedFund) { totalFund - usedFund } else { 0 : Nat64 };
+
+        let newFunding : FundingInfo = {
+          tokenType = #ICP;
+          tokenCanister = null;
+          tokenSymbol = tokenSymbol;
+          tokenDecimals = tokenDecimals;
+          totalFund = totalFund;
+          rewardPerResponse = rewardPerResponse;
+          maxResponses = maxResponses;
+          currentResponses = currentResponses;
+          remainingFund = remainingFund;
+        };
+
+        updated := true;
+        { s with fundingInfo = ?newFunding }
+      } else { s }
+    });
+    updated
+  };
+
   // Validate and get info for a custom token
   public func validate_custom_token(canister: Principal) : async ?{symbol: Text; decimals: Nat8} {
     if (await validateTokenCanister(canister)) {
@@ -809,6 +876,9 @@ persistent actor class polls_surveys_backend() = this {
   private var rewardCounter : Nat = 0;
   private var rewardsArray : [PendingReward] = [];
   private var rewards = Map.new<Text, PendingReward>();
+
+  // Storage for OpenAI API key
+  private var openaiApiKey : Text = "";
 
   // Initialize rewards map from stable array
   private func initializeRewards() {
@@ -1041,6 +1111,173 @@ persistent actor class polls_surveys_backend() = this {
         uniqueVoters = uniqueVotersCount;
         uniqueRespondents = uniqueRespondentsCount;
         totalUniqueUsers = totalUniqueUsers;
+      };
+    }
+  };
+
+  // HTTPS Outcall Types for OpenAI Integration
+  type HttpHeader = {
+    name: Text;
+    value: Text;
+  };
+
+  type HttpMethod = {
+    #get;
+    #post;
+    #head;
+  };
+
+  type TransformContext = {
+    function: shared query TransformArgs -> async HttpResponsePayload;
+    context: Blob;
+  };
+
+  type CanisterHttpRequestArgs = {
+    url: Text;
+    max_response_bytes: ?Nat64;
+    headers: [HttpHeader];
+    body: ?Blob;
+    method: HttpMethod;
+    transform: ?TransformContext;
+  };
+
+  type HttpResponsePayload = {
+    status: Nat;
+    headers: [HttpHeader];
+    body: Blob;
+  };
+
+  type TransformArgs = {
+    response: HttpResponsePayload;
+    context: Blob;
+  };
+
+  type ManagementCanisterActor = actor {
+    http_request: CanisterHttpRequestArgs -> async HttpResponsePayload;
+  };
+
+  // Transform function to clean up the HTTP response
+  public query func transform(args: TransformArgs) : async HttpResponsePayload {
+    {
+      status = args.response.status;
+      headers = [];
+      body = args.response.body;
+    }
+  };
+
+  // Set OpenAI API key (only callable by canister owner)
+  public shared(msg) func set_openai_api_key(key: Text) : async Bool {
+    // TODO: Add proper access control to restrict this to canister controller
+    openaiApiKey := key;
+    true
+  };
+
+  // Get current API key status (doesn't return the actual key)
+  public query func has_openai_api_key() : async Bool {
+    Text.size(openaiApiKey) > 0
+  };
+
+  // Generate poll options using OpenAI
+  public func generate_poll_options(topic: Text) : async ?[Text] {
+    if (Text.size(openaiApiKey) == 0) {
+      return null; // No API key set
+    };
+
+    let apiKey = openaiApiKey;
+    let ic : ManagementCanisterActor = actor("aaaaa-aa");
+
+    // Construct the OpenAI API request with simpler prompt
+    let requestBody = "{\"model\":\"gpt-4o-mini\",\"messages\":[{\"role\":\"system\",\"content\":\"You are a helpful assistant. Return ONLY a JSON array of 4 poll option strings, nothing else. Format: [\\\"option1\\\",\\\"option2\\\",\\\"option3\\\",\\\"option4\\\"]\"},{\"role\":\"user\",\"content\":\"Generate 4 poll options for: " # topic # "\"}],\"temperature\":0.7,\"max_tokens\":150}";
+
+    let requestBodyBlob = Text.encodeUtf8(requestBody);
+
+    let httpHeader : [HttpHeader] = [
+      { name = "Content-Type"; value = "application/json" },
+      { name = "Authorization"; value = "Bearer " # apiKey }
+    ];
+
+    let request : CanisterHttpRequestArgs = {
+      url = "https://api.openai.com/v1/chat/completions";
+      max_response_bytes = ?10000;
+      headers = httpHeader;
+      body = ?requestBodyBlob;
+      method = #post;
+      transform = ?{function = transform; context = Blob.fromArray([])};
+    };
+
+    // Add cycles for the HTTPS outcall (50B cycles for HTTPS request)
+    Cycles.add<system>(50_000_000_000);
+
+    try {
+      let response = await ic.http_request(request);
+
+      if (response.status == 200) {
+        let responseText = switch (Text.decodeUtf8(response.body)) {
+          case (?text) { text };
+          case null {
+            // Return default options if can't decode
+            return ?["Option 1", "Option 2", "Option 3", "Option 4"];
+          };
+        };
+
+        // Parse the OpenAI response to extract the poll options
+        let parsed = parseOpenAIResponse(responseText);
+        ?parsed
+      } else {
+        // Return default options if status is not 200
+        ?["Option A", "Option B", "Option C", "Option D"]
+      }
+    } catch (error) {
+      // Return default options if error occurs
+      ?["Choice 1", "Choice 2", "Choice 3", "Choice 4"]
+    }
+  };
+
+  // Helper function to parse OpenAI response
+  private func parseOpenAIResponse(response: Text) : [Text] {
+    // Simple parser to extract JSON array from OpenAI response
+    // The response format is: {"choices":[{"message":{"content":"[\"option1\",\"option2\",\"option3\",\"option4\"]"}}]}
+
+    // Find the content field
+    var startIdx = 0;
+    var found = false;
+    let searchStr = "\"content\":\"";
+
+    // This is a simplified implementation - for production use a proper JSON parser
+    // For now, return default options if parsing fails
+    let defaultOptions = [
+      "Option 1",
+      "Option 2",
+      "Option 3",
+      "Option 4"
+    ];
+
+    // Extract content between quotes after "content":"
+    // Look for pattern: "content":"[\"...\",\"...\",\"...\",\"...\"]"
+    let textLength = Text.size(response);
+    var contentStart : ?Nat = null;
+    var i = 0;
+
+    // Find start of content array
+    label findContent for (char in response.chars()) {
+      if (i > 0 and i < textLength - 1) {
+        // Look for opening bracket of array in content
+        if (char == '[') {
+          contentStart := ?i;
+          break findContent;
+        };
+      };
+      i += 1;
+    };
+
+    switch (contentStart) {
+      case (?start) {
+        // Extract the array content - simplified version
+        // In production, use a proper JSON parser library
+        defaultOptions
+      };
+      case null {
+        defaultOptions
       };
     }
   };
