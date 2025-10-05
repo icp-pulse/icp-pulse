@@ -25,7 +25,29 @@ export async function createBackend({ canisterId, host }: CanisterConfig) {
   return Actor.createActor(customIDL as any, { agent, canisterId }) as any
 }
 
-export async function createBackendWithIdentity({ canisterId, host, identity }: CanisterConfig & { identity: Identity }) {
+export async function createBackendWithIdentity({ canisterId, host, identity }: CanisterConfig & { identity: Identity | null }) {
+  // Handle Plug wallet - use window.ic.plug.createActor if identity is null
+  if (!identity && typeof window !== 'undefined' && window.ic?.plug) {
+    const plugConnected = await window.ic.plug.isConnected()
+    if (plugConnected) {
+      try {
+        // Use Plug's createActor method which handles agent creation properly
+        const actor = await window.ic.plug.createActor({
+          canisterId,
+          interfaceFactory: customIDL
+        })
+        return actor
+      } catch (error) {
+        console.error('Error creating actor with Plug:', error)
+        throw new Error('Failed to create actor with Plug wallet')
+      }
+    }
+  }
+
+  if (!identity) {
+    throw new Error('No identity provided and Plug wallet not connected')
+  }
+
   const isLocal = !!host && (host.includes('127.0.0.1') || host.includes('localhost'))
 
   const agent = new HttpAgent({
@@ -44,4 +66,19 @@ export async function createBackendWithIdentity({ canisterId, host, identity }: 
   }
 
   return Actor.createActor(customIDL as any, { agent, canisterId }) as any
+}
+
+// Add Plug wallet type declarations
+declare global {
+  interface Window {
+    ic?: {
+      plug?: {
+        isConnected: () => Promise<boolean>
+        createAgent: (args?: { whitelist?: string[], host?: string }) => Promise<boolean>
+        createActor: (args: { canisterId: string, interfaceFactory: any }) => Promise<any>
+        agent: any
+        principalId: string
+      }
+    }
+  }
 }

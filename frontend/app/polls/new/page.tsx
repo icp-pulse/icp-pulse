@@ -139,7 +139,7 @@ export default function NewPollPage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [aiGenerating, setAiGenerating] = useState(false)
   const [aiError, setAiError] = useState<string | null>(null)
-  const { identity } = useIcpAuth()
+  const { identity, isAuthenticated } = useIcpAuth()
   const router = useRouter()
 
   // Get minimum datetime (current time + 1 minute)
@@ -177,14 +177,14 @@ export default function NewPollPage() {
   // Fetch projects for dropdown
   useEffect(() => {
     async function fetchProjects() {
-      if (!identity) return
-      
+      if (!isAuthenticated) return
+
       try {
         const { createBackendWithIdentity } = await import('@/lib/icp')
         const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
         const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
         const backend = await createBackendWithIdentity({ canisterId, host, identity })
-        
+
         const projectData = await backend.list_projects(0n, 100n)
         setProjects(projectData.map((p: any) => ({ id: p.id.toString(), name: p.name })))
       } catch (err) {
@@ -192,7 +192,7 @@ export default function NewPollPage() {
       }
     }
     fetchProjects()
-  }, [identity])
+  }, [identity, isAuthenticated])
 
   const addOption = () => {
     append({ text: '' })

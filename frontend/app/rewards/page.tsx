@@ -46,21 +46,20 @@ export default function RewardsPage() {
           const backend = await createBackendWithIdentity({ canisterId, host, identity })
 
           const userPrincipal = identity.getPrincipal()
-          const backendRewards = await backend.get_user_rewards(userPrincipal)
+          const backendRewards = await backend.get_claimable_rewards(userPrincipal)
 
           // Transform backend rewards to display format
           const displayRewards: DisplayReward[] = backendRewards.map((reward: any) => ({
-            id: reward.id,
+            id: reward.pollId.toString(), // Use pollId as unique identifier
             pollId: reward.pollId.toString(),
             pollTitle: reward.pollTitle,
             amount: reward.amount,
             tokenSymbol: reward.tokenSymbol,
             tokenDecimals: reward.tokenDecimals,
             tokenCanister: reward.tokenCanister && reward.tokenCanister.length > 0 ? reward.tokenCanister[0]?.toString() : undefined,
-            status: 'pending' in reward.status ? 'pending' :
-                   'claimed' in reward.status ? 'claimed' : 'processing',
-            claimedAt: reward.claimedAt && reward.claimedAt.length > 0 ? Number(reward.claimedAt[0]) / 1000000 : undefined, // Convert nanoseconds to milliseconds
-            votedAt: Number(reward.votedAt) / 1000000 // Convert nanoseconds to milliseconds
+            status: reward.pollClosed ? 'pending' : 'processing', // pending = claimable, processing = poll still active
+            claimedAt: undefined,
+            votedAt: Date.now() // Not tracked in new system, use current time
           }))
 
           setRewards(displayRewards)
@@ -108,48 +107,53 @@ export default function RewardsPage() {
     })
   }
 
-  const handleClaimReward = async (rewardId: string) => {
-    setClaiming(prev => ({ ...prev, [rewardId]: true }))
+  const handleClaimReward = async (pollId: string) => {
+    setClaiming(prev => ({ ...prev, [pollId]: true }))
 
     try {
       const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
       const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
       const backend = await createBackendWithIdentity({ canisterId, host, identity: identity! })
 
-      const success = await backend.claim_reward(rewardId)
+      const result = await backend.claim_poll_reward(BigInt(pollId))
 
-      if (success) {
-        const claimedReward = rewards.find(r => r.id === rewardId)
+      if ('ok' in result) {
+        const claimedReward = rewards.find(r => r.pollId === pollId)
 
         // Track successful reward claim
         if (claimedReward) {
           analytics.track('reward_claimed', {
-            reward_id: rewardId,
+            reward_id: pollId,
             poll_id: claimedReward.pollId,
             amount: formatTokenAmount(claimedReward.amount, claimedReward.tokenDecimals),
             token_symbol: claimedReward.tokenSymbol
           })
         }
 
-        setRewards(prev => prev.map(reward =>
-          reward.id === rewardId
-            ? { ...reward, status: 'claimed' as const, claimedAt: Date.now() }
-            : reward
-        ))
+        // Remove claimed reward from list since it's no longer claimable
+        setRewards(prev => prev.filter(reward => reward.pollId !== pollId))
+
+        alert(result.ok)
       } else {
-        alert('Failed to claim reward. Please try again.')
+        alert('Failed to claim reward: ' + result.err)
       }
     } catch (error) {
       console.error('Failed to claim reward:', error)
       alert('Failed to claim reward. Please try again.')
     } finally {
-      setClaiming(prev => ({ ...prev, [rewardId]: false }))
+      setClaiming(prev => ({ ...prev, [pollId]: false }))
     }
   }
 
-  const pendingRewards = rewards.filter(r => r.status === 'pending')
-  const claimedRewards = rewards.filter(r => r.status === 'claimed')
-  const totalPendingValue = pendingRewards.reduce((sum, reward) => {
+  const claimableRewards = rewards.filter(r => r.status === 'pending') // Poll closed, can claim
+  const activeRewards = rewards.filter(r => r.status === 'processing') // Poll still active
+  const totalClaimableValue = claimableRewards.reduce((sum, reward) => {
+    if (reward.tokenSymbol === 'PULSE') {
+      return sum + Number(formatTokenAmount(reward.amount, reward.tokenDecimals))
+    }
+    return sum
+  }, 0)
+  const totalActiveValue = activeRewards.reduce((sum, reward) => {
     if (reward.tokenSymbol === 'PULSE') {
       return sum + Number(formatTokenAmount(reward.amount, reward.tokenDecimals))
     }
@@ -198,8 +202,8 @@ export default function RewardsPage() {
             <div className="flex items-center space-x-2">
               <Coins className="h-5 w-5 text-green-500" />
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Pending Rewards</p>
-                <p className="text-2xl font-bold">{pendingRewards.length}</p>
+                <p className="text-sm font-medium text-muted-foreground">Claimable Rewards</p>
+                <p className="text-2xl font-bold">{claimableRewards.length}</p>
               </div>
             </div>
           </CardContent>
@@ -210,8 +214,8 @@ export default function RewardsPage() {
             <div className="flex items-center space-x-2">
               <Gift className="h-5 w-5 text-blue-500" />
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Total Pending Value</p>
-                <p className="text-2xl font-bold">{totalPendingValue.toFixed(2)} PULSE</p>
+                <p className="text-sm font-medium text-muted-foreground">Claimable Value</p>
+                <p className="text-2xl font-bold">{totalClaimableValue.toFixed(2)} PULSE</p>
               </div>
             </div>
           </CardContent>
@@ -220,47 +224,48 @@ export default function RewardsPage() {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center space-x-2">
-              <CheckCircle className="h-5 w-5 text-green-500" />
+              <Clock className="h-5 w-5 text-yellow-500" />
               <div>
-                <p className="text-sm font-medium text-muted-foreground">Claimed Rewards</p>
-                <p className="text-2xl font-bold">{claimedRewards.length}</p>
+                <p className="text-sm font-medium text-muted-foreground">Active (In Escrow)</p>
+                <p className="text-2xl font-bold">{totalActiveValue.toFixed(2)} PULSE</p>
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Pending Rewards */}
-      {pendingRewards.length > 0 && (
+      {/* Claimable Rewards */}
+      {claimableRewards.length > 0 && (
         <Card className="mb-8">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5 text-orange-500" />
-              Pending Rewards ({pendingRewards.length})
+              <CheckCircle className="h-5 w-5 text-green-500" />
+              Claimable Rewards ({claimableRewards.length})
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {pendingRewards.map((reward) => (
-                <div key={reward.id} className="flex items-center justify-between p-4 border rounded-lg">
+              {claimableRewards.map((reward) => (
+                <div key={reward.id} className="flex items-center justify-between p-4 border rounded-lg border-green-200 bg-green-50 dark:bg-green-900/10">
                   <div className="flex-1">
                     <h3 className="font-medium">{reward.pollTitle}</h3>
                     <p className="text-sm text-muted-foreground">
-                      Voted on {formatDate(reward.votedAt)}
+                      Poll closed - reward ready to claim
                     </p>
                     <div className="flex items-center gap-2 mt-2">
                       <Badge variant="secondary">
                         {formatTokenAmount(reward.amount, reward.tokenDecimals)} {reward.tokenSymbol}
                       </Badge>
-                      <Badge variant="outline" className="text-orange-600 border-orange-200">
-                        Pending
+                      <Badge variant="outline" className="text-green-600 border-green-200">
+                        <CheckCircle className="h-3 w-3 mr-1" />
+                        Claimable
                       </Badge>
                     </div>
                   </div>
                   <Button
                     onClick={() => handleClaimReward(reward.id)}
                     disabled={claiming[reward.id]}
-                    className="ml-4"
+                    className="ml-4 bg-green-600 hover:bg-green-700"
                   >
                     {claiming[reward.id] ? (
                       <div className="flex items-center gap-2">
@@ -278,36 +283,41 @@ export default function RewardsPage() {
         </Card>
       )}
 
-      {/* Claimed Rewards */}
-      {claimedRewards.length > 0 && (
+      {/* Active (In Escrow) Rewards */}
+      {activeRewards.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <CheckCircle className="h-5 w-5 text-green-500" />
-              Claimed Rewards ({claimedRewards.length})
+              <Clock className="h-5 w-5 text-yellow-500" />
+              Active Rewards - In Escrow ({activeRewards.length})
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {claimedRewards.map((reward) => (
-                <div key={reward.id} className="flex items-center justify-between p-4 border rounded-lg bg-green-50 dark:bg-green-900/10">
+              {activeRewards.map((reward) => (
+                <div key={reward.id} className="flex items-center justify-between p-4 border rounded-lg border-yellow-200 bg-yellow-50 dark:bg-yellow-900/10">
                   <div className="flex-1">
                     <h3 className="font-medium">{reward.pollTitle}</h3>
                     <p className="text-sm text-muted-foreground">
-                      Voted on {formatDate(reward.votedAt)} • Claimed on {reward.claimedAt ? formatDate(reward.claimedAt) : 'Unknown'}
+                      Poll still active - reward will be claimable when poll closes
                     </p>
                     <div className="flex items-center gap-2 mt-2">
                       <Badge variant="secondary">
                         {formatTokenAmount(reward.amount, reward.tokenDecimals)} {reward.tokenSymbol}
                       </Badge>
-                      <Badge variant="outline" className="text-green-600 border-green-200">
-                        Claimed
+                      <Badge variant="outline" className="text-yellow-600 border-yellow-200">
+                        <Clock className="h-3 w-3 mr-1" />
+                        In Escrow
                       </Badge>
                     </div>
                   </div>
-                  <div className="ml-4 text-green-600">
-                    <CheckCircle className="h-6 w-6" />
-                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => window.open(`/results?pollId=${reward.pollId}`, '_blank')}
+                    className="ml-4"
+                  >
+                    View Poll
+                  </Button>
                 </div>
               ))}
             </div>
