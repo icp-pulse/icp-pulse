@@ -30,11 +30,40 @@ persistent actor class SwapCanister() = this {
     #GenericError : { error_code : Nat; message : Text };
   };
 
-  public type TransferResult = Result.Result<Nat, TransferError>;
+  public type TransferFromError = {
+    #BadFee : { expected_fee : Nat };
+    #BadBurn : { min_burn_amount : Nat };
+    #InsufficientFunds : { balance : Nat };
+    #InsufficientAllowance : { allowance : Nat };
+    #TooOld;
+    #CreatedInFuture : { ledger_time : Nat64 };
+    #Duplicate : { duplicate_of : Nat };
+    #TemporarilyUnavailable;
+    #GenericError : { error_code : Nat; message : Text };
+  };
+
+  public type TransferResult = { #Ok : Nat; #Err : TransferError };
+  public type TransferFromResult = { #Ok : Nat; #Err : TransferFromError };
+
+  public type TransferFromArgs = {
+    spender_subaccount : ?Blob;
+    from : Account;
+    to : Account;
+    amount : Nat;
+    fee : ?Nat;
+    memo : ?Blob;
+    created_at_time : ?Nat64;
+  };
 
   public type ICRC1Interface = actor {
     icrc1_transfer : (TransferArg) -> async TransferResult;
     icrc1_balance_of : (Account) -> async Nat;
+  };
+
+  public type ICRC2Interface = actor {
+    icrc1_transfer : (TransferArg) -> async TransferResult;
+    icrc1_balance_of : (Account) -> async Nat;
+    icrc2_transfer_from : (TransferFromArgs) -> async TransferFromResult;
   };
 
   // State variables
@@ -102,9 +131,9 @@ persistent actor class SwapCanister() = this {
       case (?canister) { canister };
     };
 
-    switch (ckUSDCTokenCanister) {
+    let ckUSDCCanister = switch (ckUSDCTokenCanister) {
       case (null) { return #err("ckUSDC token canister not set") };
-      case (?_) {};
+      case (?canister) { canister };
     };
 
     // Calculate PULSE amount to send
@@ -121,10 +150,50 @@ persistent actor class SwapCanister() = this {
       return #err("Insufficient PULSE liquidity in swap canister");
     };
 
-    // Step 1: Transfer ckUSDC from user to swap canister
-    // Note: User must first approve the swap canister to spend their ckUSDC
-    // For simplicity, we expect the user to transfer ckUSDC to this canister first
-    // In production, you'd use icrc2_transfer_from after user approves
+    // Step 1: Transfer ckUSDC from user to swap canister using icrc2_transfer_from
+    // User must have approved this canister first
+    let ckUSDCLedger : ICRC2Interface = actor (Principal.toText(ckUSDCCanister));
+
+    let transferFromResult = await ckUSDCLedger.icrc2_transfer_from({
+      spender_subaccount = null;
+      from = {
+        owner = caller;
+        subaccount = null;
+      };
+      to = {
+        owner = Principal.fromActor(this);
+        subaccount = null;
+      };
+      amount = ckUSDCAmount;
+      fee = null;
+      memo = null;
+      created_at_time = null;
+    });
+
+    // Check if ckUSDC transfer was successful
+    switch (transferFromResult) {
+      case (#Err(error)) {
+        let errorMsg = switch (error) {
+          case (#InsufficientAllowance({ allowance })) {
+            "Insufficient allowance. Current allowance: " # Nat.toText(allowance) # ". Please approve more ckUSDC.";
+          };
+          case (#InsufficientFunds({ balance })) {
+            "Insufficient ckUSDC balance: " # Nat.toText(balance);
+          };
+          case (#BadFee({ expected_fee })) {
+            "Bad fee. Expected: " # Nat.toText(expected_fee);
+          };
+          case (#GenericError({ message; error_code })) {
+            "Error: " # message # " (code: " # Nat.toText(error_code) # ")";
+          };
+          case (_) {
+            "Failed to transfer ckUSDC. Please ensure you have approved the swap canister and have sufficient balance.";
+          };
+        };
+        return #err(errorMsg);
+      };
+      case (#Ok(_)) {};
+    };
 
     // Step 2: Transfer PULSE to user
     let transferResult = await pulseLedger.icrc1_transfer({
@@ -140,10 +209,10 @@ persistent actor class SwapCanister() = this {
     });
 
     switch (transferResult) {
-      case (#ok(_)) {
+      case (#Ok(_)) {
         #ok(pulseAmount);
       };
-      case (#err(_)) {
+      case (#Err(_)) {
         #err("PULSE transfer failed");
       };
     };
@@ -194,10 +263,10 @@ persistent actor class SwapCanister() = this {
     });
 
     switch (transferResult) {
-      case (#ok(blockIndex)) {
+      case (#Ok(blockIndex)) {
         #ok(blockIndex);
       };
-      case (#err(_)) {
+      case (#Err(_)) {
         #err("Withdrawal failed");
       };
     };
@@ -218,7 +287,7 @@ persistent actor class SwapCanister() = this {
       case (?canister) { canister };
     };
 
-    let ckUSDCLedger : ICRC1Interface = actor (Principal.toText(ckUSDCCanister));
+    let ckUSDCLedger : ICRC2Interface = actor (Principal.toText(ckUSDCCanister));
 
     let transferResult = await ckUSDCLedger.icrc1_transfer({
       from_subaccount = null;
@@ -233,10 +302,10 @@ persistent actor class SwapCanister() = this {
     });
 
     switch (transferResult) {
-      case (#ok(blockIndex)) {
+      case (#Ok(blockIndex)) {
         #ok(blockIndex);
       };
-      case (#err(_)) {
+      case (#Err(_)) {
         #err("Withdrawal failed");
       };
     };
