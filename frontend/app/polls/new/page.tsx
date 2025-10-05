@@ -36,8 +36,8 @@ const schema = z.object({
   options: z.array(optionSchema).min(2, 'At least two options are required'),
   // Funding fields
   fundingEnabled: z.boolean().default(false),
+  fundingType: z.enum(['self-funded', 'crowdfunded']).default('self-funded'),
   selectedToken: z.string().default('ICP'), // Either 'ICP' or a token principal
-  customTokenCanister: z.string().optional(),
   totalFundAmount: z.number().min(0).optional(),
   rewardPerVote: z.number().min(0).optional(),
 })
@@ -49,20 +49,21 @@ interface Project {
   name: string
 }
 
-async function createPollAction(values: FormValues, identity: any) {
+async function createPollAction(values: FormValues, identity: any, isAuthenticated: boolean) {
   const { createBackendWithIdentity } = await import('@/lib/icp')
-  
-  if (!identity) {
+  const { Principal } = await import('@dfinity/principal')
+
+  if (!isAuthenticated) {
     throw new Error('Please login first')
   }
 
   const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
   const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
-  
+
   const backend = await createBackendWithIdentity({ canisterId, host, identity })
   
   // Convert form values to backend format
-  const { title, description, projectId, expiresAt, allowAnonymous, allowMultiple, options, fundingEnabled, selectedToken, customTokenCanister, totalFundAmount, rewardPerVote } = values
+  const { title, description, projectId, expiresAt, allowAnonymous, allowMultiple, options, fundingEnabled, fundingType, selectedToken, totalFundAmount, rewardPerVote } = values
   
   const backendOptions = options.map(opt => opt.text)
   
@@ -78,28 +79,37 @@ async function createPollAction(values: FormValues, identity: any) {
   const expiresAtNs = expiresAtDate.getTime() * 1_000_000
   
   try {
-    if (fundingEnabled && selectedToken === 'CUSTOM' && customTokenCanister) {
-      // Use custom token poll creation
-      const tokenCanisterPrincipal = customTokenCanister; // Assume it's already a valid principal string
-      const totalFundingE8s = Math.floor((totalFundAmount || 0) * 100_000_000);
-      const rewardPerVoteE8s = Math.floor((rewardPerVote || 0) * 100_000_000);
+    const pulseCanisterId = process.env.NEXT_PUBLIC_TOKENMANIA_CANISTER_ID
 
-      // TODO: Implement custom token poll creation when backend types are ready
-      const pollId = await backend.create_poll(
+    // Check if using PULSE or other supported tokens (not ICP)
+    if (fundingEnabled && selectedToken !== 'ICP') {
+      // Using PULSE or other supported token
+      const tokenCanisterPrincipal = Principal.fromText(selectedToken)
+
+      const totalFundingE8s = BigInt(Math.floor((totalFundAmount || 0) * 100_000_000));
+      const rewardPerVoteE8s = BigInt(Math.floor((rewardPerVote || 0) * 100_000_000));
+
+      // Use create_custom_token_poll for PULSE and other tokens
+      const result = await backend.create_custom_token_poll(
         'project',
         BigInt(projectId),
         title,
         description,
         backendOptions,
         BigInt(expiresAtNs),
-        BigInt(totalFundingE8s),
-        true, // fundingEnabled
-        [BigInt(rewardPerVoteE8s)] // rewardPerVote
+        [tokenCanisterPrincipal],
+        totalFundingE8s,
+        rewardPerVoteE8s,
+        fundingType
       );
 
-      return { success: true, pollId }
+      if ('ok' in result) {
+        return { success: true, pollId: result.ok }
+      } else {
+        throw new Error(result.err)
+      }
     } else {
-      // Use standard ICP poll creation (backward compatibility)
+      // Use standard ICP poll creation
       const rewardFundLegacy = fundingEnabled ? Math.floor((totalFundAmount || 0) * 100) : 0;
       const rewardPerVoteE8s = fundingEnabled && rewardPerVote ? BigInt(Math.floor(rewardPerVote * 100_000_000)) : null;
 
@@ -112,7 +122,8 @@ async function createPollAction(values: FormValues, identity: any) {
         BigInt(expiresAtNs),
         BigInt(rewardFundLegacy),
         fundingEnabled,
-        rewardPerVoteE8s ? [rewardPerVoteE8s] : []
+        rewardPerVoteE8s ? [rewardPerVoteE8s] : [],
+        [fundingType] // Pass funding type
       );
 
       return { success: true, pollId };
@@ -129,7 +140,7 @@ export default function NewPollPage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [aiGenerating, setAiGenerating] = useState(false)
   const [aiError, setAiError] = useState<string | null>(null)
-  const { identity } = useIcpAuth()
+  const { identity, isAuthenticated } = useIcpAuth()
   const router = useRouter()
 
   // Get minimum datetime (current time + 1 minute)
@@ -147,7 +158,8 @@ export default function NewPollPage() {
         { text: '' }
       ],
       fundingEnabled: false,
-      selectedToken: 'ICP',
+      fundingType: 'self-funded',
+      selectedToken: process.env.NEXT_PUBLIC_TOKENMANIA_CANISTER_ID || 'ICP',
       totalFundAmount: 0,
       rewardPerVote: 0,
     }
@@ -162,22 +174,18 @@ export default function NewPollPage() {
   const supportedTokens: any[] = []
   const tokensLoading = false
   const selectedToken = watch('selectedToken')
-  const customTokenCanister = watch('customTokenCanister')
-  const isCustomToken = selectedToken === 'CUSTOM'
-  const customTokenInfo = null
-  const validatingToken = false
 
   // Fetch projects for dropdown
   useEffect(() => {
     async function fetchProjects() {
-      if (!identity) return
-      
+      if (!isAuthenticated) return
+
       try {
         const { createBackendWithIdentity } = await import('@/lib/icp')
         const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
         const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
         const backend = await createBackendWithIdentity({ canisterId, host, identity })
-        
+
         const projectData = await backend.list_projects(0n, 100n)
         setProjects(projectData.map((p: any) => ({ id: p.id.toString(), name: p.name })))
       } catch (err) {
@@ -185,7 +193,7 @@ export default function NewPollPage() {
       }
     }
     fetchProjects()
-  }, [identity])
+  }, [identity, isAuthenticated])
 
   const addOption = () => {
     append({ text: '' })
@@ -216,7 +224,7 @@ export default function NewPollPage() {
       return
     }
 
-    if (!identity) {
+    if (!isAuthenticated) {
       setAiError('Please login to use AI generation')
       return
     }
@@ -257,7 +265,11 @@ export default function NewPollPage() {
   // Get the selected token info for display
   const getSelectedTokenInfo = () => {
     if (selectedToken === 'ICP') return { symbol: 'ICP', decimals: 8 }
-    if (isCustomToken && customTokenInfo) return customTokenInfo
+
+    // Check if PULSE token is selected
+    if (selectedToken === process.env.NEXT_PUBLIC_TOKENMANIA_CANISTER_ID) {
+      return { symbol: 'PULSE', decimals: 8 }
+    }
 
     // Find token info from supported tokens
     const tokenData = supportedTokens.find(([principal]) => principal === selectedToken)
@@ -295,7 +307,7 @@ export default function NewPollPage() {
           setError(null)
           startTransition(async () => {
             try {
-              await createPollAction(values, identity)
+              await createPollAction(values, identity, isAuthenticated)
               router.push('/admin?tab=polls')
             } catch (e: any) {
               setError(e.message || 'Error creating poll')
@@ -409,6 +421,30 @@ export default function NewPollPage() {
 
             {fundingEnabled && (
               <div className="space-y-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                {/* Funding Type Selection */}
+                <div>
+                  <label className="block text-sm font-medium mb-2">Funding Type</label>
+                  <Select onValueChange={(value: 'self-funded' | 'crowdfunded') => setValue('fundingType', value)} value={watch('fundingType')}>
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Select funding type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="self-funded">
+                        <div>
+                          <div className="font-medium">Self-Funded</div>
+                          <div className="text-xs text-muted-foreground">You fund the entire reward pool yourself</div>
+                        </div>
+                      </SelectItem>
+                      <SelectItem value="crowdfunded">
+                        <div>
+                          <div className="font-medium">Crowdfunded</div>
+                          <div className="text-xs text-muted-foreground">Open for community contributions</div>
+                        </div>
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 {/* Token Selection */}
                 <div>
                   <label className="block text-sm font-medium mb-2">Select Token</label>
@@ -418,54 +454,33 @@ export default function NewPollPage() {
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="ICP">ICP (Internet Computer)</SelectItem>
-                      {!tokensLoading && supportedTokens.map(([principal, symbol, decimals]) => (
-                        <SelectItem key={principal} value={principal}>
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">{symbol}</span>
-                            {KNOWN_TOKEN_INFO[symbol] && (
-                              <span className="text-sm text-muted-foreground">
-                                {KNOWN_TOKEN_INFO[symbol].name}
-                              </span>
-                            )}
-                          </div>
-                        </SelectItem>
-                      ))}
-                      <SelectItem value="CUSTOM">Custom ICRC-1 Token</SelectItem>
+                      <SelectItem value={process.env.NEXT_PUBLIC_TOKENMANIA_CANISTER_ID || 'PULSE'}>
+                        PULSE (ICP Pulse Token)
+                      </SelectItem>
+                      {!tokensLoading && supportedTokens.map(([principal, symbol, decimals]) => {
+                        // Skip PULSE token if it's already shown above
+                        if (principal === process.env.NEXT_PUBLIC_TOKENMANIA_CANISTER_ID) {
+                          return null
+                        }
+                        return (
+                          <SelectItem key={principal} value={principal}>
+                            <div className="flex items-center gap-2">
+                              <span className="font-medium">{symbol}</span>
+                              {KNOWN_TOKEN_INFO[symbol] && (
+                                <span className="text-sm text-muted-foreground">
+                                  {KNOWN_TOKEN_INFO[symbol].name}
+                                </span>
+                              )}
+                            </div>
+                          </SelectItem>
+                        )
+                      })}
                     </SelectContent>
                   </Select>
                   {tokensLoading && (
                     <p className="text-sm text-muted-foreground mt-1">Loading supported tokens...</p>
                   )}
                 </div>
-
-                {/* Custom Token Canister Input */}
-                {isCustomToken && (
-                  <div>
-                    <label className="block text-sm font-medium mb-2">Token Canister ID</label>
-                    <Input
-                      {...register('customTokenCanister')}
-                      placeholder="rdmx6-jaaaa-aaaah-qcaiq-cai"
-                      className="w-full font-mono text-sm"
-                    />
-                    {errors.customTokenCanister && <p className="text-sm text-red-600 mt-1">{errors.customTokenCanister.message}</p>}
-                    {customTokenCanister && (
-                      <div className="mt-2 text-sm">
-                        {validatingToken ? (
-                          <p className="text-yellow-600">Validating token...</p>
-                        ) : false ? (
-                          <p className="text-green-600">
-                            ✓ Valid ICRC-1 token
-                          </p>
-                        ) : customTokenCanister.length > 27 ? (
-                          <p className="text-red-600">
-                            ✗ Invalid token canister or not ICRC-1 compatible
-                          </p>
-                        ) : null}
-                      </div>
-                    )}
-                    <p className="text-xs text-gray-600 mt-1">Enter the canister ID of your ICRC-1 token</p>
-                  </div>
-                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -489,7 +504,7 @@ export default function NewPollPage() {
                     </label>
                     <Input
                       type="number"
-                      step="0.01"
+                      step="0.000001"
                       min="0"
                       {...register('rewardPerVote', { valueAsNumber: true })}
                       placeholder="0.25"
@@ -509,18 +524,12 @@ export default function NewPollPage() {
                       </div>
                       <div className="flex justify-between">
                         <span>Reward per Vote:</span>
-                        <span className="font-mono">{rewardPerVote.toFixed(2)} {tokenInfo.symbol}</span>
+                        <span className="font-mono">{rewardPerVote.toFixed(6)} {tokenInfo.symbol}</span>
                       </div>
                       <div className="flex justify-between">
                         <span>Max Funded Votes:</span>
                         <span className="font-mono">{maxVotes}</span>
                       </div>
-                      {isCustomToken && (
-                        <div className="flex justify-between">
-                          <span>Token Canister:</span>
-                          <span className="font-mono text-xs">{watch('customTokenCanister') || 'Not specified'}</span>
-                        </div>
-                      )}
                       <div className="flex justify-between text-xs text-gray-600 dark:text-gray-400">
                         <span>Total in smallest unit:</span>
                         <span className="font-mono">{Math.floor(totalFundAmount * 100_000_000).toLocaleString()}</span>
@@ -533,7 +542,6 @@ export default function NewPollPage() {
                   <p>• Voters will receive {tokenInfo.symbol} rewards directly to their wallets upon voting</p>
                   <p>• Rewards are distributed automatically from your funded amount</p>
                   <p>• Once the fund is depleted, no more rewards will be given</p>
-                  {isCustomToken && <p>• Make sure the custom token canister supports ICRC-1 standard and you have sufficient balance</p>}
                 </div>
               </div>
             )}

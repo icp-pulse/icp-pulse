@@ -8,11 +8,11 @@ import { useIcpAuth } from '@/components/IcpAuthProvider'
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
-  const { identity } = useIcpAuth()
+  const { identity, isAuthenticated } = useIcpAuth()
 
   useEffect(() => {
     async function fetchProjects() {
-      if (!identity) return
+      if (!isAuthenticated) return
       
       try {
         const { createBackendWithIdentity } = await import('@/lib/icp')
@@ -30,7 +30,7 @@ export default function ProjectsPage() {
     }
     
     fetchProjects()
-  }, [identity])
+  }, [identity, isAuthenticated])
 
   if (loading) {
     return <div>Loading projects...</div>

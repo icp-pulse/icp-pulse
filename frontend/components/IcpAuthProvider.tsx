@@ -27,6 +27,7 @@ export type IcpAuthContextValue = {
   isAuthenticated: boolean
   principalText: string | null
   identity: Identity | null
+  authProvider: 'ii' | 'nfid' | 'plug' | null
   login: (provider?: 'ii' | 'nfid' | 'plug') => Promise<void>
   logout: () => Promise<void>
 }
@@ -183,6 +184,7 @@ export function IcpAuthProvider({ children }: { children: React.ReactNode }) {
     isAuthenticated: !!(principalText && (identity || authProvider === 'plug')),
     principalText,
     identity,
+    authProvider,
     login,
     logout,
   }), [identity, principalText, authProvider, login, logout])

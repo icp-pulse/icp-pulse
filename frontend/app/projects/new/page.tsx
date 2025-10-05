@@ -14,16 +14,16 @@ const schema = z.object({
 
 type FormValues = z.infer<typeof schema>
 
-async function createProjectAction(values: FormValues, identity: any) {
+async function createProjectAction(values: FormValues, identity: any, isAuthenticated: boolean) {
   const { createBackendWithIdentity } = await import('@/lib/icp')
-  
-  if (!identity) {
+
+  if (!isAuthenticated) {
     throw new Error('Please login first')
   }
 
   const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
   const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
-  
+
   const backend = await createBackendWithIdentity({ canisterId, host, identity })
   
   try {
@@ -38,7 +38,7 @@ async function createProjectAction(values: FormValues, identity: any) {
 export default function NewProjectPage() {
   const [pending, startTransition] = useTransition()
   const [err, setErr] = useState<string | null>(null)
-  const { identity } = useIcpAuth()
+  const { identity, isAuthenticated } = useIcpAuth()
   const router = useRouter()
   const { register, handleSubmit, formState: { errors } } = useForm<FormValues>({ resolver: zodResolver(schema) })
 
@@ -51,7 +51,7 @@ export default function NewProjectPage() {
           setErr(null)
           startTransition(async () => {
             try {
-              await createProjectAction(v, identity)
+              await createProjectAction(v, identity, isAuthenticated)
               router.push('/admin')
             } catch (e: any) {
               setErr(e.message || 'Error')

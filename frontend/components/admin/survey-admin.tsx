@@ -28,12 +28,12 @@ export default function SurveyAdmin() {
   const [selectedSurveyId, setSelectedSurveyId] = useState<string | null>(null)
   const [respondents, setRespondents] = useState<any[]>([])
   const [loadingRespondents, setLoadingRespondents] = useState(false)
-  const { identity } = useIcpAuth()
+  const { identity, isAuthenticated } = useIcpAuth()
 
   // Fetch surveys from ICP backend
   useEffect(() => {
     async function fetchSurveys() {
-      if (!identity) {
+      if (!isAuthenticated) {
         setLoading(false)
         return
       }
@@ -72,7 +72,7 @@ export default function SurveyAdmin() {
     }
 
     fetchSurveys()
-  }, [identity])
+  }, [identity, isAuthenticated])
 
   const filteredSurveys = surveys.filter(survey => {
     const matchesSearch = survey.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -107,7 +107,7 @@ export default function SurveyAdmin() {
   }
 
   const fetchRespondents = async (surveyId: string) => {
-    if (!identity) return
+    if (!isAuthenticated) return
 
     setLoadingRespondents(true)
     try {

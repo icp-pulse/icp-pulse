@@ -49,16 +49,16 @@ interface Project {
   name: string
 }
 
-async function createSurveyAction(values: FormValues, identity: any) {
+async function createSurveyAction(values: FormValues, identity: any, isAuthenticated: boolean) {
   const { createBackendWithIdentity } = await import('@/lib/icp')
-  
-  if (!identity) {
+
+  if (!isAuthenticated) {
     throw new Error('Please login first')
   }
 
   const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
   const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
-  
+
   const backend = await createBackendWithIdentity({ canisterId, host, identity })
   
   // Convert form values to backend format
@@ -134,7 +134,7 @@ export default function NewSurveyPage() {
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [projects, setProjects] = useState<Project[]>([])
-  const { identity } = useIcpAuth()
+  const { identity, isAuthenticated } = useIcpAuth()
   const router = useRouter()
   
   // Get minimum datetime (current time + 1 minute)
@@ -168,14 +168,14 @@ export default function NewSurveyPage() {
   // Fetch projects for dropdown
   useEffect(() => {
     async function fetchProjects() {
-      if (!identity) return
-      
+      if (!isAuthenticated) return
+
       try {
         const { createBackendWithIdentity } = await import('@/lib/icp')
         const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
         const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
         const backend = await createBackendWithIdentity({ canisterId, host, identity })
-        
+
         const projectData = await backend.list_projects(0n, 100n)
         setProjects(projectData.map((p: any) => ({ id: p.id.toString(), name: p.name })))
       } catch (err) {
@@ -183,7 +183,7 @@ export default function NewSurveyPage() {
       }
     }
     fetchProjects()
-  }, [identity])
+  }, [identity, isAuthenticated])
 
   const addQuestion = () => {
     append({
@@ -249,7 +249,7 @@ export default function NewSurveyPage() {
           setError(null)
           startTransition(async () => {
             try {
-              await createSurveyAction(values, identity)
+              await createSurveyAction(values, identity, isAuthenticated)
               router.push('/admin?tab=surveys')
             } catch (e: any) {
               setError(e.message || 'Error creating survey')

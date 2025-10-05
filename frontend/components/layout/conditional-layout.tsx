@@ -16,14 +16,21 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
   const pathname = usePathname()
   const { isAuthenticated } = useIcpAuth()
   const isLandingPage = pathname === '/'
+  const isAdminPage = pathname?.startsWith('/admin')
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const navLinks = [
     { href: '/dashboard', label: 'Dashboard' },
     { href: '/wallet', label: 'Wallet' },
     { href: '/polls', label: 'Polls' },
+    { href: '/crowdfunding', label: 'Crowdfunding' },
     { href: '/rewards', label: 'Rewards' },
   ]
+
+  // Admin pages have their own layout (TopHeader + Sidebar), so just render children
+  if (isAdminPage) {
+    return <>{children}</>
+  }
 
   if (isLandingPage) {
     return (

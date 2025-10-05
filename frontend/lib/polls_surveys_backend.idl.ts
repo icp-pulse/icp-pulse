@@ -6,6 +6,7 @@ export const idlFactory = ({ IDL: I = IDL }) => {
   const ScopeType = I.Variant({ project: I.Null, product: I.Null })
 
   const TokenType = I.Variant({ ICP: I.Null, ICRC1: I.Principal })
+  const FundingType = I.Variant({ SelfFunded: I.Null, Crowdfunded: I.Null })
   const FundingInfo = I.Record({
     tokenType: TokenType,
     tokenCanister: I.Opt(I.Principal),
@@ -16,6 +17,19 @@ export const idlFactory = ({ IDL: I = IDL }) => {
     maxResponses: I.Nat,
     currentResponses: I.Nat,
     remainingFund: I.Nat64,
+    fundingType: FundingType,
+    contributors: I.Vec(I.Tuple(I.Principal, I.Nat64)),
+    pendingClaims: I.Vec(I.Tuple(I.Principal, I.Nat64)),
+  })
+
+  const ClaimableReward = I.Record({
+    pollId: I.Nat,
+    pollTitle: I.Text,
+    amount: I.Nat64,
+    tokenSymbol: I.Text,
+    tokenDecimals: I.Nat8,
+    tokenCanister: I.Opt(I.Principal),
+    pollClosed: I.Bool,
   })
 
   const Project = I.Record({
@@ -126,7 +140,8 @@ export const idlFactory = ({ IDL: I = IDL }) => {
     get_product: I.Func([I.Nat], [I.Opt(Product)], ['query']),
     update_product: I.Func([I.Nat, I.Text, I.Text, I.Text], [I.Bool], []),
 
-    create_poll: I.Func([I.Text, I.Nat, I.Text, I.Text, I.Vec(I.Text), I.Int, I.Nat, I.Bool, I.Opt(I.Nat64)], [I.Nat], []),
+    create_poll: I.Func([I.Text, I.Nat, I.Text, I.Text, I.Vec(I.Text), I.Int, I.Nat, I.Bool, I.Opt(I.Nat64), I.Opt(I.Text)], [I.Nat], []),
+    create_custom_token_poll: I.Func([I.Text, I.Nat, I.Text, I.Text, I.Vec(I.Text), I.Int, I.Opt(I.Principal), I.Nat64, I.Nat64, I.Text], [I.Variant({ ok: I.Nat, err: I.Text })], []),
     list_polls_by_project: I.Func([I.Nat, I.Nat, I.Nat], [I.Vec(PollSummary)], ['query']),
     list_polls_by_product: I.Func([I.Nat, I.Nat, I.Nat], [I.Vec(PollSummary)], ['query']),
     get_poll: I.Func([I.Nat], [I.Opt(Poll)], ['query']),
@@ -149,6 +164,11 @@ export const idlFactory = ({ IDL: I = IDL }) => {
 
     // Analytics
     get_analytics_overview: I.Func([], [AnalyticsOverview], ['query']),
+
+    // Rewards and crowdfunding
+    fund_poll: I.Func([I.Nat, I.Nat64], [I.Variant({ ok: I.Text, err: I.Text })], []),
+    claim_poll_reward: I.Func([I.Nat], [I.Variant({ ok: I.Text, err: I.Text })], []),
+    get_claimable_rewards: I.Func([I.Principal], [I.Vec(ClaimableReward)], ['query']),
   })
 }
 

@@ -24,12 +24,12 @@ export default function PollAdmin() {
   const [polls, setPolls] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const { identity } = useIcpAuth()
+  const { identity, isAuthenticated } = useIcpAuth()
 
   // Fetch polls from ICP backend
   useEffect(() => {
     async function fetchPolls() {
-      if (!identity) {
+      if (!isAuthenticated) {
         setLoading(false)
         return
       }
@@ -68,7 +68,7 @@ export default function PollAdmin() {
     }
 
     fetchPolls()
-  }, [identity])
+  }, [identity, isAuthenticated])
 
   const filteredPolls = polls.filter(poll => {
     const matchesSearch = (poll.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||

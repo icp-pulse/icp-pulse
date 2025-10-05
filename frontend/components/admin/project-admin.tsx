@@ -28,12 +28,12 @@ export default function ProjectAdmin() {
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const { identity } = useIcpAuth()
+  const { identity, isAuthenticated } = useIcpAuth()
 
   // Fetch projects from ICP backend
   useEffect(() => {
     async function fetchProjects() {
-      if (!identity) {
+      if (!isAuthenticated) {
         setLoading(false)
         return
       }
@@ -75,7 +75,7 @@ export default function ProjectAdmin() {
     }
 
     fetchProjects()
-  }, [identity])
+  }, [identity, isAuthenticated])
 
   const filteredProjects = projects.filter(project => {
     const matchesSearch = project.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -288,7 +288,12 @@ export default function ProjectAdmin() {
                   <Eye className="w-4 h-4 mr-1" />
                   View
                 </Button>
-                <Button variant="outline" size="sm" className="flex-1">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => window.location.href = `/projects/edit/${project.id}`}
+                >
                   <Edit className="w-4 h-4 mr-1" />
                   Edit
                 </Button>
