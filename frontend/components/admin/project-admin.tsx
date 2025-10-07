@@ -292,7 +292,7 @@ export default function ProjectAdmin() {
                   variant="outline"
                   size="sm"
                   className="flex-1"
-                  onClick={() => window.location.href = `/projects/edit/${project.id}`}
+                  onClick={() => window.location.href = `/projects/edit?id=${project.id}`}
                 >
                   <Edit className="w-4 h-4 mr-1" />
                   Edit

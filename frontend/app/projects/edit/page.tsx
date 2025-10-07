@@ -5,7 +5,7 @@ import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useTransition, useState, useEffect } from 'react'
 import { useIcpAuth } from '@/components/IcpAuthProvider'
-import { useRouter, useParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -56,8 +56,8 @@ export default function EditProjectPage() {
   const [loading, setLoading] = useState(true)
   const { identity, isAuthenticated } = useIcpAuth()
   const router = useRouter()
-  const params = useParams()
-  const projectId = params.id as string
+  const searchParams = useSearchParams()
+  const projectId = searchParams.get('id')
 
   const { register, handleSubmit, formState: { errors }, setValue, watch } = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -73,6 +73,12 @@ export default function EditProjectPage() {
   // Fetch project data
   useEffect(() => {
     async function fetchProject() {
+      if (!projectId) {
+        setErr('No project ID provided')
+        setLoading(false)
+        return
+      }
+
       if (!isAuthenticated) {
         setLoading(false)
         return
@@ -111,6 +117,19 @@ export default function EditProjectPage() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
           <p>Loading project...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!projectId) {
+    return (
+      <div className="max-w-xl mx-auto space-y-6 py-8">
+        <div className="text-center">
+          <p className="text-red-600">No project ID provided</p>
+          <Button onClick={() => router.push('/admin')} className="mt-4">
+            Back to Admin
+          </Button>
         </div>
       </div>
     )
@@ -200,7 +219,7 @@ export default function EditProjectPage() {
           <Button
             type="submit"
             disabled={pending}
-            className="flex-1"
+            className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
           >
             {pending ? 'Saving...' : 'Save Changes'}
           </Button>
