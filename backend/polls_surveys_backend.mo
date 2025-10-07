@@ -453,6 +453,52 @@ persistent actor class polls_surveys_backend() = this {
 
     let funding_type = if (fundingType == "crowdfunded") { #Crowdfunded } else { #SelfFunded };
 
+    // For self-funded polls, pull the funding from creator
+    if (funding_type == #SelfFunded and totalFunding > 0) {
+      switch (tokenCanister) {
+        case (?canister) {
+          try {
+            let tokenActor = actor(Principal.toText(canister)) : actor {
+              icrc2_transfer_from : ({
+                from : { owner : Principal; subaccount : ?Blob };
+                to : { owner : Principal; subaccount : ?Blob };
+                amount : Nat;
+                fee : ?Nat;
+                memo : ?Blob;
+                created_at_time : ?Nat64;
+              }) -> async { #Ok : Nat; #Err : { #BadFee : { expected_fee : Nat }; #BadBurn : { min_burn_amount : Nat }; #InsufficientFunds : { balance : Nat }; #InsufficientAllowance : { allowance : Nat }; #TooOld; #CreatedInFuture : { ledger_time : Nat64 }; #Duplicate : { duplicate_of : Nat }; #TemporarilyUnavailable; #GenericError : { error_code : Nat; message : Text } } };
+            };
+
+            let transferArgs = {
+              from = { owner = msg.caller; subaccount = null };
+              to = { owner = Principal.fromActor(this); subaccount = null };
+              amount = Nat64.toNat(totalFunding);
+              fee = null;
+              memo = null;
+              created_at_time = ?Nat64.fromNat(Int.abs(Time.now()));
+            };
+
+            switch (await tokenActor.icrc2_transfer_from(transferArgs)) {
+              case (#Ok(_)) { /* Transfer successful, continue */ };
+              case (#Err(error)) {
+                let errorMsg = switch (error) {
+                  case (#InsufficientFunds { balance }) { "Insufficient funds. Balance: " # Nat.toText(balance) };
+                  case (#InsufficientAllowance { allowance }) { "Insufficient allowance. Please approve this canister first. Current allowance: " # Nat.toText(allowance) };
+                  case (#BadFee { expected_fee }) { "Bad fee. Expected: " # Nat.toText(expected_fee) };
+                  case (#GenericError { message; error_code }) { "Error " # Nat.toText(error_code) # ": " # message };
+                  case _ { "Token transfer failed" };
+                };
+                return #err("Failed to fund poll: " # errorMsg);
+              };
+            };
+          } catch (e) {
+            return #err("Failed to communicate with token canister: " # Error.message(e));
+          };
+        };
+        case null { /* No token canister, skip funding */ };
+      };
+    };
+
     let fundingInfo = {
       tokenType = switch (tokenCanister) {
         case null { #ICP };
