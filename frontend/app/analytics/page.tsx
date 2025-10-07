@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart3, TrendingUp, Users, DollarSign } from 'lucide-react';
 
-const INDEXER_API_URL = process.env.NEXT_PUBLIC_INDEXER_API_URL || 'http://localhost:3001';
+const INDEXER_API_URL = process.env.NEXT_PUBLIC_INDEXER_API_URL || 'https://icp-pulse-indexer.onrender.com';
 
 interface Overview {
   polls: {
