@@ -8,6 +8,8 @@ const nextConfig = {
   },
   // Allow dynamic routes with fallback
   generateBuildId: () => 'build',
+  // Skip trailing slash for dynamic routes
+  skipTrailingSlashRedirect: true,
   // Asset prefix for custom domain (temporarily disabled)
   // assetPrefix: process.env.NODE_ENV === 'production' ? 'https://icp.dpolls.ai' : '',
   // Remove server-side features for static export
