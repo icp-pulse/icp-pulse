@@ -10,8 +10,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog'
 import { useIcpAuth } from '@/components/IcpAuthProvider'
+import { LoginButton } from '@/components/LoginButton'
 import { useRouter } from 'next/navigation'
-import { Clock, Users, Vote, CheckCircle, BarChart3, Search, Filter, TrendingUp, Grid, List, Plus, ArrowUpDown, Flame, Star, Eye } from 'lucide-react'
+import { Clock, Users, Vote, CheckCircle, BarChart3, Search, Filter, TrendingUp, Grid, List, Plus, ArrowUpDown, Flame, Star, Eye, Wallet } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 import { analytics } from '@/lib/analytics'
 
@@ -47,7 +48,10 @@ export default function PollsPage() {
   }, [identity, isAuthenticated]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchData = async () => {
-    if (!isAuthenticated) return
+    if (!isAuthenticated) {
+      setLoading(false)
+      return
+    }
     
     try {
       setLoading(true)
@@ -257,10 +261,22 @@ export default function PollsPage() {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <h1 className="text-3xl font-bold mb-4">Browse Polls</h1>
-          <p className="text-gray-600 dark:text-gray-400">Please login to view and vote on polls.</p>
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
+        <div className="max-w-md w-full mx-4">
+          <Card className="shadow-lg">
+            <CardContent className="flex flex-col items-center justify-center py-12 px-6">
+              <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-full flex items-center justify-center mb-6">
+                <Wallet className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2 text-center">
+                Connect Your Wallet
+              </h2>
+              <p className="text-gray-600 dark:text-gray-400 text-center mb-6">
+                Please connect your wallet to view and participate in community polls.
+              </p>
+              <LoginButton />
+            </CardContent>
+          </Card>
         </div>
       </div>
     )
@@ -271,7 +287,7 @@ export default function PollsPage() {
       <div className="max-w-7xl mx-auto px-4 py-6">
         {/* Header */}
         <div className="mb-6">
-          <div className="flex items-center justify-between mb-6">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
             <div>
               <h1 className="text-2xl font-bold text-gray-900 dark:text-gray-100">Browse Polls</h1>
               <p className="text-gray-600 dark:text-gray-400 mt-1">
@@ -280,7 +296,7 @@ export default function PollsPage() {
             </div>
             <Button
               onClick={() => router.push('/polls/new')}
-              className="bg-blue-600 hover:bg-blue-700"
+              className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto"
             >
               <Plus className="h-4 w-4 mr-2" />
               Create Poll
@@ -289,25 +305,25 @@ export default function PollsPage() {
 
           {/* Tabs Navigation */}
           <Tabs value="trending" className="w-full">
-            <div className="flex items-center justify-between mb-6">
-              <TabsList className="bg-transparent p-0 space-x-8">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4 mb-6">
+              <TabsList className="bg-transparent p-0 space-x-4 sm:space-x-8 overflow-x-auto">
                 <TabsTrigger
                   value="trending"
-                  className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none pb-2"
+                  className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none pb-2 whitespace-nowrap"
                 >
                   <Flame className="h-4 w-4 mr-2" />
                   Trending
                 </TabsTrigger>
                 <TabsTrigger
                   value="watchlist"
-                  className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none pb-2"
+                  className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none pb-2 whitespace-nowrap"
                 >
                   <Star className="h-4 w-4 mr-2" />
                   Watchlist
                 </TabsTrigger>
                 <TabsTrigger
                   value="voted"
-                  className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none pb-2"
+                  className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-blue-600 rounded-none pb-2 whitespace-nowrap"
                 >
                   <CheckCircle className="h-4 w-4 mr-2" />
                   Voted
@@ -315,18 +331,18 @@ export default function PollsPage() {
               </TabsList>
 
               {/* Search and Filters */}
-              <div className="flex items-center gap-4">
-                <div className="relative">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+                <div className="relative flex-1 sm:flex-initial">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
                   <Input
-                    placeholder="Search by poll title or description"
+                    placeholder="Search polls..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 w-64 bg-white dark:bg-gray-800"
+                    className="pl-10 w-full sm:w-48 md:w-64 bg-white dark:bg-gray-800"
                   />
                 </div>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-32 bg-white dark:bg-gray-800">
+                  <SelectTrigger className="w-full sm:w-32 bg-white dark:bg-gray-800">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -336,7 +352,7 @@ export default function PollsPage() {
                   </SelectContent>
                 </Select>
                 <Select value={projectFilter} onValueChange={setProjectFilter}>
-                  <SelectTrigger className="w-40 bg-white dark:bg-gray-800">
+                  <SelectTrigger className="w-full sm:w-40 bg-white dark:bg-gray-800">
                     <SelectValue placeholder="Project" />
                   </SelectTrigger>
                   <SelectContent>
