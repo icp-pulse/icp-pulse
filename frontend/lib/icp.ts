@@ -67,18 +67,3 @@ export async function createBackendWithIdentity({ canisterId, host, identity }: 
 
   return Actor.createActor(customIDL as any, { agent, canisterId }) as any
 }
-
-// Add Plug wallet type declarations
-declare global {
-  interface Window {
-    ic?: {
-      plug?: {
-        isConnected: () => Promise<boolean>
-        createAgent: (args?: { whitelist?: string[], host?: string }) => Promise<boolean>
-        createActor: (args: { canisterId: string, interfaceFactory: any }) => Promise<any>
-        agent: any
-        principalId: string
-      }
-    }
-  }
-}

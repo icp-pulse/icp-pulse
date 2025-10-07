@@ -460,7 +460,12 @@ export default function CrowdfundingPage() {
                 </div>
                 <PollCrowdfunding
                   pollId={selectedItem.id}
-                  fundingInfo={selectedItem.fundingInfo[0]}
+                  fundingInfo={{
+                    ...selectedItem.fundingInfo[0],
+                    tokenCanister: selectedItem.fundingInfo[0].tokenCanister.length > 0
+                      ? [selectedItem.fundingInfo[0].tokenCanister[0]!.toString()]
+                      : []
+                  }}
                   onContribute={() => {
                     setSelectedItem(null)
                     fetchData()
