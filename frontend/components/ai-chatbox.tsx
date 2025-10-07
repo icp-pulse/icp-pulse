@@ -184,6 +184,88 @@ export function AIChatbox({ onOptionsGenerated }: AIChatboxProps = {}) {
       // Create poll using appropriate backend function
       let pollId
       if (fundingEnabled && tokenCanisterId) {
+        // For self-funded polls, approve tokens first
+        if (totalFundE8s > 0n) {
+          const backendCanisterId = canisterId
+
+          // Add fee buffer
+          const feeBuffer = 20001n
+          const approvalAmount = totalFundE8s + feeBuffer
+
+          // Check if using Plug wallet
+          const isPlugWallet = typeof window !== 'undefined' && window.ic?.plug
+
+          if (isPlugWallet && window.ic?.plug) {
+            // Use Plug wallet for approval
+            const whitelist = [tokenCanisterId, backendCanisterId]
+            const connected = await window.ic.plug.requestConnect({ whitelist })
+
+            if (!connected) {
+              throw new Error('Failed to connect to Plug wallet')
+            }
+
+            const { idlFactory: tokenIdl } = await import('@/../../src/declarations/tokenmania')
+            const tokenActor = await window.ic.plug.createActor({
+              canisterId: tokenCanisterId,
+              interfaceFactory: tokenIdl,
+            })
+
+            const approveResult = await tokenActor.icrc2_approve({
+              from_subaccount: [],
+              spender: {
+                owner: Principal.fromText(backendCanisterId),
+                subaccount: [],
+              },
+              amount: approvalAmount,
+              expected_allowance: [],
+              expires_at: [],
+              fee: [],
+              memo: [],
+              created_at_time: [],
+            })
+
+            if ('Err' in approveResult || approveResult.Err !== undefined) {
+              throw new Error(`Failed to approve token transfer: ${JSON.stringify(approveResult.Err || approveResult)}`)
+            }
+          } else {
+            // Use identity-based approval for Internet Identity
+            const { Actor, HttpAgent } = await import('@dfinity/agent')
+            const { idlFactory: tokenIdl } = await import('@/../../src/declarations/tokenmania')
+
+            const agent = new HttpAgent({ host, identity: identity! })
+
+            if (process.env.NEXT_PUBLIC_DFX_NETWORK === 'local') {
+              await agent.fetchRootKey()
+            }
+
+            const tokenActor = Actor.createActor(tokenIdl, {
+              agent,
+              canisterId: tokenCanisterId,
+            })
+
+            const approveResult = await (tokenActor as any).icrc2_approve({
+              from_subaccount: [],
+              spender: {
+                owner: Principal.fromText(backendCanisterId),
+                subaccount: [],
+              },
+              amount: approvalAmount,
+              expected_allowance: [],
+              expires_at: [],
+              fee: [],
+              memo: [],
+              created_at_time: [],
+            })
+
+            if ('Err' in approveResult || approveResult.Err !== undefined) {
+              throw new Error(`Failed to approve token transfer: ${JSON.stringify(approveResult.Err || approveResult)}`)
+            }
+          }
+
+          // Wait for approval to be processed
+          await new Promise(resolve => setTimeout(resolve, 2000))
+        }
+
         // Use create_custom_token_poll for custom tokens
         const result = await backend.create_custom_token_poll(
           'project',
@@ -195,7 +277,7 @@ export function AIChatbox({ onOptionsGenerated }: AIChatboxProps = {}) {
           [Principal.fromText(tokenCanisterId)],
           totalFundE8s,
           rewardPerVoteE8s,
-          'SelfFunded'
+          'self-funded'
         )
 
         if ('err' in result) {

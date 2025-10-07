@@ -90,7 +90,113 @@ async function createPollAction(values: FormValues, identity: any, isAuthenticat
       const totalFundingE8s = BigInt(Math.floor((totalFundAmount || 0) * 100_000_000));
       const rewardPerVoteE8s = BigInt(Math.floor((rewardPerVote || 0) * 100_000_000));
 
+      // For self-funded polls, approve tokens first
+      if (fundingType === 'self-funded' && totalFundingE8s > 0n) {
+        console.log('Self-funded poll detected, requesting token approval...')
+        console.log('Funding amount:', totalFundingE8s.toString())
+
+        const backendCanisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
+
+        // Add fee buffer (similar to poll-crowdfunding)
+        const feeBuffer = 20001n
+        const approvalAmount = totalFundingE8s + feeBuffer
+
+        console.log('Approval amount (with buffer):', approvalAmount.toString())
+
+        // Check if using Plug wallet
+        const isPlugWallet = typeof window !== 'undefined' && window.ic?.plug
+        console.log('Using Plug wallet:', isPlugWallet)
+
+        if (isPlugWallet && window.ic?.plug) {
+          console.log('Requesting Plug approval...')
+          // Use Plug wallet for approval
+          const whitelist = [selectedToken, backendCanisterId]
+          console.log('Whitelist:', whitelist)
+
+          const connected = await window.ic.plug.requestConnect({ whitelist })
+          console.log('Plug connected:', connected)
+
+          if (!connected) {
+            throw new Error('Failed to connect to Plug wallet')
+          }
+
+          console.log('Creating token actor...')
+          const { idlFactory: tokenIdl } = await import('@/../../src/declarations/tokenmania')
+          const tokenActor = await window.ic.plug.createActor({
+            canisterId: selectedToken,
+            interfaceFactory: tokenIdl,
+          })
+
+          console.log('Requesting approval from Plug...', {
+            spender: backendCanisterId,
+            amount: approvalAmount.toString()
+          })
+
+          const approveResult = await tokenActor.icrc2_approve({
+            from_subaccount: [],
+            spender: {
+              owner: Principal.fromText(backendCanisterId),
+              subaccount: [],
+            },
+            amount: approvalAmount,
+            expected_allowance: [],
+            expires_at: [],
+            fee: [],
+            memo: [],
+            created_at_time: [],
+          })
+
+          console.log('Approve result:', approveResult)
+
+          if ('Err' in approveResult || approveResult.Err !== undefined) {
+            throw new Error(`Failed to approve token transfer: ${JSON.stringify(approveResult.Err || approveResult)}`)
+          }
+
+          console.log('Approval successful!')
+        } else {
+          // Use identity-based approval for Internet Identity
+          const { Actor, HttpAgent } = await import('@dfinity/agent')
+          const { idlFactory: tokenIdl } = await import('@/../../src/declarations/tokenmania')
+
+          const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
+          const agent = new HttpAgent({ host, identity: identity! })
+
+          if (process.env.NEXT_PUBLIC_DFX_NETWORK === 'local') {
+            await agent.fetchRootKey()
+          }
+
+          const tokenActor = Actor.createActor(tokenIdl, {
+            agent,
+            canisterId: selectedToken,
+          })
+
+          const approveResult = await (tokenActor as any).icrc2_approve({
+            from_subaccount: [],
+            spender: {
+              owner: Principal.fromText(backendCanisterId),
+              subaccount: [],
+            },
+            amount: approvalAmount,
+            expected_allowance: [],
+            expires_at: [],
+            fee: [],
+            memo: [],
+            created_at_time: [],
+          })
+
+          if ('Err' in approveResult || approveResult.Err !== undefined) {
+            throw new Error(`Failed to approve token transfer: ${JSON.stringify(approveResult.Err || approveResult)}`)
+          }
+        }
+
+        // Wait for approval to be processed
+        console.log('Waiting for approval to be processed...')
+        await new Promise(resolve => setTimeout(resolve, 2000))
+        console.log('Approval processed, creating poll...')
+      }
+
       // Use create_custom_token_poll for PULSE and other tokens
+      console.log('Calling create_custom_token_poll...')
       const result = await backend.create_custom_token_poll(
         'project',
         BigInt(projectId),
