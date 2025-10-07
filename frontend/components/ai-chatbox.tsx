@@ -178,19 +178,45 @@ export function AIChatbox({ onOptionsGenerated }: AIChatboxProps = {}) {
         ? process.env.NEXT_PUBLIC_TOKENMANIA_CANISTER_ID || ''
         : ''
 
-      // Create poll using backend function
-      const pollId = await backend.create_poll(
-        'project',
-        BigInt(preview.scopeId),
-        preview.title,
-        preview.description,
-        preview.options,
-        BigInt(preview.closesAt),
-        totalFundE8s,
-        fundingEnabled,
-        rewardPerVoteE8s > 0n ? [rewardPerVoteE8s] : [],
-        tokenCanisterId ? [tokenCanisterId] : []
-      )
+      // Import Principal for custom token polls
+      const { Principal } = await import('@dfinity/principal')
+
+      // Create poll using appropriate backend function
+      let pollId
+      if (fundingEnabled && tokenCanisterId) {
+        // Use create_custom_token_poll for custom tokens
+        const result = await backend.create_custom_token_poll(
+          'project',
+          BigInt(preview.scopeId),
+          preview.title,
+          preview.description,
+          preview.options,
+          BigInt(preview.closesAt),
+          [Principal.fromText(tokenCanisterId)],
+          totalFundE8s,
+          rewardPerVoteE8s,
+          'SelfFunded'
+        )
+
+        if ('err' in result) {
+          throw new Error(result.err)
+        }
+        pollId = result.ok
+      } else {
+        // Use create_poll for non-funded polls
+        pollId = await backend.create_poll(
+          'project',
+          BigInt(preview.scopeId),
+          preview.title,
+          preview.description,
+          preview.options,
+          BigInt(preview.closesAt),
+          totalFundE8s,
+          fundingEnabled,
+          rewardPerVoteE8s > 0n ? [rewardPerVoteE8s] : [],
+          []
+        )
+      }
 
       console.log('Poll created successfully with ID:', pollId.toString())
 
@@ -236,8 +262,11 @@ export function AIChatbox({ onOptionsGenerated }: AIChatboxProps = {}) {
       <Button
         onClick={toggleChatbox}
         className={`fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg transition-all duration-300 ease-in-out z-50 ${
-          isOpen ? 'scale-0 opacity-0' : 'scale-100 opacity-100 hover:scale-110'
+          isOpen ? 'scale-0 opacity-0' : 'scale-100 opacity-100 hover:scale-110 animate-pulse'
         }`}
+        style={{
+          boxShadow: isOpen ? '' : '0 0 20px rgba(59, 130, 246, 0.5), 0 0 40px rgba(59, 130, 246, 0.3)',
+        }}
         size="icon"
       >
         <MessageCircle className="h-6 w-6" />

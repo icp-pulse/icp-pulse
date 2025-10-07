@@ -31,7 +31,7 @@ interface PollCrowdfundingProps {
 export function PollCrowdfunding({ pollId, fundingInfo, onContribute }: PollCrowdfundingProps) {
   const [amount, setAmount] = useState('')
   const [isContributing, setIsContributing] = useState(false)
-  const { identity } = useIcpAuth()
+  const { identity, isAuthenticated } = useIcpAuth()
 
   // Check if poll is crowdfunded
   const isCrowdfunded = 'Crowdfunded' in fundingInfo.fundingType
@@ -50,7 +50,7 @@ export function PollCrowdfunding({ pollId, fundingInfo, onContribute }: PollCrow
     : 0
 
   const handleContribute = async () => {
-    if (!identity) {
+    if (!isAuthenticated) {
       toast({
         title: "Not authenticated",
         description: "Please login to contribute to this poll.",
@@ -80,6 +80,11 @@ export function PollCrowdfunding({ pollId, fundingInfo, onContribute }: PollCrow
       // Convert to smallest unit (e8s for most tokens)
       const amountE8s = BigInt(Math.floor(contributionAmount * Math.pow(10, tokenDecimals)))
 
+      // Add buffer for fees - need to be strictly greater than amount + fee
+      // Standard ICRC fee is 10000, so we add 20001 to be safe (> amount + 10000)
+      const feeBuffer = 20001n
+      const approvalAmount = amountE8s + feeBuffer
+
       // First, approve the backend canister to spend tokens
       // Get token canister ID
       const tokenCanisterId = fundingInfo.tokenCanister[0]
@@ -87,45 +92,132 @@ export function PollCrowdfunding({ pollId, fundingInfo, onContribute }: PollCrow
         throw new Error('Token canister not configured')
       }
 
-      // Create token actor for approval
-      const { Actor, HttpAgent } = await import('@dfinity/agent')
-      const { idlFactory: tokenIdl } = await import('@/../../src/declarations/tokenmania')
+      console.log('Token canister ID from fundingInfo:', tokenCanisterId)
+      console.log('Backend canister ID:', canisterId)
+      console.log('Poll ID:', pollId.toString())
+      console.log('Full funding info:', fundingInfo)
 
-      const agent = new HttpAgent({
-        host,
-        identity
-      })
+      // Check if using Plug wallet
+      const isPlugWallet = typeof window !== 'undefined' && window.ic?.plug
+      const { Principal } = await import('@dfinity/principal')
 
-      if (process.env.NEXT_PUBLIC_DFX_NETWORK === 'local') {
-        await agent.fetchRootKey()
+      if (isPlugWallet && window.ic?.plug) {
+        // Use Plug wallet for approval
+        console.log('Using Plug wallet for approval...')
+
+        // Request connection to token canister if not already connected
+        const whitelist = [tokenCanisterId, canisterId]
+        const connected = await window.ic.plug.requestConnect({ whitelist })
+
+        if (!connected) {
+          throw new Error('Failed to connect to Plug wallet')
+        }
+
+        // Create actor through Plug for the token canister
+        const { idlFactory: tokenIdl } = await import('@/../../src/declarations/tokenmania')
+        const tokenActor = await window.ic.plug.createActor({
+          canisterId: tokenCanisterId,
+          interfaceFactory: tokenIdl,
+        })
+
+        // Approve using Plug actor
+        console.log('Requesting approval via Plug...', {
+          spender: canisterId,
+          amount: amountE8s.toString(),
+          approvalAmount: approvalAmount.toString()
+        })
+
+        const approveResult = await tokenActor.icrc2_approve({
+          from_subaccount: [],
+          spender: {
+            owner: Principal.fromText(canisterId),
+            subaccount: [],
+          },
+          amount: approvalAmount,
+          expected_allowance: [],
+          expires_at: [],
+          fee: [],
+          memo: [],
+          created_at_time: [],
+        })
+
+        console.log('Plug approve result:', approveResult)
+
+        if ('Err' in approveResult || approveResult.Err !== undefined) {
+          throw new Error(`Failed to approve token transfer: ${JSON.stringify(approveResult.Err || approveResult)}`)
+        }
+      } else {
+        // Use identity-based approval for Internet Identity
+        const { Actor, HttpAgent } = await import('@dfinity/agent')
+        const { idlFactory: tokenIdl } = await import('@/../../src/declarations/tokenmania')
+
+        const agent = new HttpAgent({
+          host,
+          identity: identity!
+        })
+
+        if (process.env.NEXT_PUBLIC_DFX_NETWORK === 'local') {
+          await agent.fetchRootKey()
+        }
+
+        const tokenActor = Actor.createActor(tokenIdl, {
+          agent,
+          canisterId: tokenCanisterId,
+        })
+
+        console.log('Approving token transfer...', {
+          spender: canisterId,
+          amount: amountE8s.toString(),
+          approvalAmount: approvalAmount.toString()
+        })
+
+        const approveResult = await (tokenActor as any).icrc2_approve({
+          from_subaccount: [],
+          spender: {
+            owner: Principal.fromText(canisterId),
+            subaccount: [],
+          },
+          amount: approvalAmount,
+          expected_allowance: [],
+          expires_at: [],
+          fee: [],
+          memo: [],
+          created_at_time: [],
+        })
+
+        console.log('Approve result:', approveResult)
+
+        if ('Err' in approveResult || approveResult.Err !== undefined) {
+          throw new Error(`Failed to approve token transfer: ${JSON.stringify(approveResult.Err || approveResult)}`)
+        }
       }
 
-      const tokenActor = Actor.createActor(tokenIdl, {
-        agent,
-        canisterId: tokenCanisterId,
-      })
-
-      // Approve backend canister
-      const approveResult = await (tokenActor as any).icrc2_approve({
-        from_subaccount: [],
-        spender: {
-          owner: canisterId,
-          subaccount: [],
-        },
-        amount: amountE8s,
-        expected_allowance: [],
-        expires_at: [],
-        fee: [],
-        memo: [],
-        created_at_time: [],
-      })
-
-      if ('Err' in approveResult) {
-        throw new Error('Failed to approve token transfer')
-      }
+      // Wait for the approval to be processed on the ledger
+      console.log('Waiting for approval to be processed...')
+      await new Promise(resolve => setTimeout(resolve, 3000))
 
       // Now call fund_poll on backend
-      const result = await backend.fund_poll(pollId, amountE8s)
+      console.log('Calling fund_poll with pollId:', pollId.toString(), 'amount:', amountE8s.toString())
+
+      // Retry logic for fund_poll
+      let result: any = null
+      let retries = 3
+      while (retries > 0) {
+        try {
+          result = await backend.fund_poll(pollId, amountE8s)
+          console.log('fund_poll result:', result)
+          break
+        } catch (err) {
+          console.log('fund_poll attempt failed, retries left:', retries - 1, 'error:', err)
+          retries--
+          if (retries === 0) throw err
+          await new Promise(resolve => setTimeout(resolve, 2000))
+        }
+      }
+
+      if (!result) {
+        throw new Error('Failed to get response from backend')
+      }
 
       if ('ok' in result) {
         toast({
