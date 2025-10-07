@@ -31,7 +31,7 @@ interface PollCrowdfundingProps {
 export function PollCrowdfunding({ pollId, fundingInfo, onContribute }: PollCrowdfundingProps) {
   const [amount, setAmount] = useState('')
   const [isContributing, setIsContributing] = useState(false)
-  const { identity } = useIcpAuth()
+  const { identity, isAuthenticated } = useIcpAuth()
 
   // Check if poll is crowdfunded
   const isCrowdfunded = 'Crowdfunded' in fundingInfo.fundingType
@@ -50,7 +50,7 @@ export function PollCrowdfunding({ pollId, fundingInfo, onContribute }: PollCrow
     : 0
 
   const handleContribute = async () => {
-    if (!identity) {
+    if (!isAuthenticated) {
       toast({
         title: "Not authenticated",
         description: "Please login to contribute to this poll.",
