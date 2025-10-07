@@ -50,13 +50,26 @@ export default function PollAdmin() {
         const allPolls: any[] = []
         for (const project of projects) {
           try {
-            const projectPolls = await backend.list_polls_by_project(project.id, 0n, 100n)
-            allPolls.push(...projectPolls)
+            const projectPollSummaries = await backend.list_polls_by_project(project.id, 0n, 100n)
+
+            // Fetch full poll details for each summary
+            for (const summary of projectPollSummaries) {
+              try {
+                const fullPoll = await backend.get_poll(summary.id)
+                if (fullPoll && fullPoll.length > 0 && fullPoll[0]) {
+                  allPolls.push(fullPoll[0])
+                }
+              } catch (err) {
+                console.warn(`Failed to fetch poll ${summary.id}:`, err)
+                // Fallback to summary if full poll fetch fails
+                allPolls.push(summary)
+              }
+            }
           } catch (err) {
             console.warn(`Failed to fetch polls for project ${project.id}:`, err)
           }
         }
-        
+
         setPolls(allPolls)
         
       } catch (err) {
@@ -114,9 +127,10 @@ export default function PollAdmin() {
     return Math.round((participants / votes) * 100) || 0
   }
 
-  const getDaysLeft = (expiresAt: string) => {
+  const getDaysLeft = (expiresAtNs: any) => {
     const now = new Date()
-    const expiry = new Date(expiresAt)
+    // Convert from nanoseconds to milliseconds
+    const expiry = new Date(Number(expiresAtNs) / 1_000_000)
     const diffTime = expiry.getTime() - now.getTime()
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
     return diffDays
@@ -198,7 +212,7 @@ export default function PollAdmin() {
                 <p className="text-2xl font-bold text-gray-900 dark:text-gray-100">
                   {polls.length > 0 ? Math.round(polls.reduce((sum, p) => {
                     const votes = Number(p.totalVotes || 0n);
-                    const participants = Number(p.participants || 0n);
+                    const participants = p.voterPrincipals?.length || 0;
                     return sum + (votes > 0 ? (participants / votes) * 100 : 0);
                   }, 0) / polls.length) : 0}%
                 </p>
@@ -264,8 +278,8 @@ export default function PollAdmin() {
       {!loading && !error && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {filteredPolls.map((poll) => {
-          const daysLeft = getDaysLeft(poll.closesAt || poll.expiresAt || new Date().toISOString())
-          const participationRate = getParticipationRate(Number(poll.totalVotes || 0n), Number(poll.participants || 0n))
+          const daysLeft = getDaysLeft(poll.closesAt || BigInt(Date.now() * 1_000_000))
+          const participationRate = getParticipationRate(Number(poll.totalVotes || 0n), poll.voterPrincipals?.length || 0)
           
           return (
             <Card key={poll.id} className="hover:shadow-md transition-shadow">
@@ -297,7 +311,7 @@ export default function PollAdmin() {
                 {/* Poll Stats */}
                 <div className="grid grid-cols-3 gap-4 text-center">
                   <div>
-                    <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">{poll.options || 0}</p>
+                    <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">{poll.options?.length || 0}</p>
                     <p className="text-xs text-gray-500">Options</p>
                   </div>
                   <div>
@@ -305,7 +319,7 @@ export default function PollAdmin() {
                     <p className="text-xs text-gray-500">Votes</p>
                   </div>
                   <div>
-                    <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">{Number(poll.participants || 0n)}</p>
+                    <p className="text-lg font-semibold text-gray-900 dark:text-gray-100">{poll.voterPrincipals?.length || 0}</p>
                     <p className="text-xs text-gray-500">Participants</p>
                   </div>
                 </div>
@@ -343,15 +357,15 @@ export default function PollAdmin() {
                 <div className="pt-3 border-t space-y-2">
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-500">Owner</span>
-                    <span className="font-medium">{poll.createdBy || poll.owner || 'Unknown'}</span>
+                    <span className="font-medium text-xs">{poll.createdBy ? poll.createdBy.toString().slice(0, 8) + '...' : 'Unknown'}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-500">Created</span>
-                    <span className="font-medium">{poll.createdAt ? new Date(poll.createdAt).toLocaleDateString() : 'Unknown'}</span>
+                    <span className="font-medium">{poll.createdAt ? new Date(Number(poll.createdAt) / 1_000_000).toLocaleDateString() : 'Unknown'}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
                     <span className="text-gray-500">Expires</span>
-                    <span className="font-medium">{(poll.closesAt || poll.expiresAt) ? new Date(poll.closesAt || poll.expiresAt).toLocaleDateString() : 'Unknown'}</span>
+                    <span className="font-medium">{poll.closesAt ? new Date(Number(poll.closesAt) / 1_000_000).toLocaleDateString() : 'Unknown'}</span>
                   </div>
                 </div>
 
