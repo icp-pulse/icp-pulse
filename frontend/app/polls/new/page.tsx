@@ -47,6 +47,7 @@ type FormValues = z.infer<typeof schema>
 interface Project {
   id: string
   name: string
+  status: string
 }
 
 async function createPollAction(values: FormValues, identity: any, isAuthenticated: boolean) {
@@ -187,7 +188,8 @@ export default function NewPollPage() {
         const backend = await createBackendWithIdentity({ canisterId, host, identity })
 
         const projectData = await backend.list_projects(0n, 100n)
-        setProjects(projectData.map((p: any) => ({ id: p.id.toString(), name: p.name })))
+        const activeProjects = projectData.filter((p: any) => p.status === 'active')
+        setProjects(activeProjects.map((p: any) => ({ id: p.id.toString(), name: p.name, status: p.status })))
       } catch (err) {
         console.error('Failed to fetch projects:', err)
       }
