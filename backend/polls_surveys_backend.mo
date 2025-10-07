@@ -11,6 +11,7 @@ import Text "mo:base/Text";
 import Time "mo:base/Time";
 import Result "mo:base/Result";
 import Debug "mo:base/Debug";
+import Error "mo:base/Error";
 import Map "mo:map/Map";
 import { phash } "mo:map/Map";
 import Cycles "mo:base/ExperimentalCycles";
@@ -584,7 +585,7 @@ persistent actor class polls_surveys_backend() = this {
                     };
                   };
                 } catch (e) {
-                  #err("Failed to communicate with token canister")
+                  #err("Failed to communicate with token canister: " # Error.message(e))
                 };
               };
             };
@@ -682,7 +683,7 @@ persistent actor class polls_surveys_backend() = this {
                 };
               };
             } catch (e) {
-              #err("Failed to communicate with token canister")
+              #err("Failed to communicate with token canister: " # Error.message(e))
             };
           };
         };
