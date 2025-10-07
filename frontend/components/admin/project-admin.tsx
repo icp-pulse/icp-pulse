@@ -109,8 +109,12 @@ export default function ProjectAdmin() {
             Manage your survey and poll projects
           </p>
         </div>
-        <Button onClick={() => window.location.href = '/projects/new'}>
-          <Plus className="w-4 h-4 mr-2" />
+        <Button
+          onClick={() => window.location.href = '/projects/new'}
+          className="bg-blue-600 hover:bg-blue-700 text-white"
+          size="lg"
+        >
+          <Plus className="w-5 h-5 mr-2" />
           New Project
         </Button>
       </div>

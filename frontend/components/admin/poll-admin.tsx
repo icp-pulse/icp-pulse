@@ -132,8 +132,12 @@ export default function PollAdmin() {
             Create and manage polls for quick decision making
           </p>
         </div>
-        <Button onClick={() => window.location.href = '/polls/new'}>
-          <Plus className="w-4 h-4 mr-2" />
+        <Button
+          onClick={() => window.location.href = '/polls/new'}
+          className="bg-blue-600 hover:bg-blue-700 text-white"
+          size="lg"
+        >
+          <Plus className="w-5 h-5 mr-2" />
           New Poll
         </Button>
       </div>
