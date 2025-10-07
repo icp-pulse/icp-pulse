@@ -45,16 +45,18 @@ function ResultsContent() {
         return
       }
 
-      if (!isAuthenticated || !identity) {
-        setError('Please connect your wallet to view poll results')
-        setLoading(false)
-        return
-      }
-
       try {
         const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
         const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
-        const backend = await createBackendWithIdentity({ canisterId, host, identity })
+
+        // For viewing results, we can use createBackend (no auth required for query calls)
+        let backend
+        if (isAuthenticated && identity) {
+          backend = await createBackendWithIdentity({ canisterId, host, identity })
+        } else {
+          const { createBackend } = await import('@/lib/icp')
+          backend = await createBackend({ canisterId, host })
+        }
 
         console.log('Fetching poll with ID:', pollId)
         const pollData = await backend.get_poll(BigInt(pollId))
@@ -86,7 +88,7 @@ function ResultsContent() {
     }
 
     loadPollResults()
-  }, [pollId, isAuthenticated, identity])
+  }, [pollId])
 
   const formatDate = (timestamp: number): string => {
     return new Date(timestamp / 1000000).toLocaleDateString('en-US', {
@@ -142,16 +144,6 @@ function ResultsContent() {
     )
   }
 
-  if (!isAuthenticated) {
-    return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Authentication Required</h1>
-          <p className="text-muted-foreground">Please connect your wallet to view poll results.</p>
-        </div>
-      </div>
-    )
-  }
 
   if (loading) {
     return (
@@ -170,9 +162,6 @@ function ResultsContent() {
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">Unable to Load Poll</h1>
           <p className="text-muted-foreground mb-4">{error}</p>
-          {!isAuthenticated && (
-            <p className="text-sm text-gray-500">Please connect your wallet to view this poll.</p>
-          )}
         </div>
       </div>
     )
