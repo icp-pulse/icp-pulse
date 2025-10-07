@@ -1,7 +1,6 @@
 import { Folder, ClipboardList, BarChart3, Download, Settings } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@lib/utils";
-import { useIcpAuth } from '@/components/IcpAuthProvider';
 
 interface SidebarProps {
   activeTab: "projects" | "surveys" | "polls";
@@ -10,89 +9,26 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ activeTab, onTabChange, isCollapsed }: SidebarProps) {
-  const { identity } = useIcpAuth();
-
-  // Fetch data from ICP backend
-  const { data: projects = [] } = useQuery<any[]>({ 
-    queryKey: ["projects", identity?.getPrincipal().toString()],
+  // Fetch stats from ICP backend (single query for all counts)
+  const { data: stats } = useQuery({
+    queryKey: ["stats"],
     queryFn: async () => {
-      if (!identity) return []
-      
-      const { createBackendWithIdentity } = await import('@/lib/icp')
+      const { createBackend } = await import('@/lib/icp')
       const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
       const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
-      const backend = await createBackendWithIdentity({ canisterId, host, identity })
-      
-      return await backend.list_projects(0n, 100n)
+      const backend = await createBackend({ canisterId, host })
+      return await backend.get_stats()
     },
     staleTime: 30000, // Cache for 30 seconds
-    enabled: !!identity,
-  });
-  
-  const { data: surveys = [] } = useQuery<any[]>({ 
-    queryKey: ["surveys", identity?.getPrincipal().toString()],
-    queryFn: async () => {
-      if (!identity) return []
-      
-      const { createBackendWithIdentity } = await import('@/lib/icp')
-      const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
-      const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
-      const backend = await createBackendWithIdentity({ canisterId, host, identity })
-      
-      // Get all projects first
-      const projects = await backend.list_projects(0n, 100n)
-      
-      // Then get surveys for each project
-      const allSurveys: any[] = []
-      for (const project of projects) {
-        try {
-          const projectSurveys = await backend.list_surveys_by_project(project.id, 0n, 100n)
-          allSurveys.push(...projectSurveys)
-        } catch (err) {
-          console.warn(`Failed to fetch surveys for project ${project.id}:`, err)
-        }
-      }
-      
-      return allSurveys
-    },
-    staleTime: 30000,
-    enabled: !!identity,
-  });
-  
-  const { data: polls = [] } = useQuery<any[]>({ 
-    queryKey: ["polls", identity?.getPrincipal().toString()],
-    queryFn: async () => {
-      if (!identity) return []
-      
-      const { createBackendWithIdentity } = await import('@/lib/icp')
-      const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
-      const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
-      const backend = await createBackendWithIdentity({ canisterId, host, identity })
-      
-      // Get all projects first
-      const projects = await backend.list_projects(0n, 100n)
-      
-      // Then get polls for each project
-      const allPolls: any[] = []
-      for (const project of projects) {
-        try {
-          const projectPolls = await backend.list_polls_by_project(project.id, 0n, 100n)
-          allPolls.push(...projectPolls)
-        } catch (err) {
-          console.warn(`Failed to fetch polls for project ${project.id}:`, err)
-        }
-      }
-      
-      return allPolls
-    },
-    staleTime: 30000,
-    enabled: !!identity,
+    retry: 1,
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
   });
 
   const navItems = [
-    { id: "projects" as const, icon: Folder, label: "Projects", count: projects.length },
-    { id: "surveys" as const, icon: ClipboardList, label: "Surveys", count: surveys.length },
-    { id: "polls" as const, icon: BarChart3, label: "Polls", count: polls.length },
+    { id: "projects" as const, icon: Folder, label: "Projects", count: Number(stats?.projectCount || 0) },
+    { id: "surveys" as const, icon: ClipboardList, label: "Surveys", count: Number(stats?.surveyCount || 0) },
+    { id: "polls" as const, icon: BarChart3, label: "Polls", count: Number(stats?.pollCount || 0) },
   ];
 
   return (
