@@ -353,15 +353,30 @@ export default function PollAdmin() {
 
                 {/* Actions */}
                 <div className="flex gap-2 pt-2">
-                  <Button variant="outline" size="sm" className="flex-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => window.location.href = `/results?pollId=${poll.id}`}
+                  >
                     <Eye className="w-4 h-4 mr-1" />
                     View
                   </Button>
-                  <Button variant="outline" size="sm" className="flex-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => window.location.href = `/polls/edit?id=${poll.id}`}
+                  >
                     <Edit className="w-4 h-4 mr-1" />
-                    Edit
+                    Details
                   </Button>
-                  <Button variant="outline" size="sm" className="flex-1">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => window.location.href = `/results?pollId=${poll.id}`}
+                  >
                     <Vote className="w-4 h-4 mr-1" />
                     Results
                   </Button>
