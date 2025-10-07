@@ -10,7 +10,19 @@ interface PollCreationRequest {
   scopeId: number
   closesAt: number
   fundingEnabled?: boolean
+  fundingAmount?: number
   rewardPerVote?: number
+  durationDays?: number
+}
+
+interface PollPreview {
+  title: string
+  description: string
+  options: string[]
+  durationDays: number
+  fundingAmount?: number
+  closesAt: number
+  scopeId: number
 }
 
 async function detectPollOptionsGeneration(message: string): Promise<string | null> {
@@ -42,7 +54,7 @@ async function detectPollOptionsGeneration(message: string): Promise<string | nu
   return null
 }
 
-async function detectPollCreation(message: string): Promise<PollCreationRequest | null> {
+async function detectPollCreation(message: string): Promise<PollPreview | null> {
   if (!process.env.OPENAI_API_KEY) return null
 
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -52,38 +64,42 @@ async function detectPollCreation(message: string): Promise<PollCreationRequest 
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      model: 'gpt-3.5-turbo',
+      model: 'gpt-4o-mini',
       messages: [
         {
           role: 'system',
-          content: `You are a poll creation detector. If the user is asking to create a poll, extract the information and respond with a JSON object. Otherwise, respond with "NOT_A_POLL_REQUEST".
+          content: `You are a poll creation detector for ICP Pulse. Extract poll details from user requests.
 
-Required format for poll creation:
+If the user wants to create a poll, respond with JSON:
 {
   "title": "Poll title",
-  "description": "Poll description", 
-  "options": ["Option 1", "Option 2", ...],
-  "scopeType": "project",
-  "scopeId": 1,
-  "closesAt": timestamp_in_nanoseconds,
-  "fundingEnabled": false
+  "description": "Brief description",
+  "options": ["Option 1", "Option 2", "Option 3", "Option 4"],
+  "durationDays": 7,
+  "fundingAmount": null,
+  "scopeId": 1
 }
 
-Use these defaults:
-- scopeType: "project"
-- scopeId: 1 (default project)
-- closesAt: 7 days from now in nanoseconds
-- fundingEnabled: false
+IMPORTANT:
+- Generate 4 relevant options if not specified
+- durationDays: extract from "X days", default 7
+- fundingAmount: extract if user mentions "fund with X PULSE" or similar, otherwise null
+- If user says just a topic like "favorite color", generate appropriate options
+- scopeId: always 1
 
-Only respond with the JSON or "NOT_A_POLL_REQUEST".`
+If NOT a poll creation request, respond: "NOT_A_POLL_REQUEST"
+
+Examples:
+"Create poll about favorite color" → {"title":"Favorite Color","description":"What is your favorite color?","options":["Red","Blue","Green","Yellow"],"durationDays":7,"fundingAmount":null,"scopeId":1}
+"Poll on best framework, 3 days, fund 50 PULSE" → {"title":"Best Framework","description":"Which framework is best?","options":["React","Vue","Angular","Svelte"],"durationDays":3,"fundingAmount":50,"scopeId":1}`
         },
         {
           role: 'user',
           content: message
         }
       ],
-      max_tokens: 300,
-      temperature: 0.1,
+      max_tokens: 400,
+      temperature: 0.3,
     }),
   })
 
@@ -97,8 +113,20 @@ Only respond with the JSON or "NOT_A_POLL_REQUEST".`
   try {
     const pollData = JSON.parse(content)
     // Validate required fields
-    if (pollData.title && pollData.description && pollData.options && pollData.options.length >= 2) {
-      return pollData
+    if (pollData.title && pollData.options && pollData.options.length >= 2) {
+      // Calculate closesAt timestamp
+      const durationMs = (pollData.durationDays || 7) * 24 * 60 * 60 * 1000
+      const closesAt = Date.now() + durationMs
+
+      return {
+        title: pollData.title,
+        description: pollData.description || pollData.title,
+        options: pollData.options,
+        durationDays: pollData.durationDays || 7,
+        fundingAmount: pollData.fundingAmount || undefined,
+        closesAt: closesAt * 1_000_000, // Convert to nanoseconds
+        scopeId: pollData.scopeId || 1
+      }
     }
   } catch (error) {
     console.error('Failed to parse poll data:', error)
@@ -184,28 +212,50 @@ async function generatePollOptionsInBackend(topic: string): Promise<{ success: b
   }
 }
 
-async function createPollInBackend(pollData: PollCreationRequest): Promise<{ success: boolean; pollId?: number; error?: string }> {
+async function createPollInBackend(pollData: PollPreview): Promise<{ success: boolean; pollId?: string; error?: string }> {
   try {
     // Get canister configuration
-    const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID || 'rdmx6-jaaaa-aaaah-qdrha-cai'
-    const host = process.env.NEXT_PUBLIC_IC_HOST || 'https://icp-api.io'
+    const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID
+    const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
+
+    if (!canisterId) {
+      return { success: false, error: 'Backend canister not configured' }
+    }
 
     const backend = await createBackend({ canisterId, host })
 
+    // Calculate funding details if provided
+    let totalFundE8s = 0n
+    let rewardPerVoteE8s = 0n
+    const fundingEnabled = !!pollData.fundingAmount
+
+    if (pollData.fundingAmount && pollData.fundingAmount > 0) {
+      // Assume 4 options means we need to fund for at least 100 responses
+      const estimatedResponses = 100
+      totalFundE8s = BigInt(Math.floor(pollData.fundingAmount * 100_000_000))
+      rewardPerVoteE8s = totalFundE8s / BigInt(estimatedResponses)
+    }
+
+    // Get token canister ID if funding is enabled
+    const tokenCanisterId = fundingEnabled && pollData.fundingAmount
+      ? process.env.NEXT_PUBLIC_TOKENMANIA_CANISTER_ID || ''
+      : ''
+
     // Create poll using backend function
     const pollId = await backend.create_poll(
-      pollData.scopeType,
+      'project',
       BigInt(pollData.scopeId),
       pollData.title,
       pollData.description,
       pollData.options,
       BigInt(pollData.closesAt),
-      BigInt(0), // rewardFund
-      pollData.fundingEnabled || false,
-      pollData.rewardPerVote ? [BigInt(pollData.rewardPerVote)] : []
+      totalFundE8s,
+      fundingEnabled,
+      rewardPerVoteE8s > 0n ? [rewardPerVoteE8s] : [],
+      tokenCanisterId ? [tokenCanisterId] : []
     )
 
-    return { success: true, pollId: Number(pollId) }
+    return { success: true, pollId: pollId.toString() }
   } catch (error) {
     console.error('Backend poll creation error:', error)
     return { success: false, error: error instanceof Error ? error.message : 'Unknown error' }
@@ -214,7 +264,25 @@ async function createPollInBackend(pollData: PollCreationRequest): Promise<{ suc
 
 export async function POST(request: NextRequest) {
   try {
-    const { message, messages } = await request.json()
+    const { message, messages, action, pollPreview } = await request.json()
+
+    // Handle poll creation confirmation
+    if (action === 'create_poll' && pollPreview) {
+      const result = await createPollInBackend(pollPreview)
+
+      if (result.success) {
+        return NextResponse.json({
+          message: `✅ Poll created successfully!\n\n**${pollPreview.title}**\n${pollPreview.description}\n\nYour poll is now live and accepting votes!`,
+          pollCreated: true,
+          pollId: result.pollId
+        })
+      } else {
+        return NextResponse.json({
+          message: `❌ Failed to create poll: ${result.error}\n\nPlease try again or check your authentication.`,
+          pollCreated: false
+        })
+      }
+    }
 
     // First, check if this is a poll options generation request
     const optionsTopic = await detectPollOptionsGeneration(message)
@@ -249,21 +317,12 @@ export async function POST(request: NextRequest) {
     const pollRequest = await detectPollCreation(message)
 
     if (pollRequest) {
-      // Create poll in backend
-      const result = await createPollInBackend(pollRequest)
-      
-      if (result.success) {
-        return NextResponse.json({ 
-          message: `✅ Poll created successfully! Poll ID: ${result.pollId}\n\n**${pollRequest.title}**\n${pollRequest.description}\n\nOptions:\n${pollRequest.options.map((opt, i) => `${i + 1}. ${opt}`).join('\n')}`,
-          pollCreated: true,
-          pollId: result.pollId
-        })
-      } else {
-        return NextResponse.json({ 
-          message: `❌ Failed to create poll: ${result.error}\n\nWould you like me to help you try again with different parameters?`,
-          pollCreated: false
-        })
-      }
+      // Return preview instead of creating immediately
+      return NextResponse.json({
+        message: `I've prepared a poll preview for you. Review the details and click "Create Poll" to submit it!`,
+        pollPreview: true,
+        preview: pollRequest
+      })
     }
 
     // Regular chat response

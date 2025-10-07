@@ -33,12 +33,20 @@ function ResultsContent() {
 
   const [poll, setPoll] = useState<Poll | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [chartData, setChartData] = useState<ChartData[]>([])
   const [chartType, setChartType] = useState<'pie' | 'bar'>('pie')
 
   useEffect(() => {
     const loadPollResults = async () => {
-      if (!pollId || !isAuthenticated || !identity) {
+      if (!pollId) {
+        setError('No poll ID provided')
+        setLoading(false)
+        return
+      }
+
+      if (!isAuthenticated || !identity) {
+        setError('Please connect your wallet to view poll results')
         setLoading(false)
         return
       }
@@ -48,7 +56,9 @@ function ResultsContent() {
         const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
         const backend = await createBackendWithIdentity({ canisterId, host, identity })
 
+        console.log('Fetching poll with ID:', pollId)
         const pollData = await backend.get_poll(BigInt(pollId))
+        console.log('Poll data received:', pollData)
 
         if (pollData.length > 0 && pollData[0]) {
           const pollResult = pollData[0]
@@ -64,9 +74,12 @@ function ResultsContent() {
           }))
 
           setChartData(data)
+        } else {
+          setError(`Poll with ID ${pollId} not found`)
         }
       } catch (error) {
         console.error('Failed to load poll results:', error)
+        setError(error instanceof Error ? error.message : 'Failed to load poll')
       } finally {
         setLoading(false)
       }
@@ -146,6 +159,20 @@ function ResultsContent() {
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
           <p>Loading poll results...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold mb-4">Unable to Load Poll</h1>
+          <p className="text-muted-foreground mb-4">{error}</p>
+          {!isAuthenticated && (
+            <p className="text-sm text-gray-500">Please connect your wallet to view this poll.</p>
+          )}
         </div>
       </div>
     )
