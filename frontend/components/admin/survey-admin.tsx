@@ -145,8 +145,12 @@ export default function SurveyAdmin() {
             Create and manage survey forms across projects
           </p>
         </div>
-        <Button onClick={() => window.location.href = '/surveys/new'}>
-          <Plus className="w-4 h-4 mr-2" />
+        <Button
+          onClick={() => window.location.href = '/surveys/new'}
+          className="bg-blue-600 hover:bg-blue-700 text-white"
+          size="lg"
+        >
+          <Plus className="w-5 h-5 mr-2" />
           New Survey
         </Button>
       </div>
