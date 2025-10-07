@@ -5,24 +5,6 @@ import { AuthClient } from '@dfinity/auth-client'
 import type { Identity } from '@dfinity/agent'
 import { analytics } from '@/lib/analytics'
 
-// Plug wallet type definitions
-declare global {
-  interface Window {
-    ic?: {
-      plug?: {
-        isConnected: () => Promise<boolean>
-        createAgent: (args?: { whitelist?: string[], host?: string }) => Promise<boolean>
-        requestConnect: (args?: { whitelist?: string[], host?: string }) => Promise<boolean>
-        createActor?: (args: { canisterId: string, interfaceFactory: any }) => Promise<any>
-        requestBalance?: () => Promise<any[]>
-        disconnect: () => Promise<boolean>
-        agent: any
-        principalId: string
-      }
-    }
-  }
-}
-
 export type IcpAuthContextValue = {
   isAuthenticated: boolean
   principalText: string | null

@@ -3,7 +3,7 @@
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useTransition, useState, useEffect } from 'react'
+import { useTransition, useState, useEffect, Suspense } from 'react'
 import { useIcpAuth } from '@/components/IcpAuthProvider'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
@@ -50,7 +50,7 @@ async function updateProjectAction(id: number, values: FormValues, identity: any
   }
 }
 
-export default function EditProjectPage() {
+function EditProjectContent() {
   const [pending, startTransition] = useTransition()
   const [err, setErr] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -226,5 +226,20 @@ export default function EditProjectPage() {
         </div>
       </form>
     </div>
+  )
+}
+
+export default function EditProjectPage() {
+  return (
+    <Suspense fallback={
+      <div className="max-w-xl mx-auto space-y-6 py-8">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p>Loading...</p>
+        </div>
+      </div>
+    }>
+      <EditProjectContent />
+    </Suspense>
   )
 }

@@ -9,24 +9,6 @@ import { Badge } from '@/components/ui/badge'
 import { Wallet, RefreshCw, Eye, EyeOff, TrendingUp, Coins, AlertCircle } from 'lucide-react'
 import { analytics } from '@/lib/analytics'
 
-// Plug wallet type definitions (same as IcpAuthProvider)
-declare global {
-  interface Window {
-    ic?: {
-      plug?: {
-        isConnected: () => Promise<boolean>
-        createAgent: (args?: { whitelist?: string[], host?: string }) => Promise<boolean>
-        requestConnect: (args?: { whitelist?: string[], host?: string }) => Promise<boolean>
-        requestBalance?: () => Promise<any[]>
-        disconnect: () => Promise<boolean>
-        createActor?: (args: { canisterId: string, interfaceFactory: any }) => Promise<any>
-        agent: any
-        principalId: string
-      }
-    }
-  }
-}
-
 interface TokenBalance {
   symbol: string
   balance: bigint
