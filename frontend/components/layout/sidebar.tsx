@@ -10,34 +10,20 @@ interface SidebarProps {
 
 export default function Sidebar({ activeTab, onTabChange, isCollapsed }: SidebarProps) {
   // Fetch stats from ICP backend (single query for all counts)
-  const { data: stats, isLoading, error } = useQuery({
+  const { data: stats } = useQuery({
     queryKey: ["stats"],
     queryFn: async () => {
-      console.log('Sidebar: Starting stats fetch...')
-      try {
-        const { createBackend } = await import('@/lib/icp')
-        const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
-        const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
-
-        console.log('Sidebar: Creating backend with canisterId:', canisterId, 'host:', host)
-        const backend = await createBackend({ canisterId, host })
-
-        console.log('Sidebar: Backend created, calling get_stats...')
-        const result = await backend.get_stats()
-        console.log('Sidebar: Fetched stats:', result)
-        return result
-      } catch (err) {
-        console.error('Sidebar: Error fetching stats:', err)
-        throw err
-      }
+      const { createBackend } = await import('@/lib/icp')
+      const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
+      const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
+      const backend = await createBackend({ canisterId, host })
+      return await backend.get_stats()
     },
     staleTime: 30000, // Cache for 30 seconds
     retry: 1,
     refetchOnMount: true,
     refetchOnWindowFocus: false,
   });
-
-  console.log('Sidebar render:', { stats, isLoading, error });
 
   const navItems = [
     { id: "projects" as const, icon: Folder, label: "Projects", count: Number(stats?.projectCount || 0) },
