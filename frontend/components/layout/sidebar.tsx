@@ -1,6 +1,7 @@
-import { Folder, ClipboardList, BarChart3, Download, Settings } from "lucide-react";
+import { Folder, ClipboardList, BarChart3, Download, Settings, TrendingUp } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@lib/utils";
+import Link from "next/link";
 
 interface SidebarProps {
   activeTab: "projects" | "surveys" | "polls";
@@ -73,6 +74,12 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed }: Sidebar
               Quick Actions
             </h3>
             <ul className="space-y-2">
+              <li>
+                <Link href="/analytics" className="w-full flex items-center px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
+                  <TrendingUp className="w-4 h-4 mr-3" />
+                  Analytics
+                </Link>
+              </li>
               <li>
                 <button className="w-full flex items-center px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
                   <Download className="w-4 h-4 mr-3" />
