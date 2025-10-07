@@ -129,7 +129,15 @@ export const idlFactory = ({ IDL: I = IDL }) => {
     }),
   })
 
+  const Stats = I.Record({
+    projectCount: I.Nat,
+    surveyCount: I.Nat,
+    pollCount: I.Nat,
+  })
+
   return I.Service({
+    get_stats: I.Func([], [Stats], ['query']),
+
     create_project: I.Func([I.Text, I.Text], [I.Nat], []),
     list_projects: I.Func([I.Nat, I.Nat], [I.Vec(ProjectSummary)], ['query']),
     get_project: I.Func([I.Nat], [I.Opt(Project)], ['query']),

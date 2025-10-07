@@ -1434,6 +1434,30 @@ persistent actor class polls_surveys_backend() = this {
     }
   };
 
+  // Get counts for sidebar stats
+  public query func get_stats() : async { projectCount: Nat; surveyCount: Nat; pollCount: Nat } {
+    var surveyCount = 0;
+    var pollCount = 0;
+
+    // Count surveys across all projects
+    for (project in projects.vals()) {
+      let projectSurveys = Array.filter<Survey>(surveys, func s = (s.scopeType == #project) and (s.scopeId == project.id));
+      surveyCount += projectSurveys.size();
+    };
+
+    // Count polls across all projects
+    for (project in projects.vals()) {
+      let projectPolls = Array.filter<Poll>(polls, func p = (p.scopeType == #project) and (p.scopeId == project.id));
+      pollCount += projectPolls.size();
+    };
+
+    {
+      projectCount = projects.size();
+      surveyCount = surveyCount;
+      pollCount = pollCount;
+    }
+  };
+
   // HTTPS Outcall Types for OpenAI Integration
   type HttpHeader = {
     name: Text;
