@@ -9,6 +9,7 @@ import { Progress } from '@/components/ui/progress'
 import { Users, Coins, Target } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 import { useIcpAuth } from '@/components/IcpAuthProvider'
+import type { Principal } from '@dfinity/principal'
 
 interface PollCrowdfundingProps {
   pollId: bigint
@@ -17,11 +18,11 @@ interface PollCrowdfundingProps {
     tokenDecimals: number
     totalFund: bigint
     rewardPerResponse: bigint
-    maxResponses: number
-    currentResponses: number
+    maxResponses: bigint
+    currentResponses: bigint
     remainingFund: bigint
     fundingType: { SelfFunded: null } | { Crowdfunded: null }
-    contributors: Array<[string, bigint]>
+    contributors: Array<[Principal, bigint]>
     tokenCanister: [] | [string]
   }
   onContribute?: () => void
@@ -44,8 +45,8 @@ export function PollCrowdfunding({ pollId, fundingInfo, onContribute }: PollCrow
   const totalFundDisplay = Number(fundingInfo.totalFund) / Math.pow(10, tokenDecimals)
   const rewardPerVote = Number(fundingInfo.rewardPerResponse) / Math.pow(10, tokenDecimals)
   const contributorCount = fundingInfo.contributors.length
-  const fundingProgress = fundingInfo.maxResponses > 0
-    ? (fundingInfo.currentResponses / fundingInfo.maxResponses) * 100
+  const fundingProgress = Number(fundingInfo.maxResponses) > 0
+    ? (Number(fundingInfo.currentResponses) / Number(fundingInfo.maxResponses)) * 100
     : 0
 
   const handleContribute = async () => {

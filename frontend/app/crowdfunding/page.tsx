@@ -136,12 +136,12 @@ export default function CrowdfundingPage() {
           const bFunding = b.fundingInfo?.[0]?.totalFund || 0n
           return Number(bFunding) - Number(aFunding)
         case 'progress':
-          const aProgress = a.fundingInfo?.[0] ? (a.fundingInfo[0].currentResponses / a.fundingInfo[0].maxResponses) : 0
-          const bProgress = b.fundingInfo?.[0] ? (b.fundingInfo[0].currentResponses / b.fundingInfo[0].maxResponses) : 0
+          const aProgress = a.fundingInfo?.[0] ? (Number(a.fundingInfo[0].currentResponses) / Number(a.fundingInfo[0].maxResponses)) : 0
+          const bProgress = b.fundingInfo?.[0] ? (Number(b.fundingInfo[0].currentResponses) / Number(b.fundingInfo[0].maxResponses)) : 0
           return bProgress - aProgress
         case 'contributors':
-          const aContributors = a.fundingInfo?.[0]?.contributors.length || 0
-          const bContributors = b.fundingInfo?.[0]?.contributors.length || 0
+          const aContributors = Number(a.fundingInfo?.[0]?.contributors.length || 0)
+          const bContributors = Number(b.fundingInfo?.[0]?.contributors.length || 0)
           return bContributors - aContributors
         default:
           return 0
@@ -343,8 +343,8 @@ export default function CrowdfundingPage() {
               const totalFundDisplay = Number(fundingInfo.totalFund) / Math.pow(10, tokenDecimals)
               const rewardPerResponse = Number(fundingInfo.rewardPerResponse) / Math.pow(10, tokenDecimals)
               const contributorCount = fundingInfo.contributors.length
-              const fundingProgress = fundingInfo.maxResponses > 0
-                ? (fundingInfo.currentResponses / fundingInfo.maxResponses) * 100
+              const fundingProgress = Number(fundingInfo.maxResponses) > 0
+                ? (Number(fundingInfo.currentResponses) / Number(fundingInfo.maxResponses)) * 100
                 : 0
               const isActive = 'active' in item.status
               const timeLeft = formatTimeLeft(item.closesAt)
