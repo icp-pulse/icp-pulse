@@ -166,19 +166,24 @@ export default function PollsPage() {
         // Close the dialog
         setOpenVoteDialog(null)
 
-        // Refresh the poll data
-        await fetchData()
         toast({
-          title: "Vote submitted!",
+          title: "✓ Vote submitted!",
           description: "Your vote has been recorded successfully.",
-          duration: 3000,
+          className: "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800",
+          duration: 2000,
         })
+
+        // Redirect to results page after a short delay
+        setTimeout(() => {
+          router.push(`/results?pollId=${pollId}`)
+        }, 500)
       } else {
         setError('Failed to vote. You may have already voted on this poll.')
         toast({
-          title: "Vote failed",
+          title: "✗ Vote failed",
           description: "You may have already voted on this poll or the poll has ended.",
           variant: "destructive",
+          className: "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800",
           duration: 5000,
         })
       }
@@ -186,9 +191,10 @@ export default function PollsPage() {
       console.error('Error voting:', err)
       setError('Failed to submit vote')
       toast({
-        title: "Error",
+        title: "✗ Error",
         description: "An unexpected error occurred while submitting your vote.",
         variant: "destructive",
+        className: "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800",
         duration: 5000,
       })
     } finally {
