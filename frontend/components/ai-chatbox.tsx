@@ -236,8 +236,11 @@ export function AIChatbox({ onOptionsGenerated }: AIChatboxProps = {}) {
       <Button
         onClick={toggleChatbox}
         className={`fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg transition-all duration-300 ease-in-out z-50 ${
-          isOpen ? 'scale-0 opacity-0' : 'scale-100 opacity-100 hover:scale-110'
+          isOpen ? 'scale-0 opacity-0' : 'scale-100 opacity-100 hover:scale-110 animate-pulse'
         }`}
+        style={{
+          boxShadow: isOpen ? '' : '0 0 20px rgba(59, 130, 246, 0.5), 0 0 40px rgba(59, 130, 246, 0.3)',
+        }}
         size="icon"
       >
         <MessageCircle className="h-6 w-6" />
