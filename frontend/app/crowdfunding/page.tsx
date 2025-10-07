@@ -39,7 +39,10 @@ export default function CrowdfundingPage() {
   }, [identity, isAuthenticated]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchData = async () => {
-    if (!isAuthenticated) return
+    if (!isAuthenticated) {
+      setLoading(false)
+      return
+    }
 
     try {
       setLoading(true)
@@ -173,6 +176,36 @@ export default function CrowdfundingPage() {
     return 'Less than 1 hour left'
   }
 
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <Card className="max-w-md mx-auto mt-20">
+            <CardHeader>
+              <CardTitle className="text-center">Connect Your Wallet</CardTitle>
+            </CardHeader>
+            <CardContent className="text-center space-y-4">
+              <div className="flex justify-center">
+                <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+                  <Coins className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+                </div>
+              </div>
+              <p className="text-gray-600 dark:text-gray-400">
+                Please connect your wallet to view and participate in crowdfunding campaigns.
+              </p>
+              <Button
+                onClick={() => router.push('/')}
+                className="w-full bg-blue-600 hover:bg-blue-700"
+              >
+                Connect Wallet
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    )
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -186,17 +219,6 @@ export default function CrowdfundingPage() {
               ))}
             </div>
           </div>
-        </div>
-      </div>
-    )
-  }
-
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <h1 className="text-3xl font-bold mb-4">Crowdfunding</h1>
-          <p className="text-gray-600 dark:text-gray-400">Please login to view crowdfunding opportunities.</p>
         </div>
       </div>
     )
