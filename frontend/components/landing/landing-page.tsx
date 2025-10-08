@@ -549,7 +549,7 @@ export function LandingPage() {
                 Ready to Create Your First Poll?
               </h2>
               <p className="text-lg mb-8 opacity-90 max-w-2xl mx-auto">
-                Join thousands of organizations using PollChain for transparent, secure polling
+                Join thousands of organizations using True Pulse for transparent, secure polling
               </p>
 
               {/* Input and Button Pill */}
@@ -633,9 +633,9 @@ export function LandingPage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div className="md:col-span-2">
-              <h3 className="text-2xl font-bold mb-4">ICP Pulse</h3>
+              <h3 className="text-2xl font-bold mb-4">True Pulse</h3>
               <p className="text-gray-400 mb-6">
-                Context-aware feedback collection platform built on the Internet Computer Protocol. 
+                Context-aware feedback collection platform built on the Internet Computer Protocol.
                 Secure, transparent, and user-owned data.
               </p>
               <div className="flex space-x-4">
@@ -674,7 +674,7 @@ export function LandingPage() {
           
           <div className="border-t border-gray-800 mt-8 pt-8 flex flex-col md:flex-row justify-between items-center">
             <p className="text-gray-400 text-sm">
-              © 2025 ICP Pulse. All rights reserved.
+              © 2025 True Pulse. All rights reserved.
             </p>
             <p className="text-gray-400 text-sm mt-2 md:mt-0">
               Built on Internet Computer Protocol 🚀

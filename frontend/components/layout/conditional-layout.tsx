@@ -39,7 +39,7 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
           <div className="max-w-7xl mx-auto px-4 py-3">
             <div className="flex items-center justify-between">
               <a href="/" className="font-bold text-xl" suppressHydrationWarning>
-                ICP Pulse
+                True Pulse
               </a>
 
               {/* Desktop Navigation */}
@@ -104,7 +104,7 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
     <div className="mx-auto px-4 py-4">
       <header className="flex items-center justify-between py-2 mb-4">
         <a href="/" className="font-bold text-xl">
-          ICP Pulse
+          True Pulse
         </a>
 
         {/* Desktop Navigation */}

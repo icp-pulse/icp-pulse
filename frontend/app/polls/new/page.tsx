@@ -575,7 +575,7 @@ export default function NewPollPage() {
                     <SelectContent>
                       <SelectItem value="ICP">ICP (Internet Computer)</SelectItem>
                       <SelectItem value={process.env.NEXT_PUBLIC_TOKENMANIA_CANISTER_ID || 'PULSE'}>
-                        PULSE (ICP Pulse Token)
+                        PULSE (True Pulse Token)
                       </SelectItem>
                       {!tokensLoading && supportedTokens.map(([principal, symbol, decimals]) => {
                         // Skip PULSE token if it's already shown above

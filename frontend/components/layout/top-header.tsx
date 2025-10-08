@@ -34,11 +34,11 @@ export function TopHeader({ isSidebarCollapsed, onSidebarToggle }: TopHeaderProp
           </Button>
 
           <Link href="/" className="flex items-center space-x-3 hover:opacity-80 transition-opacity">
-            <div className="w-8 h-8 bg-primary-500 rounded-lg flex items-center justify-center">
-              <span className="text-sm font-bold text-white">ICP</span>
+            <div className="w-8 h-8 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg flex items-center justify-center">
+              <span className="text-sm font-bold text-white">TP</span>
             </div>
             <div>
-              <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">ICP Pulse</h1>
+              <h1 className="text-lg font-semibold text-slate-900 dark:text-slate-100">True Pulse</h1>
             </div>
           </Link>
         </div>
