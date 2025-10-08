@@ -68,7 +68,7 @@ async function detectPollCreation(message: string): Promise<PollPreview | null> 
       messages: [
         {
           role: 'system',
-          content: `You are a poll creation detector for ICP Pulse. Extract poll details from user requests.
+          content: `You are a poll creation detector for True Pulse. Extract poll details from user requests.
 
 If the user wants to create a poll, respond with JSON:
 {
@@ -337,12 +337,12 @@ export async function POST(request: NextRequest) {
         messages: [
           {
             role: 'system',
-            content: `You are a helpful assistant for ICP Pulse, a platform for context-aware polls and surveys on the Internet Computer. 
+            content: `You are a helpful assistant for True Pulse, a platform for context-aware polls and surveys on the Internet Computer.
 
 Key features you can help with:
 - Creating polls: I can create polls for you! Just describe what you want to ask and the answer options.
 - Managing surveys: Help with survey creation and management
-- Platform guidance: Explain how to use ICP Pulse features
+- Platform guidance: Explain how to use True Pulse features
 
 When users ask about creating polls, offer to create them directly through the chat interface.`
           },

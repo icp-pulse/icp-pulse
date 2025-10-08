@@ -1,11 +1,18 @@
 "use client"
 
+import { useState } from 'react'
 import { ScrollReveal } from './scroll-reveal'
 import { StatsSection } from './stats-section'
+import { QuickActionSection } from './quick-action-section'
+import { QuickActionHero } from './quick-action-hero'
+import { HowItWorksSection } from './how-it-works-section'
+import { WhyChooseSection } from './why-choose-section'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import {
   Vote,
   FileText,
@@ -21,10 +28,27 @@ import {
   Github,
   Twitter,
   Linkedin,
-  Settings
+  Settings,
+  Sparkles
 } from 'lucide-react'
 
 export function LandingPage() {
+  const router = useRouter()
+  const [question, setQuestion] = useState('')
+
+  const handleGetAnswers = () => {
+    if (question.trim()) {
+      router.push(`/polls/new?title=${encodeURIComponent(question)}`)
+    } else {
+      router.push('/polls/new')
+    }
+  }
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && question.trim()) {
+      handleGetAnswers()
+    }
+  }
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900">
       {/* Hero Section */}
@@ -42,110 +66,72 @@ export function LandingPage() {
               </span>
             </h1>
             <p className="text-xl text-gray-600 dark:text-gray-300 mb-8 max-w-3xl mx-auto">
-              Organize feedback under Projects and Products. Create intelligent surveys and polls 
+              Organize feedback under Projects and Products. Create intelligent surveys and polls
               that adapt to your organization&apos;s needs, all powered by blockchain technology.
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link href="/projects">
-                <Button size="lg" className="px-8 py-3 text-lg w-full sm:w-auto">
-                  Explore Projects
-                  <ArrowRight className="ml-2 w-5 h-5" />
+
+            {/* Input and Button Pill */}
+            <div className="max-w-3xl mx-auto mb-6">
+              <div className="flex flex-1 border-2 border-gray-300 dark:border-gray-600 rounded-full overflow-hidden focus-within:border-blue-500 dark:focus-within:border-blue-400 transition-colors shadow-lg">
+                <Input
+                  type="text"
+                  placeholder="What question do you want answered? e.g., Which feature should we build next?"
+                  value={question}
+                  onChange={(e) => setQuestion(e.target.value)}
+                  onKeyPress={handleKeyPress}
+                  className="h-16 text-base px-6 flex-1 border-0 rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 bg-white dark:bg-gray-800"
+                />
+                <Button
+                  size="lg"
+                  onClick={handleGetAnswers}
+                  className="h-16 px-8 whitespace-nowrap bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-none border-0 text-base font-semibold"
+                >
+                  <Sparkles className="w-5 h-5 mr-2" />
+                  Get Answers
                 </Button>
-              </Link>
-              <Link href="/admin">
-                <Button variant="outline" size="lg" className="px-8 py-3 text-lg w-full sm:w-auto">
-                  Admin Dashboard
-                </Button>
-              </Link>
-            </div>
-          </ScrollReveal>
-          
-          <ScrollReveal delay={200} className="mt-16">
-            <div className="relative max-w-4xl mx-auto">
-              <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 border">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div className="text-center">
-                    <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                      <FolderOpen className="w-6 h-6 text-blue-600" />
-                    </div>
-                    <h3 className="font-semibold mb-2">Project Organization</h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Group surveys and polls under projects</p>
-                  </div>
-                  <div className="text-center">
-                    <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                      <BarChart3 className="w-6 h-6 text-purple-600" />
-                    </div>
-                    <h3 className="font-semibold mb-2">Real-time Analytics</h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Track responses and engagement</p>
-                  </div>
-                  <div className="text-center">
-                    <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mx-auto mb-4">
-                      <Shield className="w-6 h-6 text-green-600" />
-                    </div>
-                    <h3 className="font-semibold mb-2">Blockchain Security</h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Immutable and transparent data</p>
-                  </div>
-                </div>
               </div>
             </div>
-          </ScrollReveal>
 
-          {/* Quick Navigation */}
-          <ScrollReveal delay={400} className="mt-12">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
-              <Link href="/projects">
-                <Card className="hover:shadow-lg transition-all cursor-pointer group">
-                  <CardContent className="p-6 text-center">
-                    <FolderOpen className="w-8 h-8 text-blue-600 mx-auto mb-3 group-hover:scale-110 transition-transform" />
-                    <h3 className="font-semibold mb-2">Browse Projects</h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">View all projects and their surveys</p>
-                  </CardContent>
-                </Card>
-              </Link>
-              
-              <Link href="/surveys">
-                <Card className="hover:shadow-lg transition-all cursor-pointer group">
-                  <CardContent className="p-6 text-center">
-                    <FileText className="w-8 h-8 text-purple-600 mx-auto mb-3 group-hover:scale-110 transition-transform" />
-                    <h3 className="font-semibold mb-2">View Surveys</h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Participate in active surveys</p>
-                  </CardContent>
-                </Card>
-              </Link>
-              
-              <Link href="/polls">
-                <Card className="hover:shadow-lg transition-all cursor-pointer group">
-                  <CardContent className="p-6 text-center">
-                    <Vote className="w-8 h-8 text-green-600 mx-auto mb-3 group-hover:scale-110 transition-transform" />
-                    <h3 className="font-semibold mb-2">Quick Polls</h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Vote on current polls</p>
-                  </CardContent>
-                </Card>
-              </Link>
-              
-              <Link href="/admin">
-                <Card className="hover:shadow-lg transition-all cursor-pointer group">
-                  <CardContent className="p-6 text-center">
-                    <Settings className="w-8 h-8 text-orange-600 mx-auto mb-3 group-hover:scale-110 transition-transform" />
-                    <h3 className="font-semibold mb-2">Admin Panel</h3>
-                    <p className="text-sm text-gray-600 dark:text-gray-400">Manage your content</p>
-                  </CardContent>
-                </Card>
-              </Link>
+            {/* Feature Badges */}
+            <div className="flex flex-wrap items-center justify-center gap-6 mb-6">
+              <div className="flex items-center gap-2 text-sm">
+                <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                  <Check className="w-3 h-3 text-white" />
+                </div>
+                <span className="text-gray-700 dark:text-gray-300">No registration required</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                  <Check className="w-3 h-3 text-white" />
+                </div>
+                <span className="text-gray-700 dark:text-gray-300">Tamper-proof results</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm">
+                <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                  <Check className="w-3 h-3 text-white" />
+                </div>
+                <span className="text-gray-700 dark:text-gray-300">Real-time analytics</span>
+              </div>
             </div>
-          </ScrollReveal>
 
-          <ScrollReveal delay={500} className="mt-12 text-center">
-            <ChevronDown className="w-8 h-8 text-gray-400 mx-auto animate-bounce" />
+            <p className="text-sm text-gray-500 dark:text-gray-400">
+              No credit card required • Free to start • 2-minute setup
+            </p>
           </ScrollReveal>
         </div>
       </section>
 
+      {/* Why Choose True Pulse Section */}
+      <WhyChooseSection />
+
+      {/* How It Works Section */}
+      <HowItWorksSection />
+
       {/* Statistics Section */}
       <StatsSection />
 
-      {/* Getting Started Section */}
-      <section className="py-16 bg-white dark:bg-gray-900">
+      {/* Getting Started Section - MOVED BELOW */}
+      <section className="py-16 bg-gray-50 dark:bg-gray-800/50">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <ScrollReveal className="text-center mb-12">
             <h2 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white mb-4">
@@ -556,29 +542,39 @@ export function LandingPage() {
 
       {/* Call to Action Section */}
       <section className="py-24">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <ScrollReveal>
-            <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-8 md:p-12 text-white">
-              <h2 className="text-3xl md:text-4xl font-bold mb-6">
-                Ready to get started?
+            <div className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-8 md:p-12 text-center text-white">
+              <h2 className="text-3xl md:text-4xl font-bold mb-4">
+                Ready to Create Your First Poll?
               </h2>
-              <p className="text-xl mb-8 opacity-90">
-                Join thousands of teams already using our platform to gather meaningful feedback 
-                and make data-driven decisions.
+              <p className="text-lg mb-8 opacity-90 max-w-2xl mx-auto">
+                Join thousands of organizations using True Pulse for transparent, secure polling
               </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <Link href="/projects/new">
-                  <Button size="lg" variant="secondary" className="px-8 py-3 text-lg w-full sm:w-auto">
-                    Create Your First Project
-                    <ArrowRight className="ml-2 w-5 h-5" />
+
+              {/* Input and Button Pill */}
+              <div className="max-w-2xl mx-auto mb-4">
+                <div className="flex flex-col sm:flex-row items-center gap-0 bg-white rounded-full overflow-hidden shadow-lg">
+                  <Input
+                    type="text"
+                    placeholder="Enter your poll question here..."
+                    value={question}
+                    onChange={(e) => setQuestion(e.target.value)}
+                    onKeyPress={handleKeyPress}
+                    className="h-14 px-6 flex-1 border-0 rounded-none focus-visible:ring-0 focus-visible:ring-offset-0 text-gray-900"
+                  />
+                  <Button
+                    onClick={handleGetAnswers}
+                    className="h-14 px-8 bg-black hover:bg-gray-900 text-white rounded-none sm:rounded-r-full w-full sm:w-auto"
+                  >
+                    Start Polling
                   </Button>
-                </Link>
-                <Link href="/admin">
-                  <Button size="lg" variant="outline" className="px-8 py-3 text-lg border-white text-white hover:bg-white hover:text-blue-600 w-full sm:w-auto">
-                    View Dashboard
-                  </Button>
-                </Link>
+                </div>
               </div>
+
+              <p className="text-sm opacity-80">
+                No credit card required • Deploy in seconds • Blockchain verified
+              </p>
             </div>
           </ScrollReveal>
         </div>
@@ -637,9 +633,9 @@ export function LandingPage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div className="md:col-span-2">
-              <h3 className="text-2xl font-bold mb-4">ICP Pulse</h3>
+              <h3 className="text-2xl font-bold mb-4">True Pulse</h3>
               <p className="text-gray-400 mb-6">
-                Context-aware feedback collection platform built on the Internet Computer Protocol. 
+                Context-aware feedback collection platform built on the Internet Computer Protocol.
                 Secure, transparent, and user-owned data.
               </p>
               <div className="flex space-x-4">
@@ -678,7 +674,7 @@ export function LandingPage() {
           
           <div className="border-t border-gray-800 mt-8 pt-8 flex flex-col md:flex-row justify-between items-center">
             <p className="text-gray-400 text-sm">
-              © 2025 ICP Pulse. All rights reserved.
+              © 2025 True Pulse. All rights reserved.
             </p>
             <p className="text-gray-400 text-sm mt-2 md:mt-0">
               Built on Internet Computer Protocol 🚀

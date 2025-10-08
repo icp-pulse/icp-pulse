@@ -122,7 +122,7 @@ export default function AnalyticsPage() {
         <div>
           <h1 className="text-3xl font-bold text-slate-900 dark:text-white">Analytics Dashboard</h1>
           <p className="text-slate-600 dark:text-slate-400 mt-1">
-            Data sourced from ICP Pulse Indexer
+            Data sourced from True Pulse Indexer
           </p>
         </div>
         <div className="px-3 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-sm font-medium">

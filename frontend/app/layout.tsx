@@ -8,7 +8,7 @@ import { AIChatbox } from '@/components/ai-chatbox'
 import { AnalyticsProvider } from '@/components/AnalyticsProvider'
 
 export const metadata: Metadata = {
-  title: 'ICP Pulse',
+  title: 'True Pulse',
   description: 'Context-aware polls & surveys on ICP',
 }
 
