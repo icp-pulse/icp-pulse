@@ -12,7 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Badge } from '@/components/ui/badge'
 import { Plus, Trash2, ArrowLeft, Sparkles } from 'lucide-react'
 import { useIcpAuth } from '@/components/IcpAuthProvider'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { AIChatbox } from '@/components/ai-chatbox'
 // import { useSupportedTokens, useValidateToken, KNOWN_TOKEN_INFO } from '@/lib/tokens'
 const KNOWN_TOKEN_INFO: any = {}
@@ -249,6 +249,10 @@ export default function NewPollPage() {
   const [aiError, setAiError] = useState<string | null>(null)
   const { identity, isAuthenticated } = useIcpAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // Get pre-filled title from URL parameter (from landing page)
+  const prefilledTitle = searchParams.get('title') || ''
 
   // Get minimum datetime (current time + 1 minute)
   const getMinDateTime = () => {
@@ -260,6 +264,7 @@ export default function NewPollPage() {
   const { register, handleSubmit, formState: { errors }, control, setValue, watch } = useForm({
     resolver: zodResolver(schema),
     defaultValues: {
+      title: prefilledTitle, // Pre-fill from landing page
       options: [
         { text: '' },
         { text: '' }
@@ -271,6 +276,13 @@ export default function NewPollPage() {
       rewardPerVote: 0,
     }
   })
+
+  // Update title if prefilled value changes
+  useEffect(() => {
+    if (prefilledTitle) {
+      setValue('title', prefilledTitle)
+    }
+  }, [prefilledTitle, setValue])
 
   const { fields, append, remove } = useFieldArray({
     control,
