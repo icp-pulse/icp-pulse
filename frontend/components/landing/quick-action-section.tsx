@@ -48,7 +48,7 @@ export function QuickActionSection() {
 
           <p className="text-lg text-gray-600 dark:text-gray-300 max-w-2xl mx-auto">
             Type your question, share with your audience, and watch real-time results pour in.
-            It's that simple.
+            It&apos;s that simple.
           </p>
         </ScrollReveal>
 
@@ -66,7 +66,7 @@ export function QuickActionSection() {
                     className="h-14 text-lg px-6 border-2 focus:border-blue-500 dark:bg-gray-800"
                   />
                   <p className="text-sm text-gray-500 dark:text-gray-400 mt-2 ml-2">
-                    Example: "What feature should we build next?" or "Which logo design do you prefer?"
+                    Example: &quot;What feature should we build next?&quot; or &quot;Which logo design do you prefer?&quot;
                   </p>
                 </div>
 
