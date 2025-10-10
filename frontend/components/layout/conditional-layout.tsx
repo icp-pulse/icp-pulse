@@ -25,6 +25,7 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
     { href: '/wallet', label: 'Wallet' },
     { href: '/polls', label: 'Polls' },
     { href: '/crowdfunding', label: 'Crowdfunding' },
+    { href: '/quests', label: 'Quests' },
     { href: '/rewards', label: 'Rewards' },
   ]
 

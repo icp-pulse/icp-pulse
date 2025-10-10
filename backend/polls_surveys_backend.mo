@@ -17,6 +17,19 @@ import { phash } "mo:map/Map";
 import Cycles "mo:base/ExperimentalCycles";
 
 persistent actor class polls_surveys_backend() = this {
+  // Airdrop canister actor for quest tracking
+  let airdrop = actor "27ftn-piaaa-aaaao-a4p6a-cai" : actor {
+    update_quest_progress : (
+      user : Principal,
+      questId : Nat,
+      pollsCreated : ?Nat,
+      votescast : ?Nat,
+      surveysCreated : ?Nat,
+      surveysCompleted : ?Nat,
+      rewardsClaimed : ?Nat
+    ) -> async { #ok : Bool; #err : Text };
+  };
+
   // Types
   type ProjectId = Nat;
   type ProductId = Nat;
@@ -416,6 +429,12 @@ persistent actor class polls_surveys_backend() = this {
     } else { null };
     let poll : Poll = { id = id; scopeType = toScopeType(scopeType); scopeId = scopeId; title = title; description = description; options = opts; createdBy = msg.caller; createdAt = now(); closesAt = closesAt; status = #active; totalVotes = 0; rewardFund = rewardFund; fundingInfo = fundingInfo; voterPrincipals = [] };
     polls := Array.append(polls, [poll]);
+
+    // Track poll creation for quest system (non-blocking)
+    ignore async {
+      ignore await airdrop.update_quest_progress(msg.caller, 0, ?1, null, null, null, null);
+    };
+
     id
   };
 
@@ -535,6 +554,12 @@ persistent actor class polls_surveys_backend() = this {
     };
 
     polls := Array.append(polls, [poll]);
+
+    // Track poll creation for quest system (non-blocking)
+    ignore async {
+      ignore await airdrop.update_quest_progress(msg.caller, 0, ?1, null, null, null, null);
+    };
+
     #ok(id)
   };
 
@@ -717,6 +742,11 @@ persistent actor class polls_surveys_backend() = this {
                     } else { p }
                   });
 
+                  // Track reward claim for quest system (non-blocking)
+                  ignore async {
+                    ignore await airdrop.update_quest_progress(msg.caller, 0, null, null, null, null, ?1);
+                  };
+
                   #ok("Successfully claimed " # Nat64.toText(userReward) # " " # info.tokenSymbol)
                 };
                 case (#Err(error)) {
@@ -843,6 +873,14 @@ persistent actor class polls_surveys_backend() = this {
             { p with options = updatedOptions; totalVotes = p.totalVotes + 1; voterPrincipals = Array.append(p.voterPrincipals, [msg.caller]); fundingInfo = updatedFunding }
           } else { p }
         });
+
+        // Track vote for quest system (non-blocking)
+        if (ok) {
+          ignore async {
+            ignore await airdrop.update_quest_progress(msg.caller, 0, null, ?1, null, null, null);
+          };
+        };
+
         ok
       };
       case null { false }
@@ -948,6 +986,12 @@ persistent actor class polls_surveys_backend() = this {
     } else { null };
     let survey : Survey = { id = id; scopeType = toScopeType(scopeType); scopeId = scopeId; title = title; description = description; createdBy = msg.caller; createdAt = now(); closesAt = closesAt; status = #active; rewardFund = rewardFund; fundingInfo = fundingInfo; allowAnonymous = allowAnonymous; questions = qs; submissionsCount = 0 };
     surveys := Array.append(surveys, [survey]);
+
+    // Track survey creation for quest system (non-blocking)
+    ignore async {
+      ignore await airdrop.update_quest_progress(msg.caller, 0, null, null, ?1, null, null);
+    };
+
     id
   };
 
@@ -979,6 +1023,7 @@ persistent actor class polls_surveys_backend() = this {
 
   public shared (msg) func submit_survey(surveyId : SurveyId, answers : [AnswerInput]) : async Bool {
     var ok = false;
+    var shouldTrackQuest = false;
     surveys := Array.tabulate<Survey>(surveys.size(), func i {
       let s = surveys[i];
       if (s.id == surveyId) {
@@ -1051,6 +1096,12 @@ persistent actor class polls_surveys_backend() = this {
             };
             submissions := Array.append(submissions, [newSub]);
             ok := true;
+
+            // Mark that we should track quest progress (only for non-anonymous respondents)
+            if (not (s.allowAnonymous and isAnonymous(msg.caller))) {
+              shouldTrackQuest := true;
+            };
+
             // Update funding info if enabled
             let updatedFunding = switch (s.fundingInfo) {
               case (?funding) {
@@ -1065,6 +1116,14 @@ persistent actor class polls_surveys_backend() = this {
         }
       } else { s }
     });
+
+    // Track survey submission for quest system (non-blocking)
+    if (shouldTrackQuest) {
+      ignore async {
+        ignore await airdrop.update_quest_progress(msg.caller, 0, null, null, null, ?1, null);
+      };
+    };
+
     ok
   };
 
@@ -1603,7 +1662,7 @@ persistent actor class polls_surveys_backend() = this {
 
     // Find start of content array
     label findContent for (char in response.chars()) {
-      if (i > 0 and i < textLength - 1) {
+      if (i > 0 and i + 1 < textLength) {
         // Look for opening bracket of array in content
         if (char == '[') {
           contentStart := ?i;
