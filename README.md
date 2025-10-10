@@ -67,19 +67,56 @@ TruePulse leverages **ICP smart contracts** to deliver:
 
 ---
 
+## 📚 Documentation
+
+### 🚀 Getting Started
+- **[README.md](./README.md)** - Project overview and quick start guide (this file)
+- **[BUILD.md](./BUILD.md)** - Build instructions and configuration
+- **[DEVELOP.md](./DEVELOP.md)** - Development workflow and best practices
+- **[DEPLOY.md](./DEPLOY.md)** - Comprehensive deployment guide
+- **[MAINNET_DEPLOYMENT_INFO.md](./MAINNET_DEPLOYMENT_INFO.md)** - Current mainnet deployment details
+
+### 🎁 Airdrop & Rewards System
+- **[AUTO_ALLOCATION_GUIDE.md](./AUTO_ALLOCATION_GUIDE.md)** - Automatic airdrop allocation based on user activity
+- **[EARLY_ADOPTER_CAMPAIGN_GUIDE.md](./EARLY_ADOPTER_CAMPAIGN_GUIDE.md)** - Setting up early adopter reward campaigns
+- **[FIX_ALLOCATION.md](./FIX_ALLOCATION.md)** - Troubleshooting allocation issues
+- **[FRONTEND_AIRDROP_GUIDE.md](./FRONTEND_AIRDROP_GUIDE.md)** - Frontend integration for airdrops
+- **[ADMIN_UI_GUIDE.md](./ADMIN_UI_GUIDE.md)** - Admin interface for managing campaigns
+- **[ADMIN_AIRDROP_INTERFACE.md](./ADMIN_AIRDROP_INTERFACE.md)** - Admin UI specifications
+
+### 🔐 Admin & Security
+- **[ADMIN_SETUP_GUIDE.md](./ADMIN_SETUP_GUIDE.md)** - Setting up admin access and permissions
+
+### 🎯 Features & Implementation
+- **[STAKING_IMPLEMENTATION.md](./STAKING_IMPLEMENTATION.md)** - Token staking system implementation
+- **[ANALYTICS_SETUP.md](./ANALYTICS_SETUP.md)** - Analytics integration and tracking
+- **[TPOLLS.md](./TPOLLS.md)** - Poll functionality and technical details
+- **[01_Plan_Funding.md](./01_Plan_Funding.md)** - Funding mechanism and planning
+
+### 📊 Market Research
+- **[Online Survey Software Market Report](./docs/online_survey_software_market_report.md)** - Market analysis and industry insights
+
+---
+
 ## 📂 Repository Structure
 ```
 motoko-icp-pulse/
 ├── backend/                        # Motoko smart contracts
 │   ├── polls_surveys_backend.mo   # Main backend canister with rewards system
-│   └── tokenmania.mo              # PULSE token (ICRC-1 compatible)
+│   ├── tokenmania.mo              # PULSE token (ICRC-1 compatible)
+│   ├── airdrop.mo                 # Airdrop campaign management
+│   ├── staking.mo                 # Token staking functionality
+│   └── swap.mo                    # Token swap (ckUSDC ↔ PULSE)
 ├── frontend/                       # Next.js frontend application
 │   ├── app/                       # Next.js app router pages
 │   │   ├── admin/                # Admin dashboard pages
+│   │   │   └── airdrops/        # Airdrop campaign manager
+│   │   ├── airdrop/              # User airdrop claim page
 │   │   ├── polls/                # Poll-related pages
 │   │   ├── projects/             # Project management pages
 │   │   ├── surveys/              # Survey pages
 │   │   ├── rewards/              # Rewards claiming page
+│   │   ├── wallet/               # Wallet and token management
 │   │   └── survey-response/      # Survey response page
 │   ├── components/               # Reusable React components
 │   │   ├── admin/               # Admin-specific components
@@ -92,17 +129,17 @@ motoko-icp-pulse/
 │   ├── hooks/                   # Custom React hooks
 │   ├── lib/                     # Utility libraries and configurations
 │   │   ├── icp.ts              # ICP integration utilities
+│   │   ├── staking.ts          # Staking and airdrop utilities
 │   │   ├── tokens.ts           # Token utilities and hooks
+│   │   ├── admin-config.ts     # Admin access configuration
 │   │   └── types.ts            # TypeScript type definitions
 │   └── utils/                   # Helper utilities
 ├── src/declarations/            # Generated ICP canister declarations
 ├── docs/                        # Documentation and market reports
 ├── dfx.json                     # DFX configuration
 ├── mops.toml                   # Motoko package manager config
-├── DEPLOY.md                   # Deployment guide
-├── MAINNET_DEPLOYMENT_INFO.md  # Mainnet deployment summary
 ├── package.json                # Root dependencies
-└── README.md                   # This file
+└── *.md                        # Documentation files (see above)
 ```
 
 ---
