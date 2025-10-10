@@ -2,6 +2,7 @@ import { Folder, ClipboardList, BarChart3, Download, Settings, TrendingUp, Gift 
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@lib/utils";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useIsAdmin } from "@/components/AdminGuard";
 
 interface SidebarProps {
@@ -12,6 +13,7 @@ interface SidebarProps {
 
 export default function Sidebar({ activeTab, onTabChange, isCollapsed }: SidebarProps) {
   const isAdmin = useIsAdmin();
+  const router = useRouter();
 
   // Fetch stats from ICP backend (single query for all counts)
   const { data: stats } = useQuery({
@@ -99,7 +101,7 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed }: Sidebar
               </li>
               <li>
                 <button
-                  onClick={() => window.location.href = '/settings'}
+                  onClick={() => router.push('/settings')}
                   className="w-full flex items-center px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors"
                 >
                   <Settings className="w-4 h-4 mr-3" />

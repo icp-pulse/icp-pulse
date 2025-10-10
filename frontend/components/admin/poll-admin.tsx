@@ -8,6 +8,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useIcpAuth } from '@/components/IcpAuthProvider'
+import { useRouter } from 'next/navigation'
 
 // Helper function to convert ICP Status variant to string
 function statusToString(status: any): string {
@@ -25,6 +26,7 @@ export default function PollAdmin() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const { identity, isAuthenticated } = useIcpAuth()
+  const router = useRouter()
 
   // Fetch polls from ICP backend
   useEffect(() => {
@@ -147,7 +149,7 @@ export default function PollAdmin() {
           </p>
         </div>
         <Button
-          onClick={() => window.location.href = '/polls/new'}
+          onClick={() => router.push('/polls/new')}
           className="bg-blue-600 hover:bg-blue-700 text-white"
           size="lg"
         >
@@ -375,7 +377,7 @@ export default function PollAdmin() {
                     variant="outline"
                     size="sm"
                     className="flex-1"
-                    onClick={() => window.location.href = `/results?pollId=${poll.id}`}
+                    onClick={() => router.push(`/results?pollId=${poll.id}`)}
                   >
                     <Eye className="w-4 h-4 mr-1" />
                     View
@@ -384,7 +386,7 @@ export default function PollAdmin() {
                     variant="outline"
                     size="sm"
                     className="flex-1"
-                    onClick={() => window.location.href = `/polls/edit?id=${poll.id}`}
+                    onClick={() => router.push(`/polls/edit?id=${poll.id}`)}
                   >
                     <Edit className="w-4 h-4 mr-1" />
                     Details
@@ -393,7 +395,7 @@ export default function PollAdmin() {
                     variant="outline"
                     size="sm"
                     className="flex-1"
-                    onClick={() => window.location.href = `/results?pollId=${poll.id}`}
+                    onClick={() => router.push(`/results?pollId=${poll.id}`)}
                   >
                     <Vote className="w-4 h-4 mr-1" />
                     Results
@@ -424,7 +426,7 @@ export default function PollAdmin() {
             </p>
           </>
           )}
-          <Button onClick={() => window.location.href = '/polls/new'}>
+          <Button onClick={() => router.push('/polls/new')}>
             <Plus className="w-4 h-4 mr-2" />
             Create Poll
           </Button>
