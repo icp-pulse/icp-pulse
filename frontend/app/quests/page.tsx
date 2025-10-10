@@ -3,8 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useIcpAuth } from '@/components/IcpAuthProvider'
 import { Trophy, Star, CheckCircle, Lock, TrendingUp, Gift, Zap } from 'lucide-react'
-import { Actor, HttpAgent } from '@dfinity/agent'
-import { idlFactory as airdropIdlFactory } from '@/../../src/declarations/airdrop/airdrop.did.js'
+import { createActor } from '@/lib/icp'
 
 const AIRDROP_CANISTER_ID = process.env.NEXT_PUBLIC_AIRDROP_CANISTER_ID || '27ftn-piaaa-aaaao-a4p6a-cai'
 
@@ -48,7 +47,7 @@ interface UserPointsSummary {
 }
 
 export default function QuestsPage() {
-  const { identity, isAuthenticated, principal } = useIcpAuth()
+  const { identity, isAuthenticated, principalText } = useIcpAuth()
   const [quests, setQuests] = useState<UserQuestInfo[]>([])
   const [loading, setLoading] = useState(true)
   const [pointsSummary, setPointsSummary] = useState<UserPointsSummary | null>(null)
@@ -57,34 +56,25 @@ export default function QuestsPage() {
   const [completedCount, setCompletedCount] = useState(0)
 
   useEffect(() => {
-    if (isAuthenticated && principal) {
+    if (isAuthenticated && principalText) {
       loadQuests()
     } else {
       setLoading(false)
     }
-  }, [isAuthenticated, principal])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, principalText])
 
   const loadQuests = async () => {
-    if (!principal || !identity) return
+    if (!principalText || !identity) return
 
     try {
       setLoading(true)
-      const agent = new HttpAgent({
-        host: process.env.NEXT_PUBLIC_IC_HOST || 'https://icp-api.io',
-        identity,
-      })
-
-      if (process.env.NODE_ENV !== 'production') {
-        await agent.fetchRootKey()
-      }
-
-      const airdropActor = Actor.createActor(airdropIdlFactory, {
-        agent,
-        canisterId: AIRDROP_CANISTER_ID,
-      })
+      const canisterId = AIRDROP_CANISTER_ID
+      const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
+      const airdropActor = await createActor({ canisterId, host, idlFactory: (await import('@/lib/staking')).airdropIDL })
 
       // Fetch user quests for campaign ID 1 (default quest campaign)
-      const userQuests = await airdropActor.get_user_quests(principal, 1n) as UserQuestInfo[]
+      const userQuests = await airdropActor.get_user_quests(principalText, 1n) as UserQuestInfo[]
 
       // Sort by order
       userQuests.sort((a, b) => Number(a.order) - Number(b.order))
@@ -92,11 +82,11 @@ export default function QuestsPage() {
       setQuests(userQuests)
 
       // Fetch points summary
-      const summary = await airdropActor.get_user_points(principal, 1n) as UserPointsSummary
+      const summary = await airdropActor.get_user_points(principalText, 1n) as UserPointsSummary
       setPointsSummary(summary)
 
       // Check if already claimed
-      const claimed = await airdropActor.has_claimed_quest_rewards(principal, 1n) as boolean
+      const claimed = await airdropActor.has_claimed_quest_rewards(principalText, 1n) as boolean
       setHasClaimed(claimed)
 
       // Calculate completed count
@@ -110,23 +100,13 @@ export default function QuestsPage() {
   }
 
   const handleClaimRewards = async () => {
-    if (!principal || !identity || claiming || hasClaimed) return
+    if (!principalText || !identity || claiming || hasClaimed) return
 
     try {
       setClaiming(true)
-      const agent = new HttpAgent({
-        host: process.env.NEXT_PUBLIC_IC_HOST || 'https://icp-api.io',
-        identity,
-      })
-
-      if (process.env.NODE_ENV !== 'production') {
-        await agent.fetchRootKey()
-      }
-
-      const airdropActor = Actor.createActor(airdropIdlFactory, {
-        agent,
-        canisterId: AIRDROP_CANISTER_ID,
-      })
+      const canisterId = AIRDROP_CANISTER_ID
+      const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
+      const airdropActor = await createActor({ canisterId, host, idlFactory: (await import('@/lib/staking')).airdropIDL })
 
       const result = await airdropActor.claim_quest_rewards(1n)
 
@@ -320,7 +300,7 @@ export default function QuestsPage() {
             <div className="flex-1">
               <h3 className="text-lg font-bold mb-1">Ready to Claim Your Rewards?</h3>
               <p className="text-sm text-gray-600 dark:text-gray-400 mb-2">
-                You've earned <span className="font-bold text-purple-600">{Number(pointsSummary.userPoints)} points</span> and can claim{' '}
+                You&apos;ve earned <span className="font-bold text-purple-600">{Number(pointsSummary.userPoints)} points</span> and can claim{' '}
                 <span className="font-bold text-purple-600">{(Number(pointsSummary.estimatedPulse) / 1e8).toFixed(2)} PULSE</span>
                 {' '}({(Number(pointsSummary.percentageShare) / 100).toFixed(2)}% of the pool)
               </p>

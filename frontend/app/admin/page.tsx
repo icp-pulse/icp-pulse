@@ -7,8 +7,10 @@ import { TopHeader } from '@/components/layout/top-header'
 import ProjectAdmin from '@/components/admin/project-admin'
 import SurveyAdmin from '@/components/admin/survey-admin'
 import PollAdmin from '@/components/admin/poll-admin'
+import AirdropAdmin from '@/components/admin/airdrop-admin'
+import QuestAdmin from '@/components/admin/quest-admin'
 
-export type TabType = "projects" | "surveys" | "polls";
+export type TabType = "projects" | "surveys" | "polls" | "airdrops" | "quests";
 
 function AdminDashboardContent() {
   const searchParams = useSearchParams()
@@ -17,7 +19,7 @@ function AdminDashboardContent() {
   // Set initial tab from URL parameter
   useEffect(() => {
     const tabParam = searchParams.get('tab') as TabType
-    if (tabParam && ['projects', 'surveys', 'polls'].includes(tabParam)) {
+    if (tabParam && ['projects', 'surveys', 'polls', 'airdrops', 'quests'].includes(tabParam)) {
       setActiveTab(tabParam)
     }
   }, [searchParams])
@@ -41,6 +43,12 @@ function AdminDashboardContent() {
             )}
             {activeTab === 'polls' && (
               <PollAdmin />
+            )}
+            {activeTab === 'airdrops' && (
+              <AirdropAdmin />
+            )}
+            {activeTab === 'quests' && (
+              <QuestAdmin />
             )}
           </div>
         </main>

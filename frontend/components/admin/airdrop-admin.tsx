@@ -12,11 +12,8 @@ import {
   TrendingUp,
   CheckCircle,
   Clock,
-  AlertCircle,
   Play,
-  Pause,
   UserPlus,
-  FileText,
   ChevronDown,
   ChevronUp,
   Loader2
@@ -44,7 +41,7 @@ interface Allocation {
   reason: string
 }
 
-export default function AdminAirdropsPage() {
+export default function AirdropAdmin() {
   const queryClient = useQueryClient()
   const [showCreateForm, setShowCreateForm] = useState(false)
   const [selectedCampaign, setSelectedCampaign] = useState<bigint | null>(null)
@@ -240,286 +237,284 @@ export default function AdminAirdropsPage() {
   const completedCampaigns = campaigns?.filter(c => 'Completed' in c.status) || []
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-8">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      {/* Header */}
+      <div className="mb-8">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
+              <Gift className="w-8 h-8 text-purple-600" />
+              Airdrop Campaign Manager
+            </h1>
+            <p className="text-gray-600 dark:text-gray-400 mt-2">
+              Create and manage PULSE token airdrop campaigns
+            </p>
+          </div>
+          <button
+            onClick={() => setShowCreateForm(!showCreateForm)}
+            className="inline-flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors"
+          >
+            <Plus className="w-5 h-5 mr-2" />
+            New Campaign
+          </button>
+        </div>
+      </div>
+
+      {/* Stats Overview */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border-l-4 border-purple-500">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-3">
-                <Gift className="w-8 h-8 text-purple-600" />
-                Airdrop Campaign Manager
-              </h1>
-              <p className="text-gray-600 dark:text-gray-400 mt-2">
-                Create and manage PULSE token airdrop campaigns
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Campaigns</p>
+              <p className="text-3xl font-bold text-gray-900 dark:text-white mt-1">
+                {campaigns?.length || 0}
               </p>
             </div>
-            <button
-              onClick={() => setShowCreateForm(!showCreateForm)}
-              className="inline-flex items-center px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors"
-            >
-              <Plus className="w-5 h-5 mr-2" />
-              New Campaign
-            </button>
+            <Gift className="w-8 h-8 text-purple-500" />
           </div>
         </div>
 
-        {/* Stats Overview */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border-l-4 border-purple-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Campaigns</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white mt-1">
-                  {campaigns?.length || 0}
-                </p>
-              </div>
-              <Gift className="w-8 h-8 text-purple-500" />
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border-l-4 border-green-500">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active</p>
+              <p className="text-3xl font-bold text-gray-900 dark:text-white mt-1">
+                {activeCampaigns.length}
+              </p>
             </div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border-l-4 border-green-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Active</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white mt-1">
-                  {activeCampaigns.length}
-                </p>
-              </div>
-              <Play className="w-8 h-8 text-green-500" />
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border-l-4 border-yellow-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pending</p>
-                <p className="text-3xl font-bold text-gray-900 dark:text-white mt-1">
-                  {pendingCampaigns.length}
-                </p>
-              </div>
-              <Clock className="w-8 h-8 text-yellow-500" />
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border-l-4 border-blue-500">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Allocated</p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
-                  {formatTokenAmount(campaigns?.reduce((sum, c) => sum + c.allocatedAmount, 0n) || 0n)}
-                </p>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">PULSE</p>
-              </div>
-              <TrendingUp className="w-8 h-8 text-blue-500" />
-            </div>
+            <Play className="w-8 h-8 text-green-500" />
           </div>
         </div>
 
-        {/* Create Campaign Form */}
-        {showCreateForm && (
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8 border-2 border-purple-200 dark:border-purple-800">
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Create New Campaign</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Campaign Name
-                </label>
-                <input
-                  type="text"
-                  value={newCampaign.name}
-                  onChange={(e) => setNewCampaign({ ...newCampaign, name: e.target.value })}
-                  placeholder="e.g., Early Adopter Rewards Q1 2025"
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Duration (Days)
-                </label>
-                <input
-                  type="number"
-                  value={newCampaign.durationDays}
-                  onChange={(e) => setNewCampaign({ ...newCampaign, durationDays: e.target.value })}
-                  placeholder="90"
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                />
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Cannot be changed after creation
-                </p>
-              </div>
-
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Description
-                </label>
-                <textarea
-                  value={newCampaign.description}
-                  onChange={(e) => setNewCampaign({ ...newCampaign, description: e.target.value })}
-                  placeholder="Thank you for being an early supporter of ICP Pulse!"
-                  rows={3}
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                  Total Pool (PULSE)
-                </label>
-                <input
-                  type="number"
-                  value={newCampaign.totalAmount}
-                  onChange={(e) => setNewCampaign({ ...newCampaign, totalAmount: e.target.value })}
-                  placeholder="500000"
-                  className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                />
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                  Amount in PULSE tokens
-                </p>
-              </div>
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border-l-4 border-yellow-500">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Pending</p>
+              <p className="text-3xl font-bold text-gray-900 dark:text-white mt-1">
+                {pendingCampaigns.length}
+              </p>
             </div>
+            <Clock className="w-8 h-8 text-yellow-500" />
+          </div>
+        </div>
 
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => createCampaignMutation.mutate(newCampaign)}
-                disabled={createCampaignMutation.isPending || !newCampaign.name || !newCampaign.totalAmount}
-                className="inline-flex items-center px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {createCampaignMutation.isPending ? (
-                  <>
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                    Creating...
-                  </>
-                ) : (
-                  <>
-                    <Plus className="w-4 h-4 mr-2" />
-                    Create Campaign
-                  </>
-                )}
-              </button>
-              <button
-                onClick={() => setShowCreateForm(false)}
-                className="px-6 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
-              >
-                Cancel
-              </button>
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-6 border-l-4 border-blue-500">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Allocated</p>
+              <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
+                {formatTokenAmount(campaigns?.reduce((sum, c) => sum + c.allocatedAmount, 0n) ?? 0n)}
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">PULSE</p>
             </div>
+            <TrendingUp className="w-8 h-8 text-blue-500" />
           </div>
-        )}
-
-        {/* Campaigns List */}
-        {isLoading ? (
-          <div className="flex justify-center items-center py-12">
-            <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
-          </div>
-        ) : campaigns && campaigns.length > 0 ? (
-          <div className="space-y-6">
-            {/* Active Campaigns */}
-            {activeCampaigns.length > 0 && (
-              <div>
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                  <Play className="w-5 h-5 text-green-600" />
-                  Active Campaigns ({activeCampaigns.length})
-                </h2>
-                <div className="space-y-4">
-                  {activeCampaigns.map((campaign) => (
-                    <CampaignCard
-                      key={campaign.id.toString()}
-                      campaign={campaign}
-                      formatTokenAmount={formatTokenAmount}
-                      formatDate={formatDate}
-                      getStatusInfo={getStatusInfo}
-                      showManualAlloc={showManualAlloc}
-                      setShowManualAlloc={setShowManualAlloc}
-                      manualAlloc={manualAlloc}
-                      setManualAlloc={setManualAlloc}
-                      addAllocationMutation={addAllocationMutation}
-                      showAllocations={showAllocations}
-                      setShowAllocations={setShowAllocations}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Pending Campaigns */}
-            {pendingCampaigns.length > 0 && (
-              <div>
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                  <Clock className="w-5 h-5 text-yellow-600" />
-                  Pending Campaigns ({pendingCampaigns.length})
-                </h2>
-                <div className="space-y-4">
-                  {pendingCampaigns.map((campaign) => (
-                    <CampaignCard
-                      key={campaign.id.toString()}
-                      campaign={campaign}
-                      formatTokenAmount={formatTokenAmount}
-                      formatDate={formatDate}
-                      getStatusInfo={getStatusInfo}
-                      onStart={() => startCampaignMutation.mutate(campaign.id)}
-                      isStarting={startCampaignMutation.isPending}
-                      showManualAlloc={showManualAlloc}
-                      setShowManualAlloc={setShowManualAlloc}
-                      manualAlloc={manualAlloc}
-                      setManualAlloc={setManualAlloc}
-                      addAllocationMutation={addAllocationMutation}
-                      showAllocations={showAllocations}
-                      setShowAllocations={setShowAllocations}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Completed Campaigns */}
-            {completedCampaigns.length > 0 && (
-              <div>
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
-                  <CheckCircle className="w-5 h-5 text-gray-600" />
-                  Completed Campaigns ({completedCampaigns.length})
-                </h2>
-                <div className="space-y-4">
-                  {completedCampaigns.map((campaign) => (
-                    <CampaignCard
-                      key={campaign.id.toString()}
-                      campaign={campaign}
-                      formatTokenAmount={formatTokenAmount}
-                      formatDate={formatDate}
-                      getStatusInfo={getStatusInfo}
-                      showManualAlloc={showManualAlloc}
-                      setShowManualAlloc={setShowManualAlloc}
-                      manualAlloc={manualAlloc}
-                      setManualAlloc={setManualAlloc}
-                      addAllocationMutation={addAllocationMutation}
-                      showAllocations={showAllocations}
-                      setShowAllocations={setShowAllocations}
-                    />
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        ) : (
-          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-12 text-center">
-            <Gift className="w-16 h-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
-              No Campaigns Yet
-            </h3>
-            <p className="text-gray-600 dark:text-gray-300 mb-6">
-              Create your first airdrop campaign to get started.
-            </p>
-            <button
-              onClick={() => setShowCreateForm(true)}
-              className="inline-flex items-center px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors"
-            >
-              <Plus className="w-5 h-5 mr-2" />
-              Create Campaign
-            </button>
-          </div>
-        )}
+        </div>
       </div>
+
+      {/* Create Campaign Form */}
+      {showCreateForm && (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-lg p-6 mb-8 border-2 border-purple-200 dark:border-purple-800">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Create New Campaign</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Campaign Name
+              </label>
+              <input
+                type="text"
+                value={newCampaign.name}
+                onChange={(e) => setNewCampaign({ ...newCampaign, name: e.target.value })}
+                placeholder="e.g., Early Adopter Rewards Q1 2025"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Duration (Days)
+              </label>
+              <input
+                type="number"
+                value={newCampaign.durationDays}
+                onChange={(e) => setNewCampaign({ ...newCampaign, durationDays: e.target.value })}
+                placeholder="90"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Cannot be changed after creation
+              </p>
+            </div>
+
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Description
+              </label>
+              <textarea
+                value={newCampaign.description}
+                onChange={(e) => setNewCampaign({ ...newCampaign, description: e.target.value })}
+                placeholder="Thank you for being an early supporter of ICP Pulse!"
+                rows={3}
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Total Pool (PULSE)
+              </label>
+              <input
+                type="number"
+                value={newCampaign.totalAmount}
+                onChange={(e) => setNewCampaign({ ...newCampaign, totalAmount: e.target.value })}
+                placeholder="500000"
+                className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              />
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Amount in PULSE tokens
+              </p>
+            </div>
+          </div>
+
+          <div className="flex gap-3 mt-6">
+            <button
+              onClick={() => createCampaignMutation.mutate(newCampaign)}
+              disabled={createCampaignMutation.isPending || !newCampaign.name || !newCampaign.totalAmount}
+              className="inline-flex items-center px-6 py-2 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {createCampaignMutation.isPending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Creating...
+                </>
+              ) : (
+                <>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Campaign
+                </>
+              )}
+            </button>
+            <button
+              onClick={() => setShowCreateForm(false)}
+              className="px-6 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Campaigns List */}
+      {isLoading ? (
+        <div className="flex justify-center items-center py-12">
+          <Loader2 className="w-8 h-8 animate-spin text-purple-600" />
+        </div>
+      ) : campaigns && campaigns.length > 0 ? (
+        <div className="space-y-6">
+          {/* Active Campaigns */}
+          {activeCampaigns.length > 0 && (
+            <div>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <Play className="w-5 h-5 text-green-600" />
+                Active Campaigns ({activeCampaigns.length})
+              </h2>
+              <div className="space-y-4">
+                {activeCampaigns.map((campaign) => (
+                  <CampaignCard
+                    key={campaign.id.toString()}
+                    campaign={campaign}
+                    formatTokenAmount={formatTokenAmount}
+                    formatDate={formatDate}
+                    getStatusInfo={getStatusInfo}
+                    showManualAlloc={showManualAlloc}
+                    setShowManualAlloc={setShowManualAlloc}
+                    manualAlloc={manualAlloc}
+                    setManualAlloc={setManualAlloc}
+                    addAllocationMutation={addAllocationMutation}
+                    showAllocations={showAllocations}
+                    setShowAllocations={setShowAllocations}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Pending Campaigns */}
+          {pendingCampaigns.length > 0 && (
+            <div>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <Clock className="w-5 h-5 text-yellow-600" />
+                Pending Campaigns ({pendingCampaigns.length})
+              </h2>
+              <div className="space-y-4">
+                {pendingCampaigns.map((campaign) => (
+                  <CampaignCard
+                    key={campaign.id.toString()}
+                    campaign={campaign}
+                    formatTokenAmount={formatTokenAmount}
+                    formatDate={formatDate}
+                    getStatusInfo={getStatusInfo}
+                    onStart={() => startCampaignMutation.mutate(campaign.id)}
+                    isStarting={startCampaignMutation.isPending}
+                    showManualAlloc={showManualAlloc}
+                    setShowManualAlloc={setShowManualAlloc}
+                    manualAlloc={manualAlloc}
+                    setManualAlloc={setManualAlloc}
+                    addAllocationMutation={addAllocationMutation}
+                    showAllocations={showAllocations}
+                    setShowAllocations={setShowAllocations}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Completed Campaigns */}
+          {completedCampaigns.length > 0 && (
+            <div>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <CheckCircle className="w-5 h-5 text-gray-600" />
+                Completed Campaigns ({completedCampaigns.length})
+              </h2>
+              <div className="space-y-4">
+                {completedCampaigns.map((campaign) => (
+                  <CampaignCard
+                    key={campaign.id.toString()}
+                    campaign={campaign}
+                    formatTokenAmount={formatTokenAmount}
+                    formatDate={formatDate}
+                    getStatusInfo={getStatusInfo}
+                    showManualAlloc={showManualAlloc}
+                    setShowManualAlloc={setShowManualAlloc}
+                    manualAlloc={manualAlloc}
+                    setManualAlloc={setManualAlloc}
+                    addAllocationMutation={addAllocationMutation}
+                    showAllocations={showAllocations}
+                    setShowAllocations={setShowAllocations}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-md p-12 text-center">
+          <Gift className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-xl font-bold text-gray-900 dark:text-white mb-2">
+            No Campaigns Yet
+          </h3>
+          <p className="text-gray-600 dark:text-gray-300 mb-6">
+            Create your first airdrop campaign to get started.
+          </p>
+          <button
+            onClick={() => setShowCreateForm(true)}
+            className="inline-flex items-center px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors"
+          >
+            <Plus className="w-5 h-5 mr-2" />
+            Create Campaign
+          </button>
+        </div>
+      )}
     </div>
   )
 }

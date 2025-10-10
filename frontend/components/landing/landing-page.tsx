@@ -7,6 +7,7 @@ import { QuickActionSection } from './quick-action-section'
 import { QuickActionHero } from './quick-action-hero'
 import { HowItWorksSection } from './how-it-works-section'
 import { WhyChooseSection } from './why-choose-section'
+import { QuestsBanner } from './quests-banner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
@@ -29,15 +30,12 @@ import {
   Twitter,
   Linkedin,
   Settings,
-  Sparkles,
-  Gift,
-  X
+  Sparkles
 } from 'lucide-react'
 
 export function LandingPage() {
   const router = useRouter()
   const [question, setQuestion] = useState('')
-  const [showBanner, setShowBanner] = useState(true)
 
   const handleGetAnswers = () => {
     if (question.trim()) {
@@ -54,43 +52,8 @@ export function LandingPage() {
   }
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900">
-      {/* Early Adopter Airdrop Banner */}
-      {showBanner && (
-        <div className="relative bg-gradient-to-r from-purple-600 via-blue-600 to-indigo-600 text-white pt-16 md:pt-20">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex items-center gap-3 flex-1">
-                <div className="flex-shrink-0">
-                  <Gift className="w-6 h-6" />
-                </div>
-                <div className="flex-1">
-                  <p className="text-sm md:text-base font-medium">
-                    <span className="font-bold">🎉 Early Adopter Rewards!</span> Claim your PULSE tokens as a thank you for being among our first users. Campaign runs for 90 days.
-                  </p>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <Link href="/airdrop">
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    className="bg-white text-purple-600 hover:bg-gray-100 whitespace-nowrap"
-                  >
-                    Claim Now
-                  </Button>
-                </Link>
-                <button
-                  onClick={() => setShowBanner(false)}
-                  className="flex-shrink-0 p-1 hover:bg-white/20 rounded-full transition-colors"
-                  aria-label="Close banner"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Active Quests Banner */}
+      <QuestsBanner />
 
       {/* Hero Section */}
       <section className="relative pt-20 pb-32 overflow-hidden">
