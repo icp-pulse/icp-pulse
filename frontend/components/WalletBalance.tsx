@@ -73,7 +73,7 @@ export function WalletBalance({ compact = false, showRefresh = true }: WalletBal
       let userPrincipal: any
       if (isPlugWallet && window.ic?.plug) {
         const { Principal } = await import('@dfinity/principal')
-        userPrincipal = Principal.fromText(window.ic.plug.principalId)
+        userPrincipal = Principal.fromText((window.ic.plug as any).principalId)
       } else if (identity) {
         userPrincipal = identity.getPrincipal()
       } else {
@@ -91,7 +91,7 @@ export function WalletBalance({ compact = false, showRefresh = true }: WalletBal
 
           // Use Plug agent if connected via Plug
           if (isPlugWallet && window.ic?.plug) {
-            await window.ic.plug.createAgent({
+            await (window.ic.plug as any).createAgent({
               whitelist: [pulseCanisterId],
               host
             })
@@ -105,7 +105,7 @@ export function WalletBalance({ compact = false, showRefresh = true }: WalletBal
               const { Actor } = await import('@dfinity/agent')
               pulseActor = Actor.createActor(
                 (await import('../../src/declarations/tokenmania')).idlFactory,
-                { agent: window.ic.plug.agent, canisterId: pulseCanisterId }
+                { agent: (window.ic.plug as any).agent, canisterId: pulseCanisterId }
               )
             }
           } else if (identity) {
@@ -196,7 +196,7 @@ export function WalletBalance({ compact = false, showRefresh = true }: WalletBal
             if (isPlugWallet && window.ic?.plug) {
               // Use Plug wallet - create actor for the token
               try {
-                await window.ic.plug.createAgent({
+                await (window.ic.plug as any).createAgent({
                   whitelist: [token.canisterId],
                   host
                 })
@@ -230,7 +230,7 @@ export function WalletBalance({ compact = false, showRefresh = true }: WalletBal
                         })
                       ], [IDL.Nat], ['query'])
                     }),
-                    { agent: window.ic.plug.agent, canisterId: token.canisterId }
+                    { agent: (window.ic.plug as any).agent, canisterId: token.canisterId }
                   )
 
                   balance = await icrc1Actor.icrc1_balance_of({

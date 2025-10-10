@@ -107,7 +107,7 @@ export function PollCrowdfunding({ pollId, fundingInfo, onContribute }: PollCrow
 
         // Request connection to token canister if not already connected
         const whitelist = [tokenCanisterId, canisterId]
-        const connected = await window.ic.plug.requestConnect({ whitelist })
+        const connected = await (window.ic.plug as any).requestConnect({ whitelist })
 
         if (!connected) {
           throw new Error('Failed to connect to Plug wallet')

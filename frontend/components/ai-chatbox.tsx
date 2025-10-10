@@ -198,7 +198,7 @@ export function AIChatbox({ onOptionsGenerated }: AIChatboxProps = {}) {
           if (isPlugWallet && window.ic?.plug) {
             // Use Plug wallet for approval
             const whitelist = [tokenCanisterId, backendCanisterId]
-            const connected = await window.ic.plug.requestConnect({ whitelist })
+            const connected = await (window.ic.plug as any).requestConnect({ whitelist })
 
             if (!connected) {
               throw new Error('Failed to connect to Plug wallet')
