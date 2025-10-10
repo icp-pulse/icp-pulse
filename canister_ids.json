@@ -1,4 +1,7 @@
 {
+  "airdrop": {
+    "ic": "27ftn-piaaa-aaaao-a4p6a-cai"
+  },
   "polls_surveys_backend": {
     "ic": "u2j5c-sqaaa-aaaao-a4o6q-cai"
   },
@@ -7,6 +10,12 @@
   },
   "pulse_index": {
     "ic": "zbuud-iyaaa-aaaao-a4pxa-cai"
+  },
+  "pulseg": {
+    "ic": "2ndeu-dyaaa-aaaao-a4p5a-cai"
+  },
+  "staking": {
+    "ic": "2kcca-oaaaa-aaaao-a4p5q-cai"
   },
   "swap": {
     "ic": "3ana2-mqaaa-aaaao-a4p2q-cai"
