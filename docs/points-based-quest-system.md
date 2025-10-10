@@ -203,7 +203,7 @@ dfx canister call airdrop create_campaign '(
 dfx canister call pulseg icrc1_transfer '(
   record {
     to = record {
-      owner = principal "zdjlt-6iaaa-aaaao-a4pww-cai";
+      owner = principal "27ftn-piaaa-aaaao-a4p6a-cai";
       subaccount = null;
     };
     amount = 100_000_000_000 : nat;

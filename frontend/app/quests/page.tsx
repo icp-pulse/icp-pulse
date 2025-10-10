@@ -6,7 +6,7 @@ import { Trophy, Star, CheckCircle, Lock, TrendingUp, Gift, Zap } from 'lucide-r
 import { Actor, HttpAgent } from '@dfinity/agent'
 import { idlFactory as airdropIdlFactory } from '@/../../src/declarations/airdrop/airdrop.did.js'
 
-const AIRDROP_CANISTER_ID = process.env.NEXT_PUBLIC_AIRDROP_CANISTER_ID || 'zdjlt-6iaaa-aaaao-a4pww-cai'
+const AIRDROP_CANISTER_ID = process.env.NEXT_PUBLIC_AIRDROP_CANISTER_ID || '27ftn-piaaa-aaaao-a4p6a-cai'
 
 interface QuestProgress {
   pollsCreated: bigint

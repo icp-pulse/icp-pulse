@@ -3,7 +3,7 @@
 # Script to initialize the quest system with starter quests
 # Run this after deploying the airdrop canister
 
-CANISTER_ID="zdjlt-6iaaa-aaaao-a4pww-cai"
+CANISTER_ID="27ftn-piaaa-aaaao-a4p6a-cai"
 CAMPAIGN_ID=1
 
 echo "Initializing quest system for campaign $CAMPAIGN_ID..."
@@ -11,7 +11,7 @@ echo ""
 
 # Quest 1: Welcome to True Pulse
 echo "Creating Quest 1: Welcome to True Pulse"
-dfx canister call $CANISTER_ID create_quest '(
+dfx canister --network ic call $CANISTER_ID create_quest '(
   1 : nat,
   "Welcome to True Pulse",
   "Get started by exploring the platform",
@@ -30,7 +30,7 @@ dfx canister call $CANISTER_ID create_quest '(
 
 # Quest 2: Create Your First Poll
 echo "Creating Quest 2: Create Your First Poll"
-dfx canister call $CANISTER_ID create_quest '(
+dfx canister --network ic call $CANISTER_ID create_quest '(
   1 : nat,
   "Create Your First Poll",
   "Share your first poll with the community",
@@ -49,7 +49,7 @@ dfx canister call $CANISTER_ID create_quest '(
 
 # Quest 3: Cast Your First Vote
 echo "Creating Quest 3: Cast Your First Vote"
-dfx canister call $CANISTER_ID create_quest '(
+dfx canister --network ic call $CANISTER_ID create_quest '(
   1 : nat,
   "Cast Your First Vote",
   "Participate in a poll by voting",
@@ -68,7 +68,7 @@ dfx canister call $CANISTER_ID create_quest '(
 
 # Quest 4: Survey Creator
 echo "Creating Quest 4: Survey Creator"
-dfx canister call $CANISTER_ID create_quest '(
+dfx canister --network ic call $CANISTER_ID create_quest '(
   1 : nat,
   "Survey Creator",
   "Create your first survey to gather insights",
@@ -87,7 +87,7 @@ dfx canister call $CANISTER_ID create_quest '(
 
 # Quest 5: Survey Respondent
 echo "Creating Quest 5: Survey Respondent"
-dfx canister call $CANISTER_ID create_quest '(
+dfx canister --network ic call $CANISTER_ID create_quest '(
   1 : nat,
   "Survey Respondent",
   "Complete a survey to help others",
@@ -106,7 +106,7 @@ dfx canister call $CANISTER_ID create_quest '(
 
 # Quest 6: Community Member
 echo "Creating Quest 6: Community Member"
-dfx canister call $CANISTER_ID create_quest '(
+dfx canister --network ic call $CANISTER_ID create_quest '(
   1 : nat,
   "Community Member",
   "Vote in 5 different polls",
@@ -125,7 +125,7 @@ dfx canister call $CANISTER_ID create_quest '(
 
 # Quest 7: Claim Your First Reward
 echo "Creating Quest 7: Claim Your First Reward"
-dfx canister call $CANISTER_ID create_quest '(
+dfx canister --network ic call $CANISTER_ID create_quest '(
   1 : nat,
   "Claim Your First Reward",
   "Claim your first poll reward",

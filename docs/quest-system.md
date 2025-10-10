@@ -129,7 +129,7 @@ Transfer PULSE tokens to the airdrop canister to fund quest rewards:
 dfx canister call pulseg icrc1_transfer '(
   record {
     to = record {
-      owner = principal "zdjlt-6iaaa-aaaao-a4pww-cai";
+      owner = principal "27ftn-piaaa-aaaao-a4p6a-cai";
       subaccount = null;
     };
     amount = 1000_000_000_000 : nat;
