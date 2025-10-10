@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { useIcpAuth } from '@/components/IcpAuthProvider'
+import { useRouter } from 'next/navigation'
 
 // Helper function to convert ICP Status variant to string
 function statusToString(status: any): string {
@@ -29,6 +30,7 @@ export default function SurveyAdmin() {
   const [respondents, setRespondents] = useState<any[]>([])
   const [loadingRespondents, setLoadingRespondents] = useState(false)
   const { identity, isAuthenticated } = useIcpAuth()
+  const router = useRouter()
 
   // Fetch surveys from ICP backend
   useEffect(() => {
@@ -146,7 +148,7 @@ export default function SurveyAdmin() {
           </p>
         </div>
         <Button
-          onClick={() => window.location.href = '/surveys/new'}
+          onClick={() => router.push('/surveys/new')}
           className="bg-blue-600 hover:bg-blue-700 text-white"
           size="lg"
         >
@@ -347,7 +349,7 @@ export default function SurveyAdmin() {
 
               {/* Actions */}
               <div className="grid grid-cols-2 gap-2 pt-2">
-                <Button variant="outline" size="sm" onClick={() => window.location.href = `/surveys/${survey.id}/edit`}>
+                <Button variant="outline" size="sm" onClick={() => router.push(`/surveys/${survey.id}/edit`)}>
                   <Edit className="w-4 h-4 mr-1" />
                   Edit
                 </Button>
@@ -404,11 +406,11 @@ export default function SurveyAdmin() {
                     </div>
                   </DialogContent>
                 </Dialog>
-                <Button variant="outline" size="sm" onClick={() => window.location.href = `/survey-rewards?surveyId=${survey.id}`}>
+                <Button variant="outline" size="sm" onClick={() => router.push(`/survey-rewards?surveyId=${survey.id}`)}>
                   <Gift className="w-4 h-4 mr-1" />
                   Rewards
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => window.location.href = `/survey-results?surveyId=${survey.id}`}>
+                <Button variant="outline" size="sm" onClick={() => router.push(`/survey-results?surveyId=${survey.id}`)}>
                   <BarChart3 className="w-4 h-4 mr-1" />
                   Results
                 </Button>
@@ -431,7 +433,7 @@ export default function SurveyAdmin() {
               ? 'Try adjusting your search or filter criteria.' 
               : 'Get started by creating your first survey.'}
           </p>
-          <Button onClick={() => window.location.href = '/surveys/new'}>
+          <Button onClick={() => router.push('/surveys/new')}>
             <Plus className="w-4 h-4 mr-2" />
             Create Survey
           </Button>

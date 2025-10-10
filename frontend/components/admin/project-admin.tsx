@@ -8,6 +8,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useIcpAuth } from '@/components/IcpAuthProvider'
+import { useRouter } from 'next/navigation'
 
 interface Project {
   id: number
@@ -29,6 +30,7 @@ export default function ProjectAdmin() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const { identity, isAuthenticated } = useIcpAuth()
+  const router = useRouter()
 
   // Fetch projects from ICP backend
   useEffect(() => {
@@ -110,7 +112,7 @@ export default function ProjectAdmin() {
           </p>
         </div>
         <Button
-          onClick={() => window.location.href = '/projects/new'}
+          onClick={() => router.push('/projects/new')}
           className="bg-blue-600 hover:bg-blue-700 text-white"
           size="lg"
         >
@@ -296,7 +298,7 @@ export default function ProjectAdmin() {
                   variant="outline"
                   size="sm"
                   className="flex-1"
-                  onClick={() => window.location.href = `/projects/edit?id=${project.id}`}
+                  onClick={() => router.push(`/projects/edit?id=${project.id}`)}
                 >
                   <Edit className="w-4 h-4 mr-1" />
                   Edit
@@ -325,7 +327,7 @@ export default function ProjectAdmin() {
             </p>
             </>
           )}
-          <Button onClick={() => window.location.href = '/projects/new'}>
+          <Button onClick={() => router.push('/projects/new')}>
             <Plus className="w-4 h-4 mr-2" />
             Create Project
           </Button>
