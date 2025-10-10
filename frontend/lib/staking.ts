@@ -80,6 +80,22 @@ export interface UserAirdropInfo {
   expiresAt: bigint
 }
 
+export interface UserActivity {
+  user: string
+  voteCount: bigint
+  surveyCount: bigint
+  pollsCreated: bigint
+  surveysCreated: bigint
+  totalScore: bigint
+  firstActivity: [] | [bigint]
+}
+
+export interface EngagementTier {
+  name: string
+  minScore: bigint
+  weight: bigint
+}
+
 // IDL definitions for staking canister
 export const stakingIDL = ({ IDL }: any) => {
   const StakingPeriod = IDL.Variant({
@@ -173,8 +189,19 @@ export const airdropIDL = ({ IDL }: any) => {
     'expiresAt': IDL.Int,
   })
 
+  const UserActivity = IDL.Record({
+    'user': IDL.Principal,
+    'voteCount': IDL.Nat,
+    'surveyCount': IDL.Nat,
+    'pollsCreated': IDL.Nat,
+    'surveysCreated': IDL.Nat,
+    'totalScore': IDL.Nat,
+    'firstActivity': IDL.Opt(IDL.Int),
+  })
+
   const Result = IDL.Variant({ 'ok': IDL.Nat, 'err': IDL.Text })
   const Result_1 = IDL.Variant({ 'ok': IDL.Text, 'err': IDL.Text })
+  const Result_2 = IDL.Variant({ 'ok': UserActivity, 'err': IDL.Text })
 
   return IDL.Service({
     'initialize': IDL.Func([IDL.Principal, IDL.Principal], [Result_1], []),
@@ -187,6 +214,22 @@ export const airdropIDL = ({ IDL }: any) => {
     'get_active_campaigns': IDL.Func([], [IDL.Vec(AirdropCampaign)], ['query']),
     'check_eligibility': IDL.Func([IDL.Principal, IDL.Nat], [Result], ['query']),
     'is_initialized': IDL.Func([], [IDL.Bool], ['query']),
+    // Auto-allocation functions
+    'auto_allocate_by_engagement': IDL.Func(
+      [IDL.Nat, IDL.Vec(IDL.Nat), IDL.Vec(IDL.Nat), IDL.Vec(IDL.Principal), IDL.Vec(IDL.Tuple(IDL.Text, IDL.Nat, IDL.Nat))],
+      [Result_1],
+      []
+    ),
+    'auto_allocate_early_adopters': IDL.Func(
+      [IDL.Nat, IDL.Vec(IDL.Nat), IDL.Vec(IDL.Nat), IDL.Vec(IDL.Principal), IDL.Int, IDL.Nat],
+      [Result_1],
+      []
+    ),
+    'get_user_activity': IDL.Func(
+      [IDL.Principal, IDL.Vec(IDL.Nat), IDL.Vec(IDL.Nat)],
+      [Result_2],
+      []
+    ),
   })
 }
 
@@ -456,6 +499,65 @@ export function calculateProjectedRewards(
 
   const rewards = (amount * BigInt(apy) * BigInt(duration)) / (BigInt(100) * BigInt(365))
   return formatPulse(rewards, decimals)
+}
+
+// Predefined engagement tiers for airdrop campaigns
+export const ENGAGEMENT_TIERS = {
+  BRONZE: { name: 'Bronze', minScore: 5n, weight: 1n },
+  SILVER: { name: 'Silver', minScore: 20n, weight: 2n },
+  GOLD: { name: 'Gold', minScore: 50n, weight: 5n },
+  PLATINUM: { name: 'Platinum', minScore: 100n, weight: 10n },
+}
+
+// Convert engagement tiers to tuple format for canister calls
+export function tiersToTuples(tiers: EngagementTier[]): [string, bigint, bigint][] {
+  return tiers.map(tier => [tier.name, tier.minScore, tier.weight])
+}
+
+// Calculate activity score preview (client-side estimation)
+export function calculateActivityScore(
+  votes: number,
+  surveys: number,
+  pollsCreated: number,
+  surveysCreated: number
+): bigint {
+  // Matches backend calculation: votes * 1 + surveys * 2 + polls * 5 + surveys * 5
+  return BigInt(votes * 1 + surveys * 2 + pollsCreated * 5 + surveysCreated * 5)
+}
+
+// Get tier for a given score
+export function getTierForScore(score: bigint, tiers: EngagementTier[]): EngagementTier | null {
+  let selectedTier: EngagementTier | null = null
+
+  for (const tier of tiers) {
+    if (score >= tier.minScore) {
+      if (!selectedTier || tier.minScore > selectedTier.minScore) {
+        selectedTier = tier
+      }
+    }
+  }
+
+  return selectedTier
+}
+
+// Format user activity for display
+export function formatUserActivity(activity: UserActivity): string {
+  const parts = []
+
+  if (activity.voteCount > 0n) {
+    parts.push(`${activity.voteCount} votes`)
+  }
+  if (activity.surveyCount > 0n) {
+    parts.push(`${activity.surveyCount} surveys`)
+  }
+  if (activity.pollsCreated > 0n) {
+    parts.push(`${activity.pollsCreated} polls created`)
+  }
+  if (activity.surveysCreated > 0n) {
+    parts.push(`${activity.surveysCreated} surveys created`)
+  }
+
+  return parts.join(', ') || 'No activity'
 }
 
 // Window type extension for Plug wallet

@@ -120,6 +120,55 @@ persistent actor class Airdrop() = this {
     icrc1_balance_of : (Account) -> async Nat;
   };
 
+  // Backend canister interface for user activity data
+  type PollInfo = {
+    id : Nat;
+    voterPrincipals : [Principal];
+    createdBy : Principal;
+    createdAt : Int;
+  };
+
+  type SurveyInfo = {
+    id : Nat;
+    createdBy : Principal;
+    createdAt : Int;
+    submissionsCount : Nat;
+  };
+
+  type BackendActor = actor {
+    get_poll : (Nat) -> async ?{
+      id : Nat;
+      voterPrincipals : [Principal];
+      createdBy : Principal;
+      createdAt : Int;
+    };
+    get_survey : (Nat) -> async ?{
+      id : Nat;
+      createdBy : Principal;
+      createdAt : Int;
+      submissionsCount : Nat;
+    };
+    get_survey_respondents : (Nat) -> async [Principal];
+  };
+
+  // User activity metrics
+  type UserActivity = {
+    user : Principal;
+    voteCount : Nat;
+    surveyCount : Nat;
+    pollsCreated : Nat;
+    surveysCreated : Nat;
+    totalScore : Nat;
+    firstActivity : ?Int;
+  };
+
+  // Engagement tier
+  type EngagementTier = {
+    name : Text;
+    minScore : Nat;
+    weight : Nat;
+  };
+
   // State variables
   private var owner : Principal = Principal.fromText("aaaaa-aa");
   private var pulseTokenCanister : ?Principal = null;
@@ -550,6 +599,332 @@ persistent actor class Airdrop() = this {
         }
       };
     };
+  };
+
+  // ============================================================================
+  // AUTO-ALLOCATION FUNCTIONS (Activity-Based Distribution)
+  // ============================================================================
+
+  // Calculate user activity score from backend data
+  private func calculateUserActivity(
+    user : Principal,
+    pollIds : [Nat],
+    surveyIds : [Nat]
+  ) : async UserActivity {
+    let backend = switch (backendCanister) {
+      case (null) {
+        return {
+          user = user;
+          voteCount = 0;
+          surveyCount = 0;
+          pollsCreated = 0;
+          surveysCreated = 0;
+          totalScore = 0;
+          firstActivity = null;
+        };
+      };
+      case (?canister) { actor (Principal.toText(canister)) : BackendActor };
+    };
+
+    var voteCount = 0;
+    var surveyCount = 0;
+    var pollsCreated = 0;
+    var surveysCreated = 0;
+    var firstActivity : ?Int = null;
+
+    // Check all polls for votes and creation
+    for (pollId in pollIds.vals()) {
+      try {
+        let pollOpt = await backend.get_poll(pollId);
+        switch (pollOpt) {
+          case (?poll) {
+            // Check if user voted
+            let voted = Array.find<Principal>(poll.voterPrincipals, func(p) = Principal.equal(p, user));
+            if (voted != null) {
+              voteCount += 1;
+              // Track first activity
+              switch (firstActivity) {
+                case (null) { firstActivity := ?poll.createdAt };
+                case (?existing) {
+                  if (poll.createdAt < existing) {
+                    firstActivity := ?poll.createdAt;
+                  };
+                };
+              };
+            };
+
+            // Check if user created this poll
+            if (Principal.equal(poll.createdBy, user)) {
+              pollsCreated += 1;
+            };
+          };
+          case null {};
+        };
+      } catch (e) {
+        // Skip on error
+      };
+    };
+
+    // Check all surveys for submissions and creation
+    for (surveyId in surveyIds.vals()) {
+      try {
+        let surveyOpt = await backend.get_survey(surveyId);
+        switch (surveyOpt) {
+          case (?survey) {
+            // Check if user created this survey
+            if (Principal.equal(survey.createdBy, user)) {
+              surveysCreated += 1;
+            };
+
+            // Check if user submitted a response
+            let respondents = await backend.get_survey_respondents(surveyId);
+            let submitted = Array.find<Principal>(respondents, func(p) = Principal.equal(p, user));
+            if (submitted != null) {
+              surveyCount += 1;
+              // Track first activity
+              switch (firstActivity) {
+                case (null) { firstActivity := ?survey.createdAt };
+                case (?existing) {
+                  if (survey.createdAt < existing) {
+                    firstActivity := ?survey.createdAt;
+                  };
+                };
+              };
+            };
+          };
+          case null {};
+        };
+      } catch (e) {
+        // Skip on error
+      };
+    };
+
+    // Calculate total score with weights
+    // Votes: 1 point, Surveys: 2 points, Created poll: 5 points, Created survey: 5 points
+    let totalScore = (voteCount * 1) + (surveyCount * 2) + (pollsCreated * 5) + (surveysCreated * 5);
+
+    {
+      user = user;
+      voteCount = voteCount;
+      surveyCount = surveyCount;
+      pollsCreated = pollsCreated;
+      surveysCreated = surveysCreated;
+      totalScore = totalScore;
+      firstActivity = firstActivity;
+    }
+  };
+
+  // Get engagement tier for a user based on score
+  private func getUserTier(score : Nat, tiers : [EngagementTier]) : ?EngagementTier {
+    var selectedTier : ?EngagementTier = null;
+
+    for (tier in tiers.vals()) {
+      if (score >= tier.minScore) {
+        switch (selectedTier) {
+          case (null) { selectedTier := ?tier };
+          case (?current) {
+            if (tier.minScore > current.minScore) {
+              selectedTier := ?tier;
+            };
+          };
+        };
+      };
+    };
+
+    selectedTier
+  };
+
+  // Auto-allocate based on activity score with tiered weights
+  public shared ({ caller }) func auto_allocate_by_engagement(
+    campaignId : Nat,
+    pollIds : [Nat],
+    surveyIds : [Nat],
+    users : [Principal],
+    tiers : [(Text, Nat, Nat)]  // (name, minScore, weight)
+  ) : async Result.Result<Text, Text> {
+    if (not initialized) {
+      return #err("Canister not initialized");
+    };
+
+    if (not Principal.equal(caller, owner)) {
+      return #err("Only owner can auto-allocate");
+    };
+
+    let campaignOpt = Map.get(campaigns, Map.nhash, campaignId);
+    switch (campaignOpt) {
+      case (null) { return #err("Campaign not found") };
+      case (?campaign) {
+        if (campaign.status != #Pending) {
+          return #err("Can only auto-allocate for pending campaigns");
+        };
+
+        // Convert tuples to EngagementTier records
+        let engagementTiers = Array.map<(Text, Nat, Nat), EngagementTier>(
+          tiers,
+          func((name, minScore, weight)) = {
+            name = name;
+            minScore = minScore;
+            weight = weight;
+          }
+        );
+
+        // Calculate activity for all users
+        var activities : [UserActivity] = [];
+        for (user in users.vals()) {
+          let activity = await calculateUserActivity(user, pollIds, surveyIds);
+          if (activity.totalScore > 0) {
+            activities := Array.append(activities, [activity]);
+          };
+        };
+
+        if (activities.size() == 0) {
+          return #err("No eligible users found with activity");
+        };
+
+        // Calculate total weighted shares
+        var totalShares : Nat = 0;
+        var userShares : [(Principal, Nat)] = [];
+
+        for (activity in activities.vals()) {
+          let tierOpt = getUserTier(activity.totalScore, engagementTiers);
+          let shares = switch (tierOpt) {
+            case (?tier) { tier.weight };
+            case null { 0 };
+          };
+
+          if (shares > 0) {
+            userShares := Array.append(userShares, [(activity.user, shares)]);
+            totalShares += shares;
+          };
+        };
+
+        if (totalShares == 0) {
+          return #err("No users qualified for any tier");
+        };
+
+        // Calculate and allocate tokens proportionally
+        var allocatedCount = 0;
+        for ((user, shares) in userShares.vals()) {
+          let userAmount = (campaign.totalAmount * shares) / totalShares;
+
+          if (userAmount > 0) {
+            let key = makeAllocationKey(campaignId, user);
+
+            // Skip if allocation already exists
+            switch (Map.get(allocations, thash, key)) {
+              case (?_) {};
+              case null {
+                let allocation : AirdropAllocation = {
+                  campaignId = campaignId;
+                  user = user;
+                  amount = userAmount;
+                  reason = "Engagement-based allocation (" # Nat.toText(shares) # " shares)";
+                  claimStatus = #Unclaimed;
+                  claimedAt = null;
+                };
+
+                Map.set(allocations, thash, key, allocation);
+
+                // Update user allocations
+                let currentCampaigns = switch (Map.get(userAllocations, phash, user)) {
+                  case (null) { [] };
+                  case (?campaigns) { campaigns };
+                };
+                Map.set(userAllocations, phash, user, Array.append(currentCampaigns, [campaignId]));
+
+                allocatedCount += 1;
+              };
+            };
+          };
+        };
+
+        #ok("Auto-allocated to " # Nat.toText(allocatedCount) # " users based on engagement tiers")
+      };
+    };
+  };
+
+  // Auto-allocate to early adopters (users active before cutoff date)
+  public shared ({ caller }) func auto_allocate_early_adopters(
+    campaignId : Nat,
+    pollIds : [Nat],
+    surveyIds : [Nat],
+    users : [Principal],
+    cutoffDate : Int,
+    amountPerUser : Nat
+  ) : async Result.Result<Text, Text> {
+    if (not initialized) {
+      return #err("Canister not initialized");
+    };
+
+    if (not Principal.equal(caller, owner)) {
+      return #err("Only owner can auto-allocate");
+    };
+
+    let campaignOpt = Map.get(campaigns, Map.nhash, campaignId);
+    switch (campaignOpt) {
+      case (null) { return #err("Campaign not found") };
+      case (?campaign) {
+        if (campaign.status != #Pending) {
+          return #err("Can only auto-allocate for pending campaigns");
+        };
+
+        var allocatedCount = 0;
+
+        for (user in users.vals()) {
+          let activity = await calculateUserActivity(user, pollIds, surveyIds);
+
+          // Check if user was active before cutoff
+          let isEarlyAdopter = switch (activity.firstActivity) {
+            case (?firstTime) { firstTime <= cutoffDate };
+            case null { false };
+          };
+
+          if (isEarlyAdopter) {
+            let key = makeAllocationKey(campaignId, user);
+
+            switch (Map.get(allocations, thash, key)) {
+              case (?_) {};
+              case null {
+                let allocation : AirdropAllocation = {
+                  campaignId = campaignId;
+                  user = user;
+                  amount = amountPerUser;
+                  reason = "Early adopter";
+                  claimStatus = #Unclaimed;
+                  claimedAt = null;
+                };
+
+                Map.set(allocations, thash, key, allocation);
+
+                let currentCampaigns = switch (Map.get(userAllocations, phash, user)) {
+                  case (null) { [] };
+                  case (?campaigns) { campaigns };
+                };
+                Map.set(userAllocations, phash, user, Array.append(currentCampaigns, [campaignId]));
+
+                allocatedCount += 1;
+              };
+            };
+          };
+        };
+
+        #ok("Allocated to " # Nat.toText(allocatedCount) # " early adopters")
+      };
+    };
+  };
+
+  // Get user activity metrics (for frontend preview)
+  public func get_user_activity(
+    user : Principal,
+    pollIds : [Nat],
+    surveyIds : [Nat]
+  ) : async Result.Result<UserActivity, Text> {
+    if (not initialized) {
+      return #err("Canister not initialized");
+    };
+
+    let activity = await calculateUserActivity(user, pollIds, surveyIds);
+    #ok(activity)
   };
 
   // Admin: Complete campaign

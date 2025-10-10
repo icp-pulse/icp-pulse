@@ -1,7 +1,8 @@
-import { Folder, ClipboardList, BarChart3, Download, Settings, TrendingUp } from "lucide-react";
+import { Folder, ClipboardList, BarChart3, Download, Settings, TrendingUp, Gift } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@lib/utils";
 import Link from "next/link";
+import { useIsAdmin } from "@/components/AdminGuard";
 
 interface SidebarProps {
   activeTab: "projects" | "surveys" | "polls";
@@ -10,6 +11,8 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ activeTab, onTabChange, isCollapsed }: SidebarProps) {
+  const isAdmin = useIsAdmin();
+
   // Fetch stats from ICP backend (single query for all counts)
   const { data: stats } = useQuery({
     queryKey: ["stats"],
@@ -80,6 +83,14 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed }: Sidebar
                   Analytics
                 </Link>
               </li>
+              {isAdmin && (
+                <li>
+                  <Link href="/admin/airdrops" className="w-full flex items-center px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
+                    <Gift className="w-4 h-4 mr-3" />
+                    Airdrops
+                  </Link>
+                </li>
+              )}
               <li>
                 <button className="w-full flex items-center px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
                   <Download className="w-4 h-4 mr-3" />
