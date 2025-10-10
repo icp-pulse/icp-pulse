@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { usePathname } from 'next/navigation'
+import Link from 'next/link'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { LoginButton } from '@/components/LoginButton'
 import { UserMenu } from '@/components/UserMenu'
@@ -38,20 +39,20 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
         <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 dark:bg-gray-900/80 backdrop-blur-sm border-b border-gray-200 dark:border-gray-800">
           <div className="max-w-7xl mx-auto px-4 py-3">
             <div className="flex items-center justify-between">
-              <a href="/" className="font-bold text-xl" suppressHydrationWarning>
+              <Link href="/" className="font-bold text-xl" suppressHydrationWarning>
                 True Pulse
-              </a>
+              </Link>
 
               {/* Desktop Navigation */}
               <nav className="hidden md:flex items-center gap-1">
                 {navLinks.map((link) => (
-                  <a
+                  <Link
                     key={link.href}
                     href={link.href}
                     className="px-4 py-2 text-sm font-medium rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                   >
                     {link.label}
-                  </a>
+                  </Link>
                 ))}
               </nav>
 
@@ -76,14 +77,14 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
               <div className="md:hidden mt-4 pb-4 border-t border-gray-200 dark:border-gray-800 pt-4">
                 <nav className="flex flex-col gap-2">
                   {navLinks.map((link) => (
-                    <a
+                    <Link
                       key={link.href}
                       href={link.href}
                       className="px-4 py-2 text-sm font-medium rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       {link.label}
-                    </a>
+                    </Link>
                   ))}
                 </nav>
                 <div className="flex items-center gap-3 mt-4 px-4">
@@ -103,14 +104,14 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
   return (
     <div className="mx-auto px-4 py-4">
       <header className="flex items-center justify-between py-2 mb-4">
-        <a href="/" className="font-bold text-xl">
+        <Link href="/" className="font-bold text-xl">
           True Pulse
-        </a>
+        </Link>
 
         {/* Desktop Navigation */}
         <nav className="hidden md:flex items-center gap-1">
           {navLinks.map((link) => (
-            <a
+            <Link
               key={link.href}
               href={link.href}
               className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
@@ -120,7 +121,7 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
               }`}
             >
               {link.label}
-            </a>
+            </Link>
           ))}
         </nav>
 
@@ -145,7 +146,7 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
         <div className="md:hidden mb-4 pb-4 border-b border-gray-200 dark:border-gray-800">
           <nav className="flex flex-col gap-2">
             {navLinks.map((link) => (
-              <a
+              <Link
                 key={link.href}
                 href={link.href}
                 className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
@@ -156,7 +157,7 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
                 onClick={() => setMobileMenuOpen(false)}
               >
                 {link.label}
-              </a>
+              </Link>
             ))}
           </nav>
           <div className="flex items-center gap-3 mt-4 px-4">
