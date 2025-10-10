@@ -45,8 +45,8 @@ export function IcpAuthProvider({ children }: { children: React.ReactNode }) {
     // Check if Plug is already connected
     if (typeof window !== 'undefined' && window.ic?.plug) {
       window.ic.plug.isConnected().then((connected) => {
-        if (connected && window.ic?.plug?.principalId) {
-          setPrincipalText(window.ic.plug.principalId)
+        if (connected && (window.ic?.plug as any)?.principalId) {
+          setPrincipalText((window.ic?.plug as any).principalId)
           setAuthProvider('plug')
           // Note: Plug doesn't provide Identity in the same way, so we keep identity null
         }
@@ -71,17 +71,17 @@ export function IcpAuthProvider({ children }: { children: React.ReactNode }) {
           process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID || '',
         ].filter(Boolean)
 
-        const connected = await window.ic.plug.requestConnect({
+        const connected = await (window.ic.plug as any).requestConnect({
           whitelist,
           host: process.env.NEXT_PUBLIC_DFX_NETWORK === 'ic' ? 'https://ic0.app' : 'http://localhost:4943',
         })
 
-        if (connected && window.ic.plug.principalId) {
-          setPrincipalText(window.ic.plug.principalId)
+        if (connected && (window.ic.plug as any).principalId) {
+          setPrincipalText((window.ic.plug as any).principalId)
           setAuthProvider('plug')
 
           // Track login event
-          analytics.identify(window.ic.plug.principalId)
+          analytics.identify((window.ic.plug as any).principalId)
           analytics.track('user_login', { method: 'internet_identity' })
         }
       } catch (error) {
@@ -140,7 +140,7 @@ export function IcpAuthProvider({ children }: { children: React.ReactNode }) {
     // Handle Plug logout
     if (authProvider === 'plug' && typeof window !== 'undefined' && window.ic?.plug) {
       try {
-        await window.ic.plug.disconnect()
+        await (window.ic.plug as any).disconnect()
       } catch (error) {
         console.error('Plug disconnect error:', error)
       }

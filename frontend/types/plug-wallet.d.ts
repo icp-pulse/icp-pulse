@@ -9,8 +9,8 @@ declare global {
         createActor: (args: { canisterId: string, interfaceFactory: any }) => Promise<any>
         requestBalance?: () => Promise<any[]>
         disconnect: () => Promise<boolean>
-        agent: any
-        principalId: string
+        agent?: any
+        principalId?: string
       }
     }
   }

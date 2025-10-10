@@ -68,7 +68,7 @@ export default function WalletPage() {
             // Use Plug wallet
             try {
               // Ensure Plug agent is created with ckUSDC in whitelist
-              await window.ic.plug.createAgent({
+              await (window.ic.plug as any).createAgent({
                 whitelist: [ckUSDCCanisterId],
                 host
               })
@@ -87,7 +87,7 @@ export default function WalletPage() {
                 })
 
                 balance = await ckUSDCActor.icrc1_balance_of({
-                  owner: Principal.fromText(window.ic.plug.principalId),
+                  owner: Principal.fromText((window.ic.plug as any).principalId),
                   subaccount: []
                 })
               } else {
@@ -106,11 +106,11 @@ export default function WalletPage() {
                       })
                     ], [IDL.Nat], ['query'])
                   }),
-                  { agent: window.ic.plug.agent, canisterId: ckUSDCCanisterId }
+                  { agent: (window.ic.plug as any).agent, canisterId: ckUSDCCanisterId }
                 ) as { icrc1_balance_of: (args: { owner: any; subaccount: any[] }) => Promise<bigint> }
 
                 balance = await ckUSDCActor.icrc1_balance_of({
-                  owner: Principal.fromText(window.ic.plug.principalId),
+                  owner: Principal.fromText((window.ic.plug as any).principalId),
                   subaccount: []
                 })
               }
@@ -238,14 +238,14 @@ export default function WalletPage() {
       if (isPlugWallet && window.ic?.plug) {
         // Use Plug's agent
         const ckUSDCCanisterId = 'xevnm-gaaaa-aaaar-qafnq-cai'
-        await window.ic.plug.createAgent({
+        await (window.ic.plug as any).createAgent({
           whitelist: [
             process.env.NEXT_PUBLIC_SWAP_CANISTER_ID || '',
             ckUSDCCanisterId
           ],
           host
         })
-        agent = window.ic.plug.agent
+        agent = (window.ic.plug as any).agent
       } else if (identity) {
         // Use II/NFID identity
         agent = HttpAgent.createSync({ host })
