@@ -1,7 +1,9 @@
 import { Actor, HttpAgent, type Identity } from '@dfinity/agent'
 import { idlFactory as customIDL } from './polls_surveys_backend.idl'
+import type { IDL } from '@dfinity/candid'
 
 export type CanisterConfig = { canisterId: string; host?: string }
+export type CanisterConfigWithIDL = CanisterConfig & { idlFactory: IDL.InterfaceFactory }
 
 // Use custom IDL that includes analytics
 export async function createBackend({ canisterId, host }: CanisterConfig) {
@@ -66,4 +68,24 @@ export async function createBackendWithIdentity({ canisterId, host, identity }: 
   }
 
   return Actor.createActor(customIDL as any, { agent, canisterId }) as any
+}
+
+// Generic function to create an actor with custom IDL
+export async function createActor({ canisterId, host, idlFactory }: CanisterConfigWithIDL) {
+  const isLocal = !!host && (host.includes('127.0.0.1') || host.includes('localhost'))
+
+  const agent = new HttpAgent({
+    host,
+    verifyQuerySignatures: !isLocal
+  }) as HttpAgent
+
+  if (isLocal) {
+    try {
+      await agent.fetchRootKey()
+    } catch (error) {
+      console.warn('Failed to fetch root key:', error)
+    }
+  }
+
+  return Actor.createActor(idlFactory as any, { agent, canisterId }) as any
 }

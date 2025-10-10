@@ -549,7 +549,7 @@ export default function WalletPage() {
                     <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
                       <div className="text-sm text-purple-700 dark:text-purple-300">
                         <strong>Exchange Rate:</strong><br />
-                        {exchangeRate ? `1 ckUSDC = ${Number(exchangeRate).toLocaleString()} PULSE` : 'Loading...'}
+                        {exchangeRate ? `1 ckUSDC = ${(Number(exchangeRate) / 100).toLocaleString()} PULSE` : 'Loading...'}
                       </div>
                     </div>
 
@@ -588,7 +588,7 @@ export default function WalletPage() {
                       />
                       {buyAmount && exchangeRate && (
                         <p className="text-sm text-muted-foreground mt-2">
-                          You will receive: ~{(parseFloat(buyAmount) * Number(exchangeRate)).toLocaleString()} PULSE
+                          You will receive: ~{(parseFloat(buyAmount) * Number(exchangeRate) / 100).toLocaleString()} PULSE
                         </p>
                       )}
                     </div>

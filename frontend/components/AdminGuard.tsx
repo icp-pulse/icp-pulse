@@ -68,7 +68,7 @@ export function AdminGuard({ children, fallback }: AdminGuardProps) {
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-4">Unauthorized Access</h2>
           <p className="text-gray-600 mb-6">
-            You don't have permission to access this admin area. Please contact an administrator if you believe this is an error.
+            You don&apos;t have permission to access this admin area. Please contact an administrator if you believe this is an error.
           </p>
           {principalText && (
             <div className="mb-6 p-4 bg-gray-100 rounded-lg">

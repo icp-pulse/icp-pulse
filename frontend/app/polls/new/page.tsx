@@ -113,7 +113,7 @@ async function createPollAction(values: FormValues, identity: any, isAuthenticat
           const whitelist = [selectedToken, backendCanisterId]
           console.log('Whitelist:', whitelist)
 
-          const connected = await window.ic.plug.requestConnect({ whitelist })
+          const connected = await (window.ic.plug as any).requestConnect({ whitelist })
           console.log('Plug connected:', connected)
 
           if (!connected) {

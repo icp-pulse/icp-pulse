@@ -29,12 +29,15 @@ import {
   Twitter,
   Linkedin,
   Settings,
-  Sparkles
+  Sparkles,
+  Gift,
+  X
 } from 'lucide-react'
 
 export function LandingPage() {
   const router = useRouter()
   const [question, setQuestion] = useState('')
+  const [showBanner, setShowBanner] = useState(true)
 
   const handleGetAnswers = () => {
     if (question.trim()) {
@@ -51,6 +54,44 @@ export function LandingPage() {
   }
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900">
+      {/* Early Adopter Airdrop Banner */}
+      {showBanner && (
+        <div className="relative bg-gradient-to-r from-purple-600 via-blue-600 to-indigo-600 text-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3 flex-1">
+                <div className="flex-shrink-0">
+                  <Gift className="w-6 h-6" />
+                </div>
+                <div className="flex-1">
+                  <p className="text-sm md:text-base font-medium">
+                    <span className="font-bold">🎉 Early Adopter Rewards!</span> Claim your PULSE tokens as a thank you for being among our first users. Campaign runs for 90 days.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <Link href="/airdrop">
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="bg-white text-purple-600 hover:bg-gray-100 whitespace-nowrap"
+                  >
+                    Claim Now
+                  </Button>
+                </Link>
+                <button
+                  onClick={() => setShowBanner(false)}
+                  className="flex-shrink-0 p-1 hover:bg-white/20 rounded-full transition-colors"
+                  aria-label="Close banner"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Hero Section */}
       <section className="relative pt-20 pb-32 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-gray-900 dark:via-blue-900/20 dark:to-purple-900/20" />
