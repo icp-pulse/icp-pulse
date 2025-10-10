@@ -88,7 +88,7 @@ function ResultsContent() {
     }
 
     loadPollResults()
-  }, [pollId])
+  }, [pollId, isAuthenticated, identity])
 
   const formatDate = (timestamp: number): string => {
     return new Date(timestamp / 1000000).toLocaleDateString('en-US', {

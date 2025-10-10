@@ -3,7 +3,7 @@
 import { useForm, useFieldArray } from 'react-hook-form'
 import { z } from 'zod'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useTransition, useState, useEffect } from 'react'
+import { useTransition, useState, useEffect, Suspense } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -241,7 +241,7 @@ async function createPollAction(values: FormValues, identity: any, isAuthenticat
   }
 }
 
-export default function NewPollPage() {
+function NewPollPageContent() {
   const [pending, startTransition] = useTransition()
   const [error, setError] = useState<string | null>(null)
   const [projects, setProjects] = useState<Project[]>([])
@@ -752,5 +752,13 @@ export default function NewPollPage() {
       {/* AI Chatbox */}
       <AIChatbox onOptionsGenerated={handleOptionsGenerated} />
     </div>
+  )
+}
+
+export default function NewPollPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center min-h-screen">Loading...</div>}>
+      <NewPollPageContent />
+    </Suspense>
   )
 }

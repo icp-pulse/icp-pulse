@@ -10,6 +10,21 @@
       "type": "motoko",
       "args": "--enhanced-orthogonal-persistence"
     },
+    "pulseg": {
+      "main": "backend/pulseg.mo",
+      "type": "motoko",
+      "args": "--enhanced-orthogonal-persistence"
+    },
+    "staking": {
+      "main": "backend/staking.mo",
+      "type": "motoko",
+      "args": "--enhanced-orthogonal-persistence"
+    },
+    "airdrop": {
+      "main": "backend/airdrop.mo",
+      "type": "motoko",
+      "args": "--enhanced-orthogonal-persistence"
+    },
     "swap": {
       "main": "backend/swap.mo",
       "type": "motoko",
