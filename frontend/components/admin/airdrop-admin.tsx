@@ -303,7 +303,7 @@ export default function AirdropAdmin() {
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Allocated</p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
-                {formatTokenAmount(campaigns?.reduce((sum, c) => sum + c.allocatedAmount, 0n) ?? 0n)}
+                {campaigns ? formatTokenAmount(campaigns.reduce((sum, c) => sum + BigInt(c.allocatedAmount), 0n)) : '0'}
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">PULSE</p>
             </div>

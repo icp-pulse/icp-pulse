@@ -182,8 +182,8 @@ export default function AirdropPage() {
     )
   }
 
-  const totalUnclaimed = airdrops?.reduce((sum, a) => !a.claimed ? sum + a.amount : sum, 0n) || 0n
-  const totalClaimed = airdrops?.reduce((sum, a) => a.claimed ? sum + a.amount : sum, 0n) || 0n
+  const totalUnclaimed = airdrops ? airdrops.reduce((sum, a) => !a.claimed ? sum + a.amount : sum, 0n) : 0n
+  const totalClaimed = airdrops ? airdrops.reduce((sum, a) => a.claimed ? sum + a.amount : sum, 0n) : 0n
   const unclaimedCount = airdrops?.filter(a => !a.claimed).length || 0
 
   return (
