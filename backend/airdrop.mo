@@ -1184,6 +1184,49 @@ persistent actor class Airdrop() = this {
     #ok(questId)
   };
 
+  // Update a quest (admin only)
+  public shared ({ caller }) func update_quest(
+    questId : Nat,
+    name : Text,
+    description : Text,
+    questType : QuestType,
+    points : Nat,
+    requirements : QuestRequirements,
+    icon : Text,
+    order : Nat
+  ) : async Result.Result<Text, Text> {
+    if (not initialized) {
+      return #err("Canister not initialized");
+    };
+
+    if (not Principal.equal(caller, owner)) {
+      return #err("Only owner can update quests");
+    };
+
+    // Verify quest exists
+    switch (Map.get(quests, Map.nhash, questId)) {
+      case (null) { return #err("Quest not found") };
+      case (?quest) {
+        // Create updated quest with same id, campaignId, and isActive status
+        let updatedQuest : Quest = {
+          id = quest.id;
+          campaignId = quest.campaignId;
+          name = name;
+          description = description;
+          questType = questType;
+          points = points;
+          requirements = requirements;
+          icon = icon;
+          order = order;
+          isActive = quest.isActive;
+        };
+
+        Map.set(quests, Map.nhash, questId, updatedQuest);
+        #ok("Quest updated successfully")
+      };
+    };
+  };
+
   // Update user quest progress (called by backend or admin)
   public shared ({ caller }) func update_quest_progress(
     user : Principal,

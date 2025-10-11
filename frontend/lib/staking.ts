@@ -301,6 +301,11 @@ export const airdropIDL = ({ IDL }: any) => {
       [Result],
       []
     ),
+    'update_quest': IDL.Func(
+      [IDL.Nat, IDL.Text, IDL.Text, QuestType, IDL.Nat, QuestRequirements, IDL.Text, IDL.Nat],
+      [Result_1],
+      []
+    ),
     'update_quest_progress': IDL.Func(
       [IDL.Principal, IDL.Nat, IDL.Opt(IDL.Nat), IDL.Opt(IDL.Nat), IDL.Opt(IDL.Nat), IDL.Opt(IDL.Nat), IDL.Opt(IDL.Nat)],
       [Result_3],

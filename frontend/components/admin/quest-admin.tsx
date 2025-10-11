@@ -9,12 +9,22 @@ import { useIsAdmin } from '@/components/AdminGuard'
 
 const AIRDROP_CANISTER_ID = process.env.NEXT_PUBLIC_AIRDROP_CANISTER_ID || '27ftn-piaaa-aaaao-a4p6a-cai'
 
+interface QuestRequirements {
+  minPolls: bigint
+  minVotes: bigint
+  minSurveys: bigint
+  minSubmissions: bigint
+  minRewards: bigint
+}
+
 interface Quest {
   id: bigint
   campaignId: bigint
   name: string
   description: string
+  questType: any // QuestType variant from backend
   points: bigint
+  requirements: QuestRequirements
   icon: string
   order: bigint
   isActive: boolean
@@ -40,6 +50,20 @@ export default function QuestAdmin() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedCampaign, setSelectedCampaign] = useState<bigint>(1n)
+  const [showEditModal, setShowEditModal] = useState(false)
+  const [editingQuest, setEditingQuest] = useState<Quest | null>(null)
+  const [editForm, setEditForm] = useState({
+    name: '',
+    description: '',
+    points: '',
+    icon: '',
+    order: '',
+    minPolls: '',
+    minVotes: '',
+    minSurveys: '',
+    minSubmissions: '',
+    minRewards: ''
+  })
 
   useEffect(() => {
     console.log('Quest Admin useEffect - Auth Status:', {
@@ -129,6 +153,64 @@ export default function QuestAdmin() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCampaign])
+
+  const handleEditQuest = (quest: Quest) => {
+    setEditingQuest(quest)
+    setEditForm({
+      name: quest.name,
+      description: quest.description,
+      points: quest.points.toString(),
+      icon: quest.icon,
+      order: quest.order.toString(),
+      minPolls: quest.requirements.minPolls.toString(),
+      minVotes: quest.requirements.minVotes.toString(),
+      minSurveys: quest.requirements.minSurveys.toString(),
+      minSubmissions: quest.requirements.minSubmissions.toString(),
+      minRewards: quest.requirements.minRewards.toString()
+    })
+    setShowEditModal(true)
+  }
+
+  const handleUpdateQuest = async () => {
+    if (!principalText || !editingQuest) return
+
+    try {
+      const canisterId = AIRDROP_CANISTER_ID
+      const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
+      const airdropActor = await createActor({ canisterId, host, idlFactory: (await import('@/lib/staking')).airdropIDL })
+
+      const requirements = {
+        minPolls: BigInt(editForm.minPolls || 0),
+        minVotes: BigInt(editForm.minVotes || 0),
+        minSurveys: BigInt(editForm.minSurveys || 0),
+        minSubmissions: BigInt(editForm.minSubmissions || 0),
+        minRewards: BigInt(editForm.minRewards || 0)
+      }
+
+      const result = await airdropActor.update_quest(
+        editingQuest.id,
+        editForm.name,
+        editForm.description,
+        editingQuest.questType, // Keep the same questType
+        BigInt(editForm.points),
+        requirements,
+        editForm.icon,
+        BigInt(editForm.order)
+      )
+
+      if ('ok' in result) {
+        alert('Quest updated successfully')
+        setShowEditModal(false)
+        setEditingQuest(null)
+        loadData()
+      } else {
+        alert(`Failed to update quest: ${result.err}`)
+      }
+    } catch (error) {
+      console.error('Failed to update quest:', error)
+      alert('Failed to update quest')
+    }
+  }
 
   const handleDeactivateQuest = async (questId: bigint) => {
     if (!principalText) return
@@ -353,7 +435,7 @@ export default function QuestAdmin() {
                   </div>
                   <div className="flex items-center gap-2">
                     <button
-                      onClick={() => alert('Edit quest functionality coming soon')}
+                      onClick={() => handleEditQuest(quest)}
                       className="p-2 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition-colors"
                       title="Edit quest"
                     >
@@ -375,6 +457,187 @@ export default function QuestAdmin() {
           </div>
         )}
       </div>
+
+      {/* Edit Quest Modal */}
+      {showEditModal && editingQuest && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                  Edit Quest
+                </h2>
+                <button
+                  onClick={() => setShowEditModal(false)}
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                >
+                  <Plus className="w-6 h-6 rotate-45" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                {/* Quest Name */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Quest Name
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.name}
+                    onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    placeholder="e.g., Create Your First Poll"
+                  />
+                </div>
+
+                {/* Quest Description */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Description
+                  </label>
+                  <textarea
+                    value={editForm.description}
+                    onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+                    rows={3}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    placeholder="Describe what the user needs to do..."
+                  />
+                </div>
+
+                {/* Points and Order */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Points Reward
+                    </label>
+                    <input
+                      type="number"
+                      value={editForm.points}
+                      onChange={(e) => setEditForm({ ...editForm, points: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      placeholder="100"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                      Display Order
+                    </label>
+                    <input
+                      type="number"
+                      value={editForm.order}
+                      onChange={(e) => setEditForm({ ...editForm, order: e.target.value })}
+                      className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      placeholder="1"
+                    />
+                  </div>
+                </div>
+
+                {/* Icon */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Icon
+                  </label>
+                  <select
+                    value={editForm.icon}
+                    onChange={(e) => setEditForm({ ...editForm, icon: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  >
+                    <option value="trophy">Trophy</option>
+                    <option value="star">Star</option>
+                    <option value="clock">Clock</option>
+                    <option value="users">Users</option>
+                  </select>
+                </div>
+
+                {/* Requirements */}
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
+                    Quest Requirements
+                  </h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Min Polls Created
+                      </label>
+                      <input
+                        type="number"
+                        value={editForm.minPolls}
+                        onChange={(e) => setEditForm({ ...editForm, minPolls: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Min Votes Cast
+                      </label>
+                      <input
+                        type="number"
+                        value={editForm.minVotes}
+                        onChange={(e) => setEditForm({ ...editForm, minVotes: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Min Surveys Created
+                      </label>
+                      <input
+                        type="number"
+                        value={editForm.minSurveys}
+                        onChange={(e) => setEditForm({ ...editForm, minSurveys: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Min Survey Submissions
+                      </label>
+                      <input
+                        type="number"
+                        value={editForm.minSubmissions}
+                        onChange={(e) => setEditForm({ ...editForm, minSubmissions: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        placeholder="0"
+                      />
+                    </div>
+                    <div className="col-span-2">
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                        Min Rewards Claimed
+                      </label>
+                      <input
+                        type="number"
+                        value={editForm.minRewards}
+                        onChange={(e) => setEditForm({ ...editForm, minRewards: e.target.value })}
+                        className="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                        placeholder="0"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-3 pt-4">
+                  <button
+                    onClick={handleUpdateQuest}
+                    className="flex-1 px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg transition-colors"
+                  >
+                    Update Quest
+                  </button>
+                  <button
+                    onClick={() => setShowEditModal(false)}
+                    className="px-6 py-3 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

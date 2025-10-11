@@ -214,12 +214,17 @@ export default function AirdropAdmin() {
   }
 
   const formatDate = (timestamp: bigint) => {
-    const ms = Number(timestamp / 1_000_000n)
-    return new Date(ms).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    })
+    if (!timestamp || timestamp === 0n) return 'N/A'
+    try {
+      const ms = Number(timestamp / 1_000_000n)
+      return new Date(ms).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      })
+    } catch (e) {
+      return 'Invalid Date'
+    }
   }
 
   const getStatusInfo = (status: Campaign['status']) => {
@@ -303,7 +308,7 @@ export default function AirdropAdmin() {
             <div>
               <p className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Allocated</p>
               <p className="text-2xl font-bold text-gray-900 dark:text-white mt-1">
-                {campaigns ? formatTokenAmount(campaigns.reduce((sum, c) => sum + BigInt(c.allocatedAmount), 0n)) : '0'}
+                {campaigns ? formatTokenAmount(campaigns.reduce((sum, c) => sum + (c.allocatedAmount ? BigInt(c.allocatedAmount) : 0n), 0n)) : '0'}
               </p>
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">PULSE</p>
             </div>
@@ -553,8 +558,13 @@ function CampaignCard({
 }: CampaignCardProps) {
   const statusInfo = getStatusInfo(campaign.status)
   const StatusIcon = statusInfo.icon
+  const allocatedAmount = campaign.allocatedAmount ? BigInt(campaign.allocatedAmount) : 0n
+  const claimedAmount = campaign.claimedAmount ? BigInt(campaign.claimedAmount) : 0n
+  const allocations = campaign.allocations ? BigInt(campaign.allocations) : 0n
+  const createdAt = campaign.createdAt ? BigInt(campaign.createdAt) : 0n
+  const endTime = campaign.endTime ? BigInt(campaign.endTime) : 0n
   const allocationPercentage = campaign.totalAmount > 0n
-    ? Number((campaign.allocatedAmount * 100n) / campaign.totalAmount)
+    ? Number((allocatedAmount * 100n) / campaign.totalAmount)
     : 0
 
   return (
@@ -593,7 +603,7 @@ function CampaignCard({
         <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-3">
           <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Allocated</p>
           <p className="text-lg font-bold text-blue-600 dark:text-blue-400">
-            {formatTokenAmount(campaign.allocatedAmount)}
+            {formatTokenAmount(allocatedAmount)}
           </p>
           <p className="text-xs text-gray-500 dark:text-gray-400">{allocationPercentage}%</p>
         </div>
@@ -601,7 +611,7 @@ function CampaignCard({
         <div className="bg-green-50 dark:bg-green-900/20 rounded-lg p-3">
           <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Claimed</p>
           <p className="text-lg font-bold text-green-600 dark:text-green-400">
-            {formatTokenAmount(campaign.claimedAmount)}
+            {formatTokenAmount(claimedAmount)}
           </p>
           <p className="text-xs text-gray-500 dark:text-gray-400">PULSE</p>
         </div>
@@ -609,7 +619,7 @@ function CampaignCard({
         <div className="bg-orange-50 dark:bg-orange-900/20 rounded-lg p-3">
           <p className="text-xs text-gray-600 dark:text-gray-400 mb-1">Participants</p>
           <p className="text-lg font-bold text-orange-600 dark:text-orange-400">
-            {campaign.allocations.toString()}
+            {allocations.toString()}
           </p>
           <p className="text-xs text-gray-500 dark:text-gray-400">users</p>
         </div>
@@ -630,22 +640,28 @@ function CampaignCard({
       </div>
 
       {/* Dates */}
-      <div className="flex flex-wrap gap-4 text-sm text-gray-600 dark:text-gray-400 mb-4">
-        <div className="flex items-center gap-1">
-          <Calendar className="w-4 h-4" />
-          <span>Created: {formatDate(campaign.createdAt)}</span>
+      {(createdAt > 0n || (campaign.startTime && campaign.startTime[0]) || endTime > 0n) && (
+        <div className="flex flex-wrap gap-4 text-sm text-gray-600 dark:text-gray-400 mb-4">
+          {createdAt > 0n && (
+            <div className="flex items-center gap-1">
+              <Calendar className="w-4 h-4" />
+              <span>Created: {formatDate(createdAt)}</span>
+            </div>
+          )}
+          {campaign.startTime && campaign.startTime[0] && (
+            <div className="flex items-center gap-1">
+              <Play className="w-4 h-4" />
+              <span>Started: {formatDate(campaign.startTime[0])}</span>
+            </div>
+          )}
+          {endTime > 0n && (
+            <div className="flex items-center gap-1">
+              <Clock className="w-4 h-4" />
+              <span>Ends: {formatDate(endTime)}</span>
+            </div>
+          )}
         </div>
-        {campaign.startTime[0] && (
-          <div className="flex items-center gap-1">
-            <Play className="w-4 h-4" />
-            <span>Started: {formatDate(campaign.startTime[0])}</span>
-          </div>
-        )}
-        <div className="flex items-center gap-1">
-          <Clock className="w-4 h-4" />
-          <span>Ends: {formatDate(campaign.endTime)}</span>
-        </div>
-      </div>
+      )}
 
       {/* Actions */}
       <div className="flex flex-wrap gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
@@ -757,7 +773,7 @@ function CampaignCard({
       {showAllocations === campaign.id && (
         <div className="mt-4 p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-700">
           <h4 className="font-semibold text-gray-900 dark:text-white mb-3">
-            Allocations ({campaign.allocations.toString()})
+            Allocations ({allocations.toString()})
           </h4>
           <p className="text-sm text-gray-600 dark:text-gray-400">
             Use the CLI command to view detailed allocations:
