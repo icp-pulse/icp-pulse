@@ -35,6 +35,7 @@ export default function PollsPage() {
   const [votingPoll, setVotingPoll] = useState<bigint | null>(null)
   const [votingOption, setVotingOption] = useState<bigint | null>(null)
   const [openVoteDialog, setOpenVoteDialog] = useState<bigint | null>(null)
+  const [voteSuccessDialog, setVoteSuccessDialog] = useState<bigint | null>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [projectFilter, setProjectFilter] = useState('all')
@@ -163,20 +164,14 @@ export default function PollsPage() {
       const success = await backend.vote(pollId, optionId)
 
       if (success) {
-        // Close the dialog
+        // Close the vote dialog
         setOpenVoteDialog(null)
 
-        toast({
-          title: "✓ Vote submitted!",
-          description: "Your vote has been recorded successfully.",
-          className: "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800",
-          duration: 2000,
-        })
+        // Refresh poll data
+        await fetchData()
 
-        // Redirect to results page after a short delay
-        setTimeout(() => {
-          router.push(`/results?pollId=${pollId}`)
-        }, 500)
+        // Show success dialog with options
+        setVoteSuccessDialog(pollId)
       } else {
         setError('Failed to vote. You may have already voted on this poll.')
         toast({
@@ -754,6 +749,39 @@ export default function PollsPage() {
             </TabsContent>
           </Tabs>
         </div>
+
+        {/* Vote Success Dialog */}
+        <AlertDialog open={voteSuccessDialog !== null} onOpenChange={(open) => !open && setVoteSuccessDialog(null)}>
+          <AlertDialogContent className="sm:max-w-md">
+            <AlertDialogHeader>
+              <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-green-100 dark:bg-green-900/30 rounded-full">
+                <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
+              </div>
+              <AlertDialogTitle className="text-center text-xl">Vote Submitted Successfully!</AlertDialogTitle>
+              <AlertDialogDescription className="text-center">
+                Your vote has been recorded on the blockchain. What would you like to do next?
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter className="flex flex-col sm:flex-row gap-2">
+              <AlertDialogAction
+                onClick={() => {
+                  if (voteSuccessDialog) {
+                    router.push(`/results?pollId=${voteSuccessDialog}`)
+                  }
+                  setVoteSuccessDialog(null)
+                }}
+                className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto"
+              >
+                <BarChart3 className="w-4 h-4 mr-2" />
+                View Results
+              </AlertDialogAction>
+              <AlertDialogCancel className="w-full sm:w-auto mt-0">
+                <Vote className="w-4 h-4 mr-2" />
+                Vote on Another Poll
+              </AlertDialogCancel>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </div>
     </div>
   )
