@@ -21,7 +21,7 @@ interface PollCrowdfundingProps {
     maxResponses: bigint
     currentResponses: bigint
     remainingFund: bigint
-    fundingType: { SelfFunded: null } | { Crowdfunded: null }
+    fundingType: { SelfFunded: null } | { Crowdfunded: null } | { TreasuryFunded: null }
     contributors: Array<[Principal, bigint]>
     tokenCanister: [] | [string]
   }

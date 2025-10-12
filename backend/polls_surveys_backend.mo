@@ -83,7 +83,17 @@ persistent actor class polls_surveys_backend() = this {
     #GenericError: { error_code: Nat; message: Text };
   };
 
-  type FundingType = { #SelfFunded; #Crowdfunded };
+  type FundingType = { #SelfFunded; #Crowdfunded; #TreasuryFunded };
+
+  type RewardDistributionType = { #Fixed; #EqualSplit };
+
+  type PollConfig = {
+    maxResponses: ?Nat;              // Target number of respondents
+    allowAnonymous: Bool;            // Allow anonymous voting
+    allowMultiple: Bool;             // Allow multiple choice selection
+    visibility: Text;                // "public" | "private" | "invite-only"
+    rewardDistributionType: RewardDistributionType; // How rewards are distributed
+  };
 
   type FundingInfo = {
     tokenType: TokenType;         // Type of token used for funding
@@ -95,7 +105,7 @@ persistent actor class polls_surveys_backend() = this {
     maxResponses: Nat;          // Maximum funded responses
     currentResponses: Nat;       // Current response count
     remainingFund: Nat64;       // Remaining token balance in smallest unit
-    fundingType: FundingType;    // Self-funded or crowdfunded
+    fundingType: FundingType;    // Self-funded, crowdfunded, or treasury-funded
     contributors: [(Principal, Nat64)]; // List of contributors and their amounts
     pendingClaims: [(Principal, Nat64)]; // Unclaimed rewards: (user, amount)
   };
@@ -154,6 +164,7 @@ persistent actor class polls_surveys_backend() = this {
     rewardFund : Nat;  // Keep for backward compatibility
     fundingInfo : ?FundingInfo;
     voterPrincipals : [Principal];
+    config : ?PollConfig; // Poll configuration
   };
 
   type PollSummary = { id : PollId; scopeType : ScopeType; scopeId : Nat; title : Text; status : Status; totalVotes : Nat };
@@ -393,30 +404,83 @@ persistent actor class polls_surveys_backend() = this {
   };
 
   // Polls
-  public shared (msg) func create_poll(scopeType : Text, scopeId : Nat, title : Text, description : Text, options : [Text], closesAt : Int, rewardFund : Nat, fundingEnabled : Bool, rewardPerVote : ?Nat64, fundingType : ?Text) : async PollId {
+  public shared (msg) func create_poll(
+    scopeType : Text,
+    scopeId : Nat,
+    title : Text,
+    description : Text,
+    options : [Text],
+    closesAt : Int,
+    rewardFund : Nat,
+    fundingEnabled : Bool,
+    rewardPerVote : ?Nat64,
+    fundingType : ?Text,
+    // New configuration parameters
+    maxResponses : ?Nat,
+    allowAnonymous : ?Bool,
+    allowMultiple : ?Bool,
+    visibility : ?Text,
+    rewardDistributionType : ?Text
+  ) : async PollId {
     assert(options.size() >= 2);
     assert(closesAt > now());
     let id = nextPollId; nextPollId += 1;
     let opts = Array.tabulate<OptionT>(options.size(), func i { { id = i; text = options[i]; votes = 0 } });
 
     let funding_type = switch (fundingType) {
-      case (?ft) { if (ft == "crowdfunded") { #Crowdfunded } else { #SelfFunded } };
+      case (?ft) {
+        if (ft == "crowdfunded") { #Crowdfunded }
+        else if (ft == "treasury-funded") { #TreasuryFunded }
+        else { #SelfFunded }
+      };
       case null { #SelfFunded };
+    };
+
+    let distribution_type = switch (rewardDistributionType) {
+      case (?dt) { if (dt == "equal-split") { #EqualSplit } else { #Fixed } };
+      case null { #Fixed };
+    };
+
+    // Create poll config
+    let pollConfig : PollConfig = {
+      maxResponses = maxResponses;
+      allowAnonymous = switch (allowAnonymous) { case (?val) val; case null false };
+      allowMultiple = switch (allowMultiple) { case (?val) val; case null false };
+      visibility = switch (visibility) { case (?val) val; case null "public" };
+      rewardDistributionType = distribution_type;
     };
 
     let fundingInfo = if (fundingEnabled) {
       switch (rewardPerVote) {
         case (?reward) {
           let totalFund = Nat64.fromNat(rewardFund) * 1_000_000; // Convert cents to e8s (rewardFund is in cents, so multiply by 1M instead of 100M)
-          let maxResponses = if (reward > 0) { Nat64.toNat(totalFund / reward) } else { 0 };
+
+          // Calculate maxResponses and rewardPerResponse based on distribution type
+          let (calculatedMaxResponses, calculatedRewardPerResponse) : (Nat, Nat64) = switch (distribution_type) {
+            case (#EqualSplit) {
+              // For equal split, use the maxResponses from config and calculate reward per response
+              let targetResponses = switch (maxResponses) {
+                case (?target) target;
+                case null 100; // Default to 100 if not specified
+              };
+              let rewardPerResp : Nat64 = if (targetResponses > 0) { totalFund / Nat64.fromNat(targetResponses) } else { 0 : Nat64 };
+              (targetResponses, rewardPerResp)
+            };
+            case (#Fixed) {
+              // For fixed reward, use the provided reward and calculate max responses
+              let maxResp = if (reward > 0) { Nat64.toNat(totalFund / reward) } else { 0 };
+              (maxResp, reward)
+            };
+          };
+
           ?{
             tokenType = #ICP;
             tokenCanister = null;
             tokenSymbol = "ICP";
             tokenDecimals = 8 : Nat8;
             totalFund = totalFund;
-            rewardPerResponse = reward;
-            maxResponses = maxResponses;
+            rewardPerResponse = calculatedRewardPerResponse;
+            maxResponses = calculatedMaxResponses;
             currentResponses = 0;
             remainingFund = totalFund;
             fundingType = funding_type;
@@ -427,7 +491,24 @@ persistent actor class polls_surveys_backend() = this {
         case null { null }
       }
     } else { null };
-    let poll : Poll = { id = id; scopeType = toScopeType(scopeType); scopeId = scopeId; title = title; description = description; options = opts; createdBy = msg.caller; createdAt = now(); closesAt = closesAt; status = #active; totalVotes = 0; rewardFund = rewardFund; fundingInfo = fundingInfo; voterPrincipals = [] };
+
+    let poll : Poll = {
+      id = id;
+      scopeType = toScopeType(scopeType);
+      scopeId = scopeId;
+      title = title;
+      description = description;
+      options = opts;
+      createdBy = msg.caller;
+      createdAt = now();
+      closesAt = closesAt;
+      status = #active;
+      totalVotes = 0;
+      rewardFund = rewardFund;
+      fundingInfo = fundingInfo;
+      voterPrincipals = [];
+      config = ?pollConfig;
+    };
     polls := Array.append(polls, [poll]);
 
     // Track poll creation for quest system (non-blocking)
@@ -449,7 +530,13 @@ persistent actor class polls_surveys_backend() = this {
     tokenCanister : ?Principal,
     totalFunding : Nat64,
     rewardPerVote : Nat64,
-    fundingType : Text
+    fundingType : Text,
+    // New configuration parameters
+    maxResponses : ?Nat,
+    allowAnonymous : ?Bool,
+    allowMultiple : ?Bool,
+    visibility : ?Text,
+    rewardDistributionType : ?Text
   ) : async Result.Result<PollId, Text> {
     assert(options.size() >= 2);
     assert(closesAt > now());
@@ -470,7 +557,23 @@ persistent actor class polls_surveys_backend() = this {
     // Get token info
     let (tokenSymbol, tokenDecimals) = await getTokenInfo(tokenCanister);
 
-    let funding_type = if (fundingType == "crowdfunded") { #Crowdfunded } else { #SelfFunded };
+    let funding_type = if (fundingType == "crowdfunded") { #Crowdfunded }
+                      else if (fundingType == "treasury-funded") { #TreasuryFunded }
+                      else { #SelfFunded };
+
+    let distribution_type = switch (rewardDistributionType) {
+      case (?dt) { if (dt == "equal-split") { #EqualSplit } else { #Fixed } };
+      case null { #Fixed };
+    };
+
+    // Create poll config
+    let pollConfig : PollConfig = {
+      maxResponses = maxResponses;
+      allowAnonymous = switch (allowAnonymous) { case (?val) val; case null false };
+      allowMultiple = switch (allowMultiple) { case (?val) val; case null false };
+      visibility = switch (visibility) { case (?val) val; case null "public" };
+      rewardDistributionType = distribution_type;
+    };
 
     // For self-funded polls, pull the funding from creator
     if (funding_type == #SelfFunded and totalFunding > 0) {
@@ -518,6 +621,26 @@ persistent actor class polls_surveys_backend() = this {
       };
     };
 
+    // Calculate maxResponses and rewardPerResponse based on distribution type
+    let (calculatedMaxResponses, calculatedRewardPerResponse) : (Nat, Nat64) = switch (distribution_type) {
+      case (#EqualSplit) {
+        // For equal split, use the maxResponses from config and calculate reward per response
+        let targetResponses = switch (maxResponses) {
+          case (?target) target;
+          case null 100; // Default to 100 if not specified
+        };
+        let rewardPerResp : Nat64 = if (targetResponses > 0) {
+          totalFunding / Nat64.fromNat(targetResponses)
+        } else { 0 : Nat64 };
+        (targetResponses, rewardPerResp)
+      };
+      case (#Fixed) {
+        // For fixed reward, use the provided reward and calculate max responses
+        let maxResp = if (rewardPerVote > 0) { Nat64.toNat(totalFunding / rewardPerVote) } else { 0 };
+        (maxResp, rewardPerVote)
+      };
+    };
+
     let fundingInfo = {
       tokenType = switch (tokenCanister) {
         case null { #ICP };
@@ -527,8 +650,8 @@ persistent actor class polls_surveys_backend() = this {
       tokenSymbol = tokenSymbol;
       tokenDecimals = tokenDecimals;
       totalFund = totalFunding;
-      rewardPerResponse = rewardPerVote;
-      maxResponses = if (rewardPerVote > 0) { Nat64.toNat(totalFunding / rewardPerVote) } else { 0 };
+      rewardPerResponse = calculatedRewardPerResponse;
+      maxResponses = calculatedMaxResponses;
       currentResponses = 0;
       remainingFund = totalFunding;
       fundingType = funding_type;
@@ -551,6 +674,7 @@ persistent actor class polls_surveys_backend() = this {
       rewardFund = Nat64.toNat(totalFunding / 1_000_000); // Convert back to legacy format for backward compatibility
       fundingInfo = ?fundingInfo;
       voterPrincipals = [];
+      config = ?pollConfig;
     };
 
     polls := Array.append(polls, [poll]);
@@ -577,6 +701,7 @@ persistent actor class polls_surveys_backend() = this {
             // Check if poll is crowdfunded
             switch (info.fundingType) {
               case (#SelfFunded) { return #err("Poll is self-funded and does not accept contributions") };
+              case (#TreasuryFunded) { return #err("Poll is treasury-funded and does not accept public contributions") };
               case (#Crowdfunded) {
                 // Check if poll is still active
                 if (poll.status != #active) {
