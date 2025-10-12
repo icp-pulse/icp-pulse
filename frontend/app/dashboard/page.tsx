@@ -11,6 +11,7 @@ import { Coins, Gift, CheckCircle, Clock, AlertCircle, Vote, BarChart3, Trophy, 
 import { analytics } from '@/lib/analytics'
 import Link from 'next/link'
 import { WalletBalance } from '@/components/WalletBalance'
+import { CampaignCarouselBanner } from '@/components/landing/campaign-carousel-banner'
 
 import type { PendingReward, BackendPendingReward, Poll } from '@/lib/types'
 
@@ -258,9 +259,11 @@ export default function ParticipantDashboard() {
   const claimedRewards = rewards.filter(r => 'claimed' in r.status)
 
   return (
-    <div className="container mx-auto px-4 py-8 max-w-6xl">
-      {/* Header */}
-      <div className="mb-8">
+    <>
+      <CampaignCarouselBanner />
+      <div className="container mx-auto px-4 py-8 max-w-6xl">
+        {/* Header */}
+        <div className="mb-8">
         <h1 className="text-3xl font-bold flex items-center gap-2 mb-2">
           <BarChart3 className="h-8 w-8 text-primary" />
           Participant Dashboard
@@ -573,6 +576,7 @@ export default function ParticipantDashboard() {
           </div>
         </TabsContent>
       </Tabs>
-    </div>
+      </div>
+    </>
   )
 }
