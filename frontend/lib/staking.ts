@@ -512,6 +512,18 @@ export async function createPulsegActor(
 }
 
 // Utility functions
+/**
+ * Format PULSE tokens from smallest units (e8s) to display format
+ *
+ * PULSE uses 8 decimals:
+ * - 100_000_000 e8s = 1.0 PULSE (displayed)
+ * - 10_000 e8s = 0.0001 PULSE (transfer fee)
+ * - 500_000_000 e8s = 5.0 PULSE (displayed)
+ *
+ * @param amount - Amount in smallest units (e8s)
+ * @param decimals - Number of decimals (default: 8)
+ * @returns Formatted string for display
+ */
 export function formatPulse(amount: bigint, decimals: number = 8): string {
   const divisor = BigInt(10 ** decimals)
   const whole = amount / divisor
@@ -520,6 +532,18 @@ export function formatPulse(amount: bigint, decimals: number = 8): string {
   return `${whole}.${fractionStr}`
 }
 
+/**
+ * Parse PULSE tokens from display format to smallest units (e8s)
+ *
+ * Converts display values to e8s for contract calls:
+ * - "1.0" → 100_000_000n e8s
+ * - "5.5" → 550_000_000n e8s
+ * - "0.0001" → 10_000n e8s (transfer fee)
+ *
+ * @param amount - Amount as string in display format
+ * @param decimals - Number of decimals (default: 8)
+ * @returns Amount in smallest units (e8s)
+ */
 export function parsePulse(amount: string, decimals: number = 8): bigint {
   const [whole, fraction = '0'] = amount.split('.')
   const paddedFraction = fraction.padEnd(decimals, '0').slice(0, decimals)
