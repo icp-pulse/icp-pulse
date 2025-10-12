@@ -1,4 +1,4 @@
-import { Folder, ClipboardList, BarChart3, Download, Settings, TrendingUp, Gift, Trophy } from "lucide-react";
+import { Folder, ClipboardList, BarChart3, Download, Settings, TrendingUp, Gift, Trophy, Wallet, Coins } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@lib/utils";
 import Link from "next/link";
@@ -6,8 +6,8 @@ import { useRouter } from "next/navigation";
 import { useIsAdmin } from "@/components/AdminGuard";
 
 interface SidebarProps {
-  activeTab: "projects" | "surveys" | "polls" | "airdrops" | "quests";
-  onTabChange: (tab: "projects" | "surveys" | "polls" | "airdrops" | "quests") => void;
+  activeTab: "projects" | "surveys" | "polls" | "airdrops" | "quests" | "holders";
+  onTabChange: (tab: "projects" | "surveys" | "polls" | "airdrops" | "quests" | "holders") => void;
   isCollapsed: boolean;
 }
 
@@ -31,6 +31,32 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed }: Sidebar
     refetchOnWindowFocus: false,
   });
 
+  // Fetch token holder count
+  const { data: holderCount } = useQuery({
+    queryKey: ["holderCount"],
+    queryFn: async () => {
+      const { createActor } = await import('@/lib/icp')
+      const canisterId = process.env.NEXT_PUBLIC_TOKEN_CANISTER_ID || 'zix77-6qaaa-aaaao-a4pwq-cai'
+      const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
+
+      const backend = await createActor({
+        canisterId,
+        host,
+        idlFactory: ({ IDL }) => {
+          return IDL.Service({
+            'get_holder_count': IDL.Func([], [IDL.Nat], ['query']),
+          });
+        }
+      })
+
+      return Number(await backend.get_holder_count())
+    },
+    staleTime: 30000,
+    retry: 1,
+    refetchOnMount: true,
+    refetchOnWindowFocus: false,
+  });
+
   const baseNavItems = [
     { id: "projects" as const, icon: Folder, label: "Projects", count: Number(stats?.projectCount || 0), adminOnly: false },
     { id: "surveys" as const, icon: ClipboardList, label: "Surveys", count: Number(stats?.surveyCount || 0), adminOnly: false },
@@ -40,6 +66,7 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed }: Sidebar
   const adminNavItems = [
     { id: "airdrops" as const, icon: Gift, label: "Airdrops", count: 0, adminOnly: true },
     { id: "quests" as const, icon: Trophy, label: "Quests", count: 0, adminOnly: true },
+    { id: "holders" as const, icon: Wallet, label: "Holders", count: holderCount || 0, adminOnly: true },
   ];
 
   const navItems = isAdmin ? [...baseNavItems, ...adminNavItems] : baseNavItems;
@@ -86,6 +113,12 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed }: Sidebar
               Quick Actions
             </h3>
             <ul className="space-y-2">
+              <li>
+                <Link href="/token-stats" className="w-full flex items-center px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
+                  <Coins className="w-4 h-4 mr-3" />
+                  Token Stats
+                </Link>
+              </li>
               <li>
                 <Link href="/analytics" className="w-full flex items-center px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
                   <TrendingUp className="w-4 h-4 mr-3" />
