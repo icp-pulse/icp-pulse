@@ -8,11 +8,10 @@ import { Button } from '@/components/ui/button'
 import { Coins, TrendingUp, Lock, RefreshCw, AlertCircle, Info } from 'lucide-react'
 import {
   PULSE_MAX_SUPPLY,
+  PULSE_MAX_SUPPLY_E8S,
   PULSE_DECIMALS,
   PULSE_TRANSFER_FEE_DISPLAY,
   formatPULSE,
-  calculateMintedPercentage,
-  calculateRemainingSupply,
   formatLargeNumber
 } from '@/lib/token-constants'
 
@@ -22,6 +21,7 @@ interface TokenStatsProps {
 
 export function TokenStatsDashboard({ canisterId }: TokenStatsProps) {
   const [totalSupply, setTotalSupply] = useState<bigint | null>(null)
+  const [maxSupply, setMaxSupply] = useState<bigint | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [tokenName, setTokenName] = useState<string>('PULSE')
@@ -38,30 +38,37 @@ export function TokenStatsDashboard({ canisterId }: TokenStatsProps) {
         throw new Error('Token canister ID not configured')
       }
 
-      // Import the tokenmania actor
-      const { createActor } = await import('../../src/declarations/tokenmania')
-      const { HttpAgent } = await import('@dfinity/agent')
+      // Import the createActor utility
+      const { createActor } = await import('@/lib/icp')
 
       const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local'
         ? 'http://127.0.0.1:4943'
         : 'https://ic0.app'
 
-      const agent = HttpAgent.createSync({ host })
+      // Create actor with IDL that includes icrc1_max_supply
+      const tokenActor = await createActor({
+        canisterId: tokenCanisterId,
+        host,
+        idlFactory: ({ IDL }) => {
+          return IDL.Service({
+            'icrc1_total_supply': IDL.Func([], [IDL.Nat], ['query']),
+            'icrc1_name': IDL.Func([], [IDL.Text], ['query']),
+            'icrc1_symbol': IDL.Func([], [IDL.Text], ['query']),
+            'icrc1_max_supply': IDL.Func([], [IDL.Nat], ['query']),
+          });
+        }
+      })
 
-      if (process.env.NEXT_PUBLIC_DFX_NETWORK === 'local') {
-        await agent.fetchRootKey()
-      }
-
-      const tokenActor = createActor(tokenCanisterId, { agent })
-
-      // Fetch token stats
-      const [supply, name, symbol] = await Promise.all([
+      // Fetch token stats including max supply from backend
+      const [supply, name, symbol, maxSup] = await Promise.all([
         tokenActor.icrc1_total_supply(),
         tokenActor.icrc1_name(),
-        tokenActor.icrc1_symbol()
+        tokenActor.icrc1_symbol(),
+        tokenActor.icrc1_max_supply()
       ])
 
       setTotalSupply(supply)
+      setMaxSupply(maxSup)
       setTokenName(name)
       setTokenSymbol(symbol)
       setLastRefresh(new Date())
@@ -77,8 +84,14 @@ export function TokenStatsDashboard({ canisterId }: TokenStatsProps) {
     fetchTokenStats()
   }, [fetchTokenStats])
 
-  const mintedPercentage = totalSupply ? calculateMintedPercentage(totalSupply) : 0
-  const remainingSupply = totalSupply ? calculateRemainingSupply(totalSupply) : PULSE_MAX_SUPPLY
+  // Use backend max supply if available, otherwise fallback to constant
+  const effectiveMaxSupply = maxSupply || PULSE_MAX_SUPPLY_E8S
+  const effectiveMaxSupplyDisplay = maxSupply ? Number(formatPULSE(maxSupply)) : Number(PULSE_MAX_SUPPLY)
+
+  const mintedPercentage = totalSupply && maxSupply
+    ? Number((totalSupply * 10000n) / maxSupply) / 100
+    : 0
+  const remainingSupply = totalSupply && maxSupply ? maxSupply - totalSupply : effectiveMaxSupply
   const totalSupplyFormatted = totalSupply ? Number(formatPULSE(totalSupply)) : 0
   const remainingFormatted = Number(formatPULSE(remainingSupply))
 
@@ -150,7 +163,7 @@ export function TokenStatsDashboard({ canisterId }: TokenStatsProps) {
         <CardHeader>
           <CardTitle className="text-2xl">Total Supply Overview</CardTitle>
           <CardDescription>
-            Current minted supply out of maximum cap of 1 billion tokens
+            Current minted supply out of maximum cap of {formatLargeNumber(effectiveMaxSupplyDisplay)} tokens
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -163,7 +176,7 @@ export function TokenStatsDashboard({ canisterId }: TokenStatsProps) {
             <Progress value={mintedPercentage} className="h-4" />
             <div className="flex justify-between text-xs text-muted-foreground">
               <span>0 {tokenSymbol}</span>
-              <span>{formatLargeNumber(Number(PULSE_MAX_SUPPLY))} {tokenSymbol} (Max)</span>
+              <span>{formatLargeNumber(effectiveMaxSupplyDisplay)} {tokenSymbol} (Max)</span>
             </div>
           </div>
 
@@ -205,7 +218,7 @@ export function TokenStatsDashboard({ canisterId }: TokenStatsProps) {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-2xl font-bold">{formatLargeNumber(Number(PULSE_MAX_SUPPLY))}</p>
+            <p className="text-2xl font-bold">{formatLargeNumber(effectiveMaxSupplyDisplay)}</p>
             <p className="text-sm text-muted-foreground mt-1">
               {tokenSymbol} tokens (fixed cap)
             </p>
@@ -265,7 +278,7 @@ export function TokenStatsDashboard({ canisterId }: TokenStatsProps) {
         <CardContent className="text-sm space-y-2 text-blue-900 dark:text-blue-100">
           <p>
             <strong>Fixed Supply:</strong> {tokenName} has a maximum supply of{' '}
-            <strong>{formatLargeNumber(Number(PULSE_MAX_SUPPLY))} tokens</strong>, permanently enforced
+            <strong>{formatLargeNumber(effectiveMaxSupplyDisplay)} tokens</strong>, permanently enforced
             at the smart contract level.
           </p>
           <p>
