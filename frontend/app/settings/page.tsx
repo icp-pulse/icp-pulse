@@ -21,7 +21,7 @@ function SettingsContent() {
   const [success, setSuccess] = useState(false)
   const { identity, isAuthenticated } = useIcpAuth()
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
-  const [activeTab, setActiveTab] = useState<'projects' | 'surveys' | 'polls' | 'airdrops' | 'quests'>('projects')
+  const [activeTab, setActiveTab] = useState<'projects' | 'surveys' | 'polls' | 'airdrops' | 'quests' | 'holders'>('projects')
 
   const checkApiKey = async () => {
     if (!isAuthenticated) {
