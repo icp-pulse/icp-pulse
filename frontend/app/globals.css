@@ -18,3 +18,10 @@ html, body, :root { height: 100%; }
 .animate-fade-in-up {
   animation: fadeInUp 0.7s ease-out forwards;
 }
+
+/* Mobile Bottom Navigation Spacing */
+@media (max-width: 767px) {
+  .mobile-main-content {
+    padding-bottom: 90px; /* Height of nav (60px) + bottom spacing (12px) + extra buffer (18px) */
+  }
+}

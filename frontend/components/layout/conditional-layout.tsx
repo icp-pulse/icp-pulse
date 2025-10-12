@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import { LoginButton } from '@/components/LoginButton'
 import { UserMenu } from '@/components/UserMenu'
+import { MobileBottomNav } from '@/components/layout/mobile-bottom-nav'
 import { Menu, X } from 'lucide-react'
 import { useIcpAuth } from '@/components/IcpAuthProvider'
 
@@ -133,7 +134,7 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
           <ThemeToggle />
         </div>
 
-        {/* Mobile Menu Button */}
+        {/* Mobile Menu Button - Only show on mobile for additional actions */}
         <button
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
           className="md:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
@@ -142,26 +143,10 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
         </button>
       </header>
 
-      {/* Mobile Navigation */}
+      {/* Mobile Top Menu - For additional actions only */}
       {mobileMenuOpen && (
         <div className="md:hidden mb-4 pb-4 border-b border-gray-200 dark:border-gray-800">
-          <nav className="flex flex-col gap-2">
-            {navLinks.map((link) => (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-                  pathname === link.href
-                    ? 'bg-gray-100 dark:bg-gray-800'
-                    : 'hover:bg-gray-100 dark:hover:bg-gray-800'
-                }`}
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                {link.label}
-              </Link>
-            ))}
-          </nav>
-          <div className="flex items-center gap-3 mt-4 px-4">
+          <div className="flex items-center gap-3 px-4">
             {!isAuthenticated && <LoginButton />}
             {isAuthenticated && <UserMenu />}
             <ThemeToggle />
@@ -169,7 +154,10 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
         </div>
       )}
 
-      <main>{children}</main>
+      <main className="mobile-main-content">{children}</main>
+
+      {/* Mobile Bottom Navigation - Primary navigation on mobile */}
+      <MobileBottomNav />
     </div>
   )
 }

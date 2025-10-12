@@ -7,7 +7,7 @@ import { QuickActionSection } from './quick-action-section'
 import { QuickActionHero } from './quick-action-hero'
 import { HowItWorksSection } from './how-it-works-section'
 import { WhyChooseSection } from './why-choose-section'
-import { QuestsBanner } from './quests-banner'
+import { CampaignCarouselBanner } from './campaign-carousel-banner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent } from '@/components/ui/card'
@@ -52,8 +52,8 @@ export function LandingPage() {
   }
   return (
     <div className="min-h-screen bg-white dark:bg-gray-900">
-      {/* Active Quests Banner */}
-      <QuestsBanner />
+      {/* Campaign Carousel Banner */}
+      <CampaignCarouselBanner />
 
       {/* Hero Section */}
       <section className="relative pt-20 pb-32 overflow-hidden">
