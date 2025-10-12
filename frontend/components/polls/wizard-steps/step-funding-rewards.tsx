@@ -423,9 +423,9 @@ export function StepFundingRewards({
                 <ul className="text-sm text-green-800 dark:text-green-200 space-y-1 list-disc list-inside">
                   <li>Voters receive {tokenInfo.symbol} rewards directly to their wallets</li>
                   <li>Rewards are distributed automatically upon voting</li>
-                  <li>{fundingSource === 'self-funded' && 'You must approve token transfer before poll creation'}</li>
-                  <li>{fundingSource === 'crowdfunded' && 'Others can contribute to increase the reward pool'}</li>
-                  <li>{fundingSource === 'treasury-funded' && 'Requires governance approval from the treasury'}</li>
+                  {fundingSource === 'self-funded' && <li>You must approve token transfer before poll creation</li>}
+                  {fundingSource === 'crowdfunded' && <li>Others can contribute to increase the reward pool</li>}
+                  {fundingSource === 'treasury-funded' && <li>Requires governance approval from the treasury</li>}
                   <li>Once the fund is depleted, voting continues without rewards</li>
                 </ul>
               </div>

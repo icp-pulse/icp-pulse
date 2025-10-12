@@ -6,7 +6,15 @@ export const idlFactory = ({ IDL: I = IDL }) => {
   const ScopeType = I.Variant({ project: I.Null, product: I.Null })
 
   const TokenType = I.Variant({ ICP: I.Null, ICRC1: I.Principal })
-  const FundingType = I.Variant({ SelfFunded: I.Null, Crowdfunded: I.Null })
+  const FundingType = I.Variant({ SelfFunded: I.Null, Crowdfunded: I.Null, TreasuryFunded: I.Null })
+  const RewardDistributionType = I.Variant({ Fixed: I.Null, EqualSplit: I.Null })
+  const PollConfig = I.Record({
+    maxResponses: I.Opt(I.Nat),
+    allowAnonymous: I.Bool,
+    allowMultiple: I.Bool,
+    visibility: I.Text,
+    rewardDistributionType: RewardDistributionType,
+  })
   const FundingInfo = I.Record({
     tokenType: TokenType,
     tokenCanister: I.Opt(I.Principal),
@@ -71,6 +79,7 @@ export const idlFactory = ({ IDL: I = IDL }) => {
     rewardFund: I.Nat,
     fundingInfo: I.Opt(FundingInfo),
     voterPrincipals: I.Vec(I.Principal),
+    config: I.Opt(PollConfig),
   })
   const PollSummary = I.Record({ id: I.Nat, scopeType: ScopeType, scopeId: I.Nat, title: I.Text, status: Status, totalVotes: I.Nat })
 
@@ -148,8 +157,8 @@ export const idlFactory = ({ IDL: I = IDL }) => {
     get_product: I.Func([I.Nat], [I.Opt(Product)], ['query']),
     update_product: I.Func([I.Nat, I.Text, I.Text, I.Text], [I.Bool], []),
 
-    create_poll: I.Func([I.Text, I.Nat, I.Text, I.Text, I.Vec(I.Text), I.Int, I.Nat, I.Bool, I.Opt(I.Nat64), I.Opt(I.Text)], [I.Nat], []),
-    create_custom_token_poll: I.Func([I.Text, I.Nat, I.Text, I.Text, I.Vec(I.Text), I.Int, I.Opt(I.Principal), I.Nat64, I.Nat64, I.Text], [I.Variant({ ok: I.Nat, err: I.Text })], []),
+    create_poll: I.Func([I.Text, I.Nat, I.Text, I.Text, I.Vec(I.Text), I.Int, I.Nat, I.Bool, I.Opt(I.Nat64), I.Opt(I.Text), I.Opt(I.Nat), I.Opt(I.Bool), I.Opt(I.Bool), I.Opt(I.Text), I.Opt(I.Text)], [I.Nat], []),
+    create_custom_token_poll: I.Func([I.Text, I.Nat, I.Text, I.Text, I.Vec(I.Text), I.Int, I.Opt(I.Principal), I.Nat64, I.Nat64, I.Text, I.Opt(I.Nat), I.Opt(I.Bool), I.Opt(I.Bool), I.Opt(I.Text), I.Opt(I.Text)], [I.Variant({ ok: I.Nat, err: I.Text })], []),
     list_polls_by_project: I.Func([I.Nat, I.Nat, I.Nat], [I.Vec(PollSummary)], ['query']),
     list_polls_by_product: I.Func([I.Nat, I.Nat, I.Nat], [I.Vec(PollSummary)], ['query']),
     get_poll: I.Func([I.Nat], [I.Opt(Poll)], ['query']),

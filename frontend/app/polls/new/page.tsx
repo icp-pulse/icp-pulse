@@ -295,8 +295,9 @@ function NewPollPageContent() {
       const result = await backend.generate_poll_options(title)
 
       if (result && result.length > 0 && result[0]) {
-        // Clear existing options
-        while (fields.length > 0) {
+        // Clear existing options - remove from the end to avoid index issues
+        const numFieldsToRemove = fields.length
+        for (let i = 0; i < numFieldsToRemove; i++) {
           remove(0)
         }
         // Add generated options
