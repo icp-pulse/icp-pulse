@@ -86,12 +86,39 @@ export function CampaignCarouselBanner() {
   const announcements: Announcement[] = [
     {
       id: 'ido-sale',
-      title: '🚀 PULSE Token IDO - Live Now!',
-      description: 'Join the decentralized token distribution | Multi-pool vesting | Transparent distribution',
+      title: '🚀 PULSE Token IDO - Coming Soon!',
+      description: 'Join the decentralized token distribution | Multi-pool vesting | Secure on ICP',
       ctaText: 'Participate Now',
       ctaLink: 'https://ej3ry-6qaaa-aaaai-atlza-cai.icp0.io/',
       icon: 'rocket',
       gradient: 'from-blue-600 via-purple-600 to-pink-600'
+    },
+    {
+      id: 'quest-launch',
+      title: '🎯 Quest System - Earn PULSE Tokens!',
+      description: 'Complete quests and earn points to claim your share of 50,000 PULSE tokens',
+      ctaText: 'Start Quests',
+      ctaLink: '/quests',
+      icon: 'sparkles',
+      gradient: 'from-purple-600 via-indigo-600 to-blue-600'
+    },
+    {
+      id: 'early-adopter',
+      title: '💎 Early Adopter Rewards',
+      description: 'Join True Pulse now and participate in exclusive airdrop campaigns for early supporters',
+      ctaText: 'Learn More',
+      ctaLink: '/airdrop',
+      icon: 'gift',
+      gradient: 'from-green-600 via-teal-600 to-cyan-600'
+    },
+    {
+      id: 'community',
+      title: '⭐ Join Our Growing Community',
+      description: 'Connect with thousands of users creating polls, surveys, and making decisions on-chain',
+      ctaText: 'Get Started',
+      ctaLink: '/polls',
+      icon: 'star',
+      gradient: 'from-orange-600 via-red-600 to-pink-600'
     }
   ]
 
