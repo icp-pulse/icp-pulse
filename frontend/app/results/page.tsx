@@ -7,7 +7,7 @@ import { createBackendWithIdentity } from '@/lib/icp'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { BarChart3, PieChart as PieChartIcon, Users, Calendar, Clock, Award, Eye } from 'lucide-react'
 import type { Poll } from '@/../../src/declarations/polls_surveys_backend/polls_surveys_backend.did'
@@ -340,62 +340,69 @@ function ResultsContent() {
                     View Detailed Results
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-2xl">
+                <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto bg-white dark:bg-gray-900">
                   <DialogHeader>
                     <DialogTitle>Detailed Poll Results</DialogTitle>
                   </DialogHeader>
                   <div className="space-y-6">
                     {/* Poll Information */}
                     <div>
-                      <h3 className="font-semibold mb-2">Poll Information</h3>
-                      <div className="bg-gray-50 p-4 rounded-lg space-y-2">
-                        <p><strong>Title:</strong> {poll.title}</p>
-                        <p><strong>Description:</strong> {poll.description}</p>
-                        <p><strong>Created:</strong> {formatDate(Number(poll.createdAt))}</p>
-                        <p><strong>Closes:</strong> {formatDate(Number(poll.closesAt))}</p>
-                        <p><strong>Total Votes:</strong> {Number(poll.totalVotes)}</p>
-                        <p><strong>Total Voters:</strong> {poll.voterPrincipals.length}</p>
-                        <p><strong>Created By:</strong> {poll.createdBy.toString()}</p>
+                      <h3 className="font-semibold mb-2 text-gray-900 dark:text-gray-100">Poll Information</h3>
+                      <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg space-y-2 text-gray-900 dark:text-gray-100">
+                        <p><strong className="text-gray-900 dark:text-gray-100">Title:</strong> {poll.title}</p>
+                        <p><strong className="text-gray-900 dark:text-gray-100">Description:</strong> {poll.description}</p>
+                        <p><strong className="text-gray-900 dark:text-gray-100">Created:</strong> {formatDate(Number(poll.createdAt))}</p>
+                        <p><strong className="text-gray-900 dark:text-gray-100">Closes:</strong> {formatDate(Number(poll.closesAt))}</p>
+                        <p><strong className="text-gray-900 dark:text-gray-100">Total Votes:</strong> {Number(poll.totalVotes)}</p>
+                        <p><strong className="text-gray-900 dark:text-gray-100">Total Voters:</strong> {poll.voterPrincipals.length}</p>
+                        <p className="break-all"><strong className="text-gray-900 dark:text-gray-100">Created By:</strong> {poll.createdBy.toString()}</p>
                       </div>
                     </div>
 
                     {/* Funding Information */}
                     {poll.fundingInfo && poll.fundingInfo.length > 0 && poll.fundingInfo[0] && (
                       <div>
-                        <h3 className="font-semibold mb-2">Funding Information</h3>
-                        <div className="bg-blue-50 p-4 rounded-lg space-y-2">
-                          <p><strong>Token:</strong> {poll.fundingInfo[0].tokenSymbol}</p>
-                          <p><strong>Total Fund:</strong> {formatTokenAmount(poll.fundingInfo[0].totalFund)} {poll.fundingInfo[0].tokenSymbol}</p>
-                          <p><strong>Reward Per Vote:</strong> {formatTokenAmount(poll.fundingInfo[0].rewardPerResponse)} {poll.fundingInfo[0].tokenSymbol}</p>
-                          <p><strong>Max Responses:</strong> {poll.fundingInfo[0].maxResponses}</p>
-                          <p><strong>Current Responses:</strong> {poll.fundingInfo[0].currentResponses}</p>
-                          <p><strong>Remaining Fund:</strong> {formatTokenAmount(poll.fundingInfo[0].remainingFund)} {poll.fundingInfo[0].tokenSymbol}</p>
+                        <h3 className="font-semibold mb-2 text-gray-900 dark:text-gray-100">Funding Information</h3>
+                        <div className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-lg space-y-2 text-gray-900 dark:text-gray-100">
+                          <p><strong className="text-gray-900 dark:text-gray-100">Token:</strong> {poll.fundingInfo[0].tokenSymbol}</p>
+                          <p><strong className="text-gray-900 dark:text-gray-100">Total Fund:</strong> {formatTokenAmount(poll.fundingInfo[0].totalFund)} {poll.fundingInfo[0].tokenSymbol}</p>
+                          <p><strong className="text-gray-900 dark:text-gray-100">Reward Per Vote:</strong> {formatTokenAmount(poll.fundingInfo[0].rewardPerResponse)} {poll.fundingInfo[0].tokenSymbol}</p>
+                          <p><strong className="text-gray-900 dark:text-gray-100">Max Responses:</strong> {Number(poll.fundingInfo[0].maxResponses)}</p>
+                          <p><strong className="text-gray-900 dark:text-gray-100">Current Responses:</strong> {Number(poll.fundingInfo[0].currentResponses)}</p>
+                          <p><strong className="text-gray-900 dark:text-gray-100">Remaining Fund:</strong> {formatTokenAmount(poll.fundingInfo[0].remainingFund)} {poll.fundingInfo[0].tokenSymbol}</p>
                         </div>
                       </div>
                     )}
 
                     {/* Vote Breakdown */}
                     <div>
-                      <h3 className="font-semibold mb-2">Vote Breakdown</h3>
+                      <h3 className="font-semibold mb-2 text-gray-900 dark:text-gray-100">Vote Breakdown</h3>
                       <div className="space-y-2">
                         {chartData.map((option, index) => (
-                          <div key={index} className="flex items-center justify-between p-3 border rounded">
+                          <div key={index} className="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded bg-white dark:bg-gray-800">
                             <div className="flex items-center gap-3">
                               <div
                                 className="w-4 h-4 rounded-full"
                                 style={{ backgroundColor: option.color }}
                               />
-                              <span className="font-medium">{option.name}</span>
+                              <span className="font-medium text-gray-900 dark:text-gray-100">{option.name}</span>
                             </div>
                             <div className="text-right">
-                              <div className="font-semibold">{option.value} votes</div>
-                              <div className="text-sm text-muted-foreground">{option.percentage.toFixed(1)}%</div>
+                              <div className="font-semibold text-gray-900 dark:text-gray-100">{option.value} votes</div>
+                              <div className="text-sm text-gray-600 dark:text-gray-400">{option.percentage.toFixed(1)}%</div>
                             </div>
                           </div>
                         ))}
                       </div>
                     </div>
                   </div>
+                  <DialogFooter>
+                    <DialogClose asChild>
+                      <Button variant="outline" className="w-full sm:w-auto">
+                        Close
+                      </Button>
+                    </DialogClose>
+                  </DialogFooter>
                 </DialogContent>
               </Dialog>
             </CardContent>
