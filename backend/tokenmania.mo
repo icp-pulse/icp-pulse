@@ -9,6 +9,7 @@ import Principal "mo:base/Principal";
 import Option "mo:base/Option";
 import Time "mo:base/Time";
 import Int "mo:base/Int";
+import Nat "mo:base/Nat";
 import Nat8 "mo:base/Nat8";
 import Nat64 "mo:base/Nat64";
 
@@ -17,6 +18,7 @@ persistent actor class Tokenmania() = this {
   // PULSE Token Maximum Supply: 1 billion tokens
   // With 8 decimals: 1 PULSE = 100_000_000 e8s (smallest units)
   // Max supply = 1,000,000,000 PULSE = 100_000_000_000_000_000 e8s
+  // This is enforced by the smart contract - no more tokens can be minted
   private let MAX_SUPPLY : Nat = 100_000_000_000_000_000;
 
   // Set temporary values for the token.
@@ -422,7 +424,7 @@ persistent actor class Tokenmania() = this {
   var persistedLog : [Transaction] = [];
 
   system func preupgrade() {
-    persistedLog := log.toArray();
+    persistedLog := Buffer.toArray(log);
   };
 
   system func postupgrade() {
@@ -449,12 +451,12 @@ persistent actor class Tokenmania() = this {
     };
 
     let result = if (accountsEqual(transfer.from, minter)) {
-      // Enforce maximum supply cap: prevent minting beyond 1 billion PULSE
+      // Enforce maximum supply cap
       let currentSupply = totalSupply(log);
       if (currentSupply + transfer.amount > MAX_SUPPLY) {
         return #Err(#GenericError {
           error_code = 1001;
-          message = "Minting would exceed maximum supply of 1 billion PULSE tokens"
+          message = "Minting would exceed maximum supply"
         });
       };
 
@@ -553,6 +555,40 @@ persistent actor class Tokenmania() = this {
   // 1 billion PULSE = 100_000_000_000_000_000 e8s (with 8 decimals)
   public query func icrc1_max_supply() : async Tokens {
     MAX_SUPPLY;
+  };
+
+  // Admin function to burn tokens from minting account
+  // This is needed because standard burns (transfer TO minting account)
+  // don't work when the minting account itself is the caller
+  public shared ({ caller }) func burn_from_minting_account(amount : Nat) : async Result<TxIndex, Text> {
+    if (not Principal.equal(caller, init.minting_account.owner)) {
+      return #Err("Only minting account can burn its own tokens");
+    };
+
+    let mintingBalance = balance(init.minting_account, log);
+    if (mintingBalance < amount) {
+      return #Err("Insufficient balance in minting account");
+    };
+
+    // Create a burn transaction
+    let now = Nat64.fromNat(Int.abs(Time.now()));
+    let burnTx : Transaction = {
+      operation = #Burn({
+        spender = init.minting_account;
+        source = #Icrc1Transfer;
+        from = init.minting_account;
+        to = init.minting_account;
+        amount = amount;
+        fee = null;
+        memo = null;
+        created_at_time = ?now;
+      });
+      fee = 0;
+      timestamp = now;
+    };
+
+    let txid = recordTransaction(burnTx);
+    #Ok(txid);
   };
 
   public query func icrc1_minting_account() : async ?Account {
@@ -769,7 +805,7 @@ persistent actor class Tokenmania() = this {
       i += 1;
     };
 
-    result.toArray();
+    Buffer.toArray(result);
   };
 
   // Get all unique token holders by scanning the transaction log
@@ -816,7 +852,7 @@ persistent actor class Tokenmania() = this {
       };
     };
 
-    holders.toArray();
+    Buffer.toArray(holders);
   };
 
   // Helper function to check if principal already in list

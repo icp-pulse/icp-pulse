@@ -4,19 +4,25 @@
  * PULSE uses 8 decimals, meaning:
  * - 1 PULSE (displayed) = 100,000,000 e8s (smallest units)
  * - Transfer fee = 10,000 e8s = 0.0001 PULSE (displayed)
- * - Max supply = 1 billion PULSE = 100,000,000,000,000,000 e8s
+ * - Max supply = 1.35 billion PULSE = 135,000,000,000,000,000 e8s
+ *
+ * Supply Breakdown:
+ * - 1 billion PULSE: Treasury/Team allocation
+ * - 350 million PULSE: IDO platform allocation
+ * - Total: 1.35 billion PULSE (hard cap enforced by smart contract)
  */
 
 // Token decimals - PULSE uses 8 decimal places
 export const PULSE_DECIMALS = 8;
 
-// Maximum supply: 1 billion PULSE tokens
+// Maximum supply: 1.35 billion PULSE tokens
 // This is enforced at the smart contract level
-export const PULSE_MAX_SUPPLY = 1_000_000_000n; // 1 billion PULSE
+// Breakdown: 1B (treasury) + 350M (IDO) = 1.35B total
+export const PULSE_MAX_SUPPLY = 1_350_000_000n; // 1.35 billion PULSE
 
 // Maximum supply in smallest units (e8s)
-// 1 billion PULSE * 10^8 = 100,000,000,000,000,000 e8s
-export const PULSE_MAX_SUPPLY_E8S = 100_000_000_000_000_000n;
+// 1.35 billion PULSE * 10^8 = 135,000,000,000,000,000 e8s
+export const PULSE_MAX_SUPPLY_E8S = 135_000_000_000_000_000n;
 
 // Transfer fee in smallest units (e8s)
 // 10,000 e8s = 0.0001 PULSE (displayed to users)
