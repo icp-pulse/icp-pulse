@@ -241,7 +241,7 @@ async function createPollInBackend(pollData: PollPreview): Promise<{ success: bo
       ? process.env.NEXT_PUBLIC_TOKENMANIA_CANISTER_ID || ''
       : ''
 
-    // Create poll using backend function
+    // Create poll using backend function with new configuration parameters
     const pollId = await backend.create_poll(
       'project',
       BigInt(pollData.scopeId),
@@ -252,7 +252,13 @@ async function createPollInBackend(pollData: PollPreview): Promise<{ success: bo
       totalFundE8s,
       fundingEnabled,
       rewardPerVoteE8s > 0n ? [rewardPerVoteE8s] : [],
-      tokenCanisterId ? [tokenCanisterId] : []
+      ['self-funded'], // fundingSource - default to self-funded for AI-created polls
+      // New configuration parameters with sensible defaults for AI-created polls
+      [], // maxResponses - no limit
+      [false], // allowAnonymous - disabled by default
+      [false], // allowMultiple - disabled by default
+      ['public'], // visibility - public by default
+      ['fixed'] // rewardDistributionType - fixed by default
     )
 
     return { success: true, pollId: pollId.toString() }

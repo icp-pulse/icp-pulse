@@ -162,9 +162,9 @@ async function createPollAction(values: PollFormValues, identity: any, isAuthent
         rewardPerVoteE8s,
         fundingSource,
         // New configuration parameters
-        maxResponses ? [BigInt(maxResponses)] : [],
-        allowAnonymous ? [allowAnonymous] : [],
-        allowMultiple ? [allowMultiple] : [],
+        maxResponses !== undefined ? [BigInt(maxResponses)] : [],
+        allowAnonymous !== undefined ? [allowAnonymous] : [],
+        allowMultiple !== undefined ? [allowMultiple] : [],
         visibility ? [visibility] : [],
         rewardDistributionType ? [rewardDistributionType] : []
       )
@@ -191,9 +191,9 @@ async function createPollAction(values: PollFormValues, identity: any, isAuthent
         rewardPerVoteE8s ? [rewardPerVoteE8s] : [],
         [fundingSource],
         // New configuration parameters
-        maxResponses ? [BigInt(maxResponses)] : [],
-        allowAnonymous ? [allowAnonymous] : [],
-        allowMultiple ? [allowMultiple] : [],
+        maxResponses !== undefined ? [BigInt(maxResponses)] : [],
+        allowAnonymous !== undefined ? [allowAnonymous] : [],
+        allowMultiple !== undefined ? [allowMultiple] : [],
         visibility ? [visibility] : [],
         rewardDistributionType ? [rewardDistributionType] : []
       )

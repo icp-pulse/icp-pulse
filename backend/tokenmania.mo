@@ -344,8 +344,16 @@ persistent actor class Tokenmania() = this {
         };
         case (#Transfer(args)) {
           if (args.from == account and args.spender == spender) {
-            assert (allowance > args.amount + tx.fee);
-            allowance -= args.amount + tx.fee;
+            // Deduct the amount + fee from allowance if there's enough
+            // Don't assert here as this is recalculating historical state
+            let required = args.amount + tx.fee;
+            if (allowance >= required) {
+              allowance -= required;
+            } else {
+              // If allowance is insufficient, this shouldn't trap during query
+              // Just set allowance to 0 as the transfer already happened
+              allowance := 0;
+            };
           };
         };
         case (_) {};

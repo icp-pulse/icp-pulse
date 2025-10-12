@@ -8,7 +8,8 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Wallet, ArrowUpRight, ArrowDownLeft, RefreshCw, Copy, ExternalLink, AlertCircle, Send, QrCode, ShoppingCart, BarChart } from 'lucide-react'
+import { Switch } from '@/components/ui/switch'
+import { Wallet, ArrowUpRight, ArrowDownLeft, RefreshCw, Copy, ExternalLink, AlertCircle, Send, QrCode, ShoppingCart, BarChart, ArrowLeftRight } from 'lucide-react'
 import { analytics } from '@/lib/analytics'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
@@ -27,7 +28,13 @@ export default function WalletPage() {
   const [buyResult, setBuyResult] = useState<{ success: boolean; message: string } | null>(null)
   const [exchangeRate, setExchangeRate] = useState<bigint | null>(null)
   const [ckUSDCBalance, setCkUSDCBalance] = useState<bigint | null>(null)
+  const [pulseBalance, setPulseBalance] = useState<bigint | null>(null)
   const [loadingBalance, setLoadingBalance] = useState(false)
+  const [swapDirection, setSwapDirection] = useState<'buy' | 'sell'>('buy') // 'buy' = ckUSDC -> PULSE, 'sell' = PULSE -> ckUSDC
+  const [estimatedReceive, setEstimatedReceive] = useState<string | null>(null)
+  const [calculatingEstimate, setCalculatingEstimate] = useState(false)
+  const [effectiveRate, setEffectiveRate] = useState<string | null>(null)
+  const [loadingRate, setLoadingRate] = useState(false)
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -147,9 +154,94 @@ export default function WalletPage() {
           }
 
           setCkUSDCBalance(balance)
+
+          // Fetch PULSE balance
+          const pulseCanisterId = process.env.NEXT_PUBLIC_TOKENMANIA_CANISTER_ID!
+          let pulseBalanceResult: bigint
+
+          if (isPlugWallet && window.ic?.plug) {
+            try {
+              await (window.ic.plug as any).createAgent({
+                whitelist: [pulseCanisterId],
+                host
+              })
+
+              if (window.ic.plug.createActor) {
+                const pulseActor = await window.ic.plug.createActor({
+                  canisterId: pulseCanisterId,
+                  interfaceFactory: ({ IDL }: any) => IDL.Service({
+                    icrc1_balance_of: IDL.Func([
+                      IDL.Record({
+                        owner: IDL.Principal,
+                        subaccount: IDL.Opt(IDL.Vec(IDL.Nat8))
+                      })
+                    ], [IDL.Nat], ['query'])
+                  })
+                })
+
+                pulseBalanceResult = await pulseActor.icrc1_balance_of({
+                  owner: Principal.fromText((window.ic.plug as any).principalId),
+                  subaccount: []
+                })
+              } else {
+                const balanceAgent = HttpAgent.createSync({ host })
+                if (process.env.NEXT_PUBLIC_DFX_NETWORK === 'local') {
+                  await balanceAgent.fetchRootKey()
+                }
+
+                const pulseActor = Actor.createActor(
+                  ({ IDL }: any) => IDL.Service({
+                    icrc1_balance_of: IDL.Func([
+                      IDL.Record({
+                        owner: IDL.Principal,
+                        subaccount: IDL.Opt(IDL.Vec(IDL.Nat8))
+                      })
+                    ], [IDL.Nat], ['query'])
+                  }),
+                  { agent: (window.ic.plug as any).agent, canisterId: pulseCanisterId }
+                ) as { icrc1_balance_of: (args: { owner: any; subaccount: any[] }) => Promise<bigint> }
+
+                pulseBalanceResult = await pulseActor.icrc1_balance_of({
+                  owner: Principal.fromText((window.ic.plug as any).principalId),
+                  subaccount: []
+                })
+              }
+            } catch (plugError) {
+              console.error('[Swap Modal] Plug PULSE balance fetch error:', plugError)
+              pulseBalanceResult = 0n
+            }
+          } else if (identity) {
+            const balanceAgent = HttpAgent.createSync({ host })
+            if (process.env.NEXT_PUBLIC_DFX_NETWORK === 'local') {
+              await balanceAgent.fetchRootKey()
+            }
+            balanceAgent.replaceIdentity(identity)
+
+            const pulseActor = Actor.createActor(
+              ({ IDL }: any) => IDL.Service({
+                icrc1_balance_of: IDL.Func([
+                  IDL.Record({
+                    owner: IDL.Principal,
+                    subaccount: IDL.Opt(IDL.Vec(IDL.Nat8))
+                  })
+                ], [IDL.Nat], ['query'])
+              }),
+              { agent: balanceAgent, canisterId: pulseCanisterId }
+            ) as { icrc1_balance_of: (args: { owner: any; subaccount: any[] }) => Promise<bigint> }
+
+            pulseBalanceResult = await pulseActor.icrc1_balance_of({
+              owner: identity.getPrincipal(),
+              subaccount: []
+            })
+          } else {
+            pulseBalanceResult = 0n
+          }
+
+          setPulseBalance(pulseBalanceResult)
         } catch (error) {
           console.error('Error fetching swap data:', error)
           setCkUSDCBalance(0n)
+          setPulseBalance(0n)
         } finally {
           setLoadingBalance(false)
         }
@@ -158,6 +250,105 @@ export default function WalletPage() {
 
     fetchSwapData()
   }, [showBuyModal, identity, principalText])
+
+  // Calculate effective exchange rate with spread
+  useEffect(() => {
+    const calculateEffectiveRate = async () => {
+      if (!showBuyModal) {
+        setEffectiveRate(null)
+        setLoadingRate(false)
+        return
+      }
+
+      try {
+        setLoadingRate(true)
+        const { createActor: createSwapActor } = await import('../../../src/declarations/swap')
+        const { HttpAgent } = await import('@dfinity/agent')
+
+        const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
+        const swapAgent = HttpAgent.createSync({ host })
+
+        if (process.env.NEXT_PUBLIC_DFX_NETWORK === 'local') {
+          await swapAgent.fetchRootKey()
+        }
+
+        const swapActor = createSwapActor(process.env.NEXT_PUBLIC_SWAP_CANISTER_ID!, { agent: swapAgent })
+
+        const isBuyDirection = swapDirection === 'buy'
+
+        if (isBuyDirection) {
+          // For buy: calculate how much PULSE you get for 1 ckUSDC (1,000,000 e6s)
+          const oneUSDC = 1_000_000n
+          const pulseAmount = await swapActor.calculatePulseAmount(oneUSDC)
+          const pulseValue = Number(pulseAmount) / 100_000_000
+          setEffectiveRate(`1 ckUSDC = ${pulseValue.toLocaleString()} PULSE`)
+        } else {
+          // For sell: calculate how much ckUSDC you get for 1 PULSE (100,000,000 e8s)
+          const onePulse = 100_000_000n
+          const ckUSDCAmount = await swapActor.calculateCkUSDCAmount(onePulse)
+          const ckUSDCValue = Number(ckUSDCAmount) / 1_000_000
+          setEffectiveRate(`1 PULSE = ${ckUSDCValue.toFixed(6)} ckUSDC`)
+        }
+      } catch (error) {
+        console.error('Error calculating effective rate:', error)
+        setEffectiveRate(null)
+      } finally {
+        setLoadingRate(false)
+      }
+    }
+
+    calculateEffectiveRate()
+  }, [showBuyModal, swapDirection])
+
+  // Calculate estimated receive amount with spread
+  useEffect(() => {
+    const calculateEstimate = async () => {
+      if (!buyAmount || !showBuyModal) {
+        setEstimatedReceive(null)
+        return
+      }
+
+      try {
+        setCalculatingEstimate(true)
+        const { createActor: createSwapActor } = await import('../../../src/declarations/swap')
+        const { HttpAgent } = await import('@dfinity/agent')
+
+        const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
+        const swapAgent = HttpAgent.createSync({ host })
+
+        if (process.env.NEXT_PUBLIC_DFX_NETWORK === 'local') {
+          await swapAgent.fetchRootKey()
+        }
+
+        const swapActor = createSwapActor(process.env.NEXT_PUBLIC_SWAP_CANISTER_ID!, { agent: swapAgent })
+
+        const isBuyDirection = swapDirection === 'buy'
+        const inputDecimals = isBuyDirection ? 6 : 8 // ckUSDC has 6, PULSE has 8
+        const inputAmount = BigInt(Math.floor(parseFloat(buyAmount) * (10 ** inputDecimals)))
+
+        // Call the appropriate calculation function
+        const result = isBuyDirection
+          ? await swapActor.calculatePulseAmount(inputAmount)
+          : await swapActor.calculateCkUSDCAmount(inputAmount)
+
+        // Format the result
+        const outputDecimals = isBuyDirection ? 8 : 6 // PULSE has 8, ckUSDC has 6
+        const outputAmount = Number(result) / (10 ** outputDecimals)
+        const outputToken = isBuyDirection ? 'PULSE' : 'ckUSDC'
+
+        setEstimatedReceive(`${outputAmount.toFixed(6)} ${outputToken}`)
+      } catch (error) {
+        console.error('Error calculating estimate:', error)
+        setEstimatedReceive(null)
+      } finally {
+        setCalculatingEstimate(false)
+      }
+    }
+
+    // Debounce the calculation
+    const timeoutId = setTimeout(calculateEstimate, 300)
+    return () => clearTimeout(timeoutId)
+  }, [buyAmount, swapDirection, showBuyModal])
 
   const formatTokenAmount = (amount: bigint, decimals: number): string => {
     const divisor = BigInt(10 ** decimals)
@@ -175,7 +366,7 @@ export default function WalletPage() {
   }
 
   const setMaxAmount = () => {
-    if (ckUSDCBalance !== null) {
+    if (swapDirection === 'buy' && ckUSDCBalance !== null) {
       // ckUSDC has 6 decimals and 10,000 e6s fee (0.01 ckUSDC)
       // We need to account for:
       // 1. Approval fee: 10,000 e6s (deducted from balance)
@@ -187,6 +378,22 @@ export default function WalletPage() {
         // Max swap amount is balance minus both fees
         const maxSwapAmount = ckUSDCBalance - feeReserve
         const maxAmount = formatTokenAmount(maxSwapAmount, 6)
+        setBuyAmount(maxAmount)
+      } else {
+        setBuyAmount('0')
+      }
+    } else if (swapDirection === 'sell' && pulseBalance !== null) {
+      // PULSE has 8 decimals and 10,000 e8s fee (0.0001 PULSE)
+      // We need to account for:
+      // 1. Approval fee: 10,000 e8s
+      // 2. Transfer_from fee: 10,000 e8s
+      // Total fees to reserve: 20,000 e8s (0.0002 PULSE)
+      const feeReserve = 20_000n
+
+      if (pulseBalance > feeReserve) {
+        // Max swap amount is balance minus both fees
+        const maxSwapAmount = pulseBalance - feeReserve
+        const maxAmount = formatTokenAmount(maxSwapAmount, 8)
         setBuyAmount(maxAmount)
       } else {
         setBuyAmount('0')
@@ -234,14 +441,23 @@ export default function WalletPage() {
       // Check if using Plug wallet
       const isPlugWallet = !identity && typeof window !== 'undefined' && window.ic?.plug
 
+      // Determine which token we're working with based on swap direction
+      const isBuyDirection = swapDirection === 'buy'
+      const ckUSDCCanisterId = 'xevnm-gaaaa-aaaar-qafnq-cai'
+      const pulseCanisterId = process.env.NEXT_PUBLIC_TOKENMANIA_CANISTER_ID!
+      const swapCanisterId = process.env.NEXT_PUBLIC_SWAP_CANISTER_ID!
+
+      const tokenCanisterId = isBuyDirection ? ckUSDCCanisterId : pulseCanisterId
+      const tokenDecimals = isBuyDirection ? 6 : 8
+      const tokenFee = 10_000n // Fee is 10,000 smallest units for both tokens
+
       let agent: any
       if (isPlugWallet && window.ic?.plug) {
         // Use Plug's agent
-        const ckUSDCCanisterId = 'xevnm-gaaaa-aaaar-qafnq-cai'
         await (window.ic.plug as any).createAgent({
           whitelist: [
-            process.env.NEXT_PUBLIC_SWAP_CANISTER_ID || '',
-            ckUSDCCanisterId
+            swapCanisterId,
+            tokenCanisterId
           ],
           host
         })
@@ -257,15 +473,11 @@ export default function WalletPage() {
         throw new Error('No valid authentication method available')
       }
 
-      // Convert ckUSDC amount to smallest unit (6 decimals for ckUSDC)
-      // Example: 1.5 ckUSDC = 1_500_000 e6s (smallest units)
-      const ckUSDCAmount = BigInt(Math.floor(parseFloat(buyAmount) * 1_000_000))
-
-      const swapCanisterId = process.env.NEXT_PUBLIC_SWAP_CANISTER_ID!
-      const ckUSDCCanisterId = 'xevnm-gaaaa-aaaar-qafnq-cai'
+      // Convert input amount to smallest unit based on token decimals
+      const tokenAmount = BigInt(Math.floor(parseFloat(buyAmount) * (10 ** tokenDecimals)))
 
       // Create the IDL interface for ICRC-2
-      const ckUSDCIdl = ({ IDL }: any) => {
+      const tokenIdl = ({ IDL }: any) => {
         const Account = IDL.Record({
           owner: IDL.Principal,
           subaccount: IDL.Opt(IDL.Vec(IDL.Nat8))
@@ -300,27 +512,26 @@ export default function WalletPage() {
         })
       }
 
-      // Create ckUSDC actor for approval
-      let ckUSDCActor: any
+      // Create token actor for approval
+      let tokenActor: any
       if (isPlugWallet && window.ic?.plug?.createActor) {
         // Use Plug's createActor method
-        ckUSDCActor = await window.ic.plug.createActor({
-          canisterId: ckUSDCCanisterId,
-          interfaceFactory: ckUSDCIdl
+        tokenActor = await window.ic.plug.createActor({
+          canisterId: tokenCanisterId,
+          interfaceFactory: tokenIdl
         })
       } else {
         // Use standard Actor.createActor for II/NFID
         const { Actor } = await import('@dfinity/agent')
-        ckUSDCActor = Actor.createActor(ckUSDCIdl, {
+        tokenActor = Actor.createActor(tokenIdl, {
           agent,
-          canisterId: ckUSDCCanisterId
+          canisterId: tokenCanisterId
         })
       }
 
-      // Step 1: Approve swap canister to spend ckUSDC
-      // Need to approve: swap amount + transfer_from fee (10,000 e6s)
-      const ckUSDCFee = 10_000n
-      const approvalAmount = ckUSDCAmount + ckUSDCFee
+      // Step 1: Approve swap canister to spend tokens
+      // Need to approve: swap amount + transfer_from fee
+      const approvalAmount = tokenAmount + tokenFee
 
       const approveArgs = {
         fee: [],
@@ -336,11 +547,11 @@ export default function WalletPage() {
         }
       }
 
-      const approveResult: any = await ckUSDCActor.icrc2_approve(approveArgs)
+      const approveResult: any = await tokenActor.icrc2_approve(approveArgs)
 
       if ('Err' in approveResult || 'err' in approveResult) {
         const error = 'Err' in approveResult ? approveResult.Err : approveResult.err
-        throw new Error(`Approval failed: ${error}`)
+        throw new Error(`Approval failed: ${JSON.stringify(error)}`)
       }
 
       // Step 2: Call swap canister to perform the swap
@@ -357,26 +568,30 @@ export default function WalletPage() {
         swapActor = createSwapActor(swapCanisterId, { agent })
       }
 
-      const swapResult: any = await swapActor.swapCkUSDCForPulse(ckUSDCAmount)
+      // Call the appropriate swap function based on direction
+      const swapResult: any = isBuyDirection
+        ? await swapActor.swapCkUSDCForPulse(tokenAmount)
+        : await swapActor.swapPulseForCkUSDC(tokenAmount)
 
       // Check for error in result
       if ('err' in swapResult) {
-        throw new Error(`Swap failed: ${swapResult.err}`)
+        throw new Error(`Swap failed: ${JSON.stringify(swapResult.err)}`)
       }
 
-      // Extract PULSE amount from successful result
-      // PULSE has 8 decimals: divide by 100_000_000 to convert e8s to display value
-      // Example: 500_000_000n e8s = 5.0 PULSE (displayed)
-      const pulseReceived = swapResult.ok || 0n
-      const pulseAmount = Number(pulseReceived) / 100_000_000
+      // Extract received amount from successful result
+      const receivedAmount = swapResult.ok || 0n
+      const receivedDecimals = isBuyDirection ? 8 : 6 // PULSE has 8, ckUSDC has 6
+      const receivedValue = Number(receivedAmount) / (10 ** receivedDecimals)
+      const receivedToken = isBuyDirection ? 'PULSE' : 'ckUSDC'
 
       setBuyResult({
         success: true,
-        message: `Successfully bought ${pulseAmount.toLocaleString()} PULSE!`
+        message: `Successfully swapped! Received ${receivedValue.toLocaleString()} ${receivedToken}`
       })
 
-      // Refresh ckUSDC balance
+      // Refresh both balances
       setCkUSDCBalance(null)
+      setPulseBalance(null)
 
       // Close dialog after successful swap
       setTimeout(() => {
@@ -386,12 +601,12 @@ export default function WalletPage() {
       }, 3000)
 
       analytics.track('button_clicked', {
-        button_name: 'buy_pulse',
+        button_name: isBuyDirection ? 'buy_pulse' : 'sell_pulse',
         page: 'wallet'
       })
 
     } catch (error) {
-      console.error('Buy error:', error)
+      console.error('Swap error:', error)
 
       // Check if this is the IDL decoding error that happens even when swap succeeds
       const errorMessage = error instanceof Error ? error.message : String(error)
@@ -404,6 +619,7 @@ export default function WalletPage() {
 
         // Refresh balances
         setCkUSDCBalance(null)
+        setPulseBalance(null)
 
         // Close dialog after 3 seconds
         setTimeout(() => {
@@ -414,7 +630,7 @@ export default function WalletPage() {
       } else {
         setBuyResult({
           success: false,
-          message: `Buy failed: ${errorMessage}`
+          message: `Swap failed: ${errorMessage}`
         })
       }
     } finally {
@@ -542,36 +758,75 @@ export default function WalletPage() {
               <Dialog open={showBuyModal} onOpenChange={setShowBuyModal}>
                 <DialogTrigger asChild>
                   <Button className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700">
-                    <ShoppingCart className="h-4 w-4 mr-2" />
-                    Buy PULSE
+                    <ArrowLeftRight className="h-4 w-4 mr-2" />
+                    Swap Tokens
                   </Button>
                 </DialogTrigger>
                 <DialogContent className="sm:max-w-md bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm">
                   <DialogHeader>
-                    <DialogTitle>Buy PULSE Tokens</DialogTitle>
+                    <DialogTitle>Swap Tokens</DialogTitle>
                   </DialogHeader>
                   <div className="space-y-4">
-                    <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
-                      <div className="text-sm text-purple-700 dark:text-purple-300">
-                        <strong>Exchange Rate:</strong><br />
-                        {exchangeRate ? `1 ckUSDC = ${(Number(exchangeRate) / 100).toLocaleString()} PULSE` : 'Loading...'}
+                    {/* Swap Direction Toggle */}
+                    <div className="flex items-center justify-between p-4 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
+                          <div className={`px-3 py-1.5 rounded-md font-medium text-sm transition-colors ${
+                            swapDirection === 'buy'
+                              ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
+                              : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'
+                          }`}>
+                            Buy PULSE
+                          </div>
+                          <Switch
+                            checked={swapDirection === 'sell'}
+                            onCheckedChange={(checked) => {
+                              setSwapDirection(checked ? 'sell' : 'buy')
+                              setBuyAmount('')
+                              setBuyResult(null)
+                              setEstimatedReceive(null)
+                            }}
+                          />
+                          <div className={`px-3 py-1.5 rounded-md font-medium text-sm transition-colors ${
+                            swapDirection === 'sell'
+                              ? 'bg-gradient-to-r from-purple-600 to-pink-600 text-white'
+                              : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300'
+                          }`}>
+                            Sell PULSE
+                          </div>
+                        </div>
                       </div>
                     </div>
 
+                    {/* Exchange Rate with Spread */}
+                    <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                      <div className="text-sm text-purple-700 dark:text-purple-300">
+                        <strong>Exchange Rate:</strong><br />
+                        {loadingRate ? 'Loading...' : (effectiveRate || 'Loading...')}
+                      </div>
+                    </div>
+
+                    {/* Balance Display */}
                     <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                       <div className="flex items-center justify-between">
                         <div className="text-sm">
-                          <span className="text-muted-foreground">Your ckUSDC Balance:</span>
+                          <span className="text-muted-foreground">
+                            {swapDirection === 'buy' ? 'Your ckUSDC Balance:' : 'Your PULSE Balance:'}
+                          </span>
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="font-semibold text-blue-700 dark:text-blue-300">
-                            {loadingBalance ? 'Loading...' : ckUSDCBalance !== null ? `${formatTokenAmount(ckUSDCBalance, 6)} ckUSDC` : '0 ckUSDC'}
+                            {loadingBalance ? 'Loading...' : (
+                              swapDirection === 'buy'
+                                ? (ckUSDCBalance !== null ? `${formatTokenAmount(ckUSDCBalance, 6)} ckUSDC` : '0 ckUSDC')
+                                : (pulseBalance !== null ? `${formatTokenAmount(pulseBalance, 8)} PULSE` : '0 PULSE')
+                            )}
                           </span>
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={setMaxAmount}
-                            disabled={loadingBalance || ckUSDCBalance === null || ckUSDCBalance === 0n}
+                            disabled={loadingBalance || (swapDirection === 'buy' ? (ckUSDCBalance === null || ckUSDCBalance === 0n) : (pulseBalance === null || pulseBalance === 0n))}
                             className="h-6 px-2 text-xs"
                           >
                             Max
@@ -580,24 +835,32 @@ export default function WalletPage() {
                       </div>
                     </div>
 
+                    {/* Amount Input */}
                     <div>
-                      <Label htmlFor="buyAmount">ckUSDC Amount</Label>
+                      <Label htmlFor="buyAmount">
+                        {swapDirection === 'buy' ? 'ckUSDC Amount' : 'PULSE Amount'}
+                      </Label>
                       <Input
                         id="buyAmount"
                         type="number"
-                        placeholder="Enter ckUSDC amount"
+                        placeholder={swapDirection === 'buy' ? 'Enter ckUSDC amount' : 'Enter PULSE amount'}
                         value={buyAmount}
                         onChange={(e) => setBuyAmount(e.target.value)}
-                        step="0.000001"
+                        step={swapDirection === 'buy' ? '0.000001' : '0.00000001'}
                         min="0"
                       />
-                      {buyAmount && exchangeRate && (
+                      {buyAmount && (
                         <p className="text-sm text-muted-foreground mt-2">
-                          You will receive: ~{(parseFloat(buyAmount) * Number(exchangeRate) / 100).toLocaleString()} PULSE
+                          {calculatingEstimate ? (
+                            <>Calculating...</>
+                          ) : estimatedReceive ? (
+                            <>You will receive: ~{estimatedReceive}</>
+                          ) : null}
                         </p>
                       )}
                     </div>
 
+                    {/* Result Message */}
                     {buyResult && (
                       <div className={`p-3 rounded-lg text-sm ${
                         buyResult.success
@@ -608,23 +871,37 @@ export default function WalletPage() {
                       </div>
                     )}
 
+                    {/* Instructions */}
                     <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                       <p className="text-xs text-blue-700 dark:text-blue-300">
-                        <strong>How to buy:</strong><br />
-                        1. Ensure you have ckUSDC in your wallet<br />
-                        2. Enter the amount of ckUSDC you want to spend<br />
-                        3. Click &quot;Preview Swap&quot; to see details<br />
-                        4. Tokens will be swapped instantly
+                        {swapDirection === 'buy' ? (
+                          <>
+                            <strong>How to buy PULSE:</strong><br />
+                            1. Ensure you have ckUSDC in your wallet<br />
+                            2. Enter the amount of ckUSDC you want to spend<br />
+                            3. Click &quot;Execute Swap&quot; to confirm<br />
+                            4. Tokens will be swapped instantly
+                          </>
+                        ) : (
+                          <>
+                            <strong>How to sell PULSE:</strong><br />
+                            1. Ensure you have PULSE in your wallet<br />
+                            2. Enter the amount of PULSE you want to sell<br />
+                            3. Click &quot;Execute Swap&quot; to confirm<br />
+                            4. You will receive ckUSDC instantly
+                          </>
+                        )}
                       </p>
                     </div>
 
+                    {/* Swap Button */}
                     <Button
                       onClick={buyPulse}
                       disabled={isBuying || !buyAmount}
                       className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700"
                     >
-                      <ShoppingCart className="h-4 w-4 mr-2" />
-                      {isBuying ? 'Processing...' : 'Preview Swap'}
+                      <ArrowLeftRight className="h-4 w-4 mr-2" />
+                      {isBuying ? 'Processing...' : 'Execute Swap'}
                     </Button>
                   </div>
                 </DialogContent>
