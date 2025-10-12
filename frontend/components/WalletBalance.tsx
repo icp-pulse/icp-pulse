@@ -129,12 +129,13 @@ export function WalletBalance({ compact = false, showRefresh = true }: WalletBal
             subaccount: []
           })
 
+          // PULSE uses 8 decimals: 100_000_000 e8s (smallest units) = 1.0 PULSE (displayed)
           const decimals = await pulseActor.icrc1_decimals()
 
           tokenBalances.push({
             symbol: 'PULSE',
-            balance,
-            decimals,
+            balance, // Balance in e8s (smallest units), e.g., 100_000_000n = 1.0 PULSE
+            decimals, // 8 decimals for PULSE
             canisterId: pulseCanisterId,
             usdValue: getTokenUSDValue('PULSE')
           })

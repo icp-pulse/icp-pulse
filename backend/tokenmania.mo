@@ -14,6 +14,11 @@ import Nat64 "mo:base/Nat64";
 
 persistent actor class Tokenmania() = this {
 
+  // PULSE Token Maximum Supply: 1 billion tokens
+  // With 8 decimals: 1 PULSE = 100_000_000 e8s (smallest units)
+  // Max supply = 1,000,000,000 PULSE = 100_000_000_000_000_000 e8s
+  private let MAX_SUPPLY : Nat = 100_000_000_000_000_000;
+
   // Set temporary values for the token.
   // These will be overritten when the token is created.
   var init : {
@@ -102,6 +107,11 @@ persistent actor class Tokenmania() = this {
       return #Err("Cannot create token with anonymous principal");
     };
 
+    // Validate initial supply doesn't exceed maximum supply cap
+    if (initial_supply > MAX_SUPPLY) {
+      return #Err("Initial supply cannot exceed maximum supply of 1 billion PULSE tokens");
+    };
+
     // Specify actual token details, set the caller to own some inital amount.
     init := {
       initial_mints = [{
@@ -117,8 +127,10 @@ persistent actor class Tokenmania() = this {
       };
       token_name;
       token_symbol;
-      decimals = 8; // Change this to the number of decimals you want to use.
-      transfer_fee = 10_000; // Change this to the fee you want to charge for transfers.
+      // PULSE uses 8 decimals: 100_000_000 e8s = 1.0 PULSE (displayed to users)
+      decimals = 8;
+      // Transfer fee: 10_000 e8s = 0.0001 PULSE (displayed to users)
+      transfer_fee = 10_000;
     };
 
     // Set the token logo.
@@ -437,6 +449,15 @@ persistent actor class Tokenmania() = this {
     };
 
     let result = if (accountsEqual(transfer.from, minter)) {
+      // Enforce maximum supply cap: prevent minting beyond 1 billion PULSE
+      let currentSupply = totalSupply(log);
+      if (currentSupply + transfer.amount > MAX_SUPPLY) {
+        return #Err(#GenericError {
+          error_code = 1001;
+          message = "Minting would exceed maximum supply of 1 billion PULSE tokens"
+        });
+      };
+
       if (Option.get(transfer.fee, 0) != 0) {
         return #Err(#BadFee { expected_fee = 0 });
       };
@@ -526,6 +547,12 @@ persistent actor class Tokenmania() = this {
 
   public query func icrc1_total_supply() : async Tokens {
     totalSupply(log);
+  };
+
+  // Returns the maximum supply cap for PULSE tokens
+  // 1 billion PULSE = 100_000_000_000_000_000 e8s (with 8 decimals)
+  public query func icrc1_max_supply() : async Tokens {
+    MAX_SUPPLY;
   };
 
   public query func icrc1_minting_account() : async ?Account {

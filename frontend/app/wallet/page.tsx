@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
-import { Wallet, ArrowUpRight, ArrowDownLeft, RefreshCw, Copy, ExternalLink, AlertCircle, Send, QrCode, ShoppingCart } from 'lucide-react'
+import { Wallet, ArrowUpRight, ArrowDownLeft, RefreshCw, Copy, ExternalLink, AlertCircle, Send, QrCode, ShoppingCart, BarChart } from 'lucide-react'
 import { analytics } from '@/lib/analytics'
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
@@ -258,6 +258,7 @@ export default function WalletPage() {
       }
 
       // Convert ckUSDC amount to smallest unit (6 decimals for ckUSDC)
+      // Example: 1.5 ckUSDC = 1_500_000 e6s (smallest units)
       const ckUSDCAmount = BigInt(Math.floor(parseFloat(buyAmount) * 1_000_000))
 
       const swapCanisterId = process.env.NEXT_PUBLIC_SWAP_CANISTER_ID!
@@ -364,6 +365,8 @@ export default function WalletPage() {
       }
 
       // Extract PULSE amount from successful result
+      // PULSE has 8 decimals: divide by 100_000_000 to convert e8s to display value
+      // Example: 500_000_000n e8s = 5.0 PULSE (displayed)
       const pulseReceived = swapResult.ok || 0n
       const pulseAmount = Number(pulseReceived) / 100_000_000
 
@@ -444,7 +447,9 @@ export default function WalletPage() {
 
       const tokenmaniaActor = createActor(process.env.NEXT_PUBLIC_TOKENMANIA_CANISTER_ID!, { agent })
 
-      // Convert amount to smallest unit (8 decimals)
+      // Convert amount to smallest unit (8 decimals for PULSE)
+      // Example: 1.5 PULSE = 150_000_000 e8s (smallest units)
+      // Formula: display value * 100_000_000 = e8s value
       const amountInSmallestUnit = BigInt(Math.floor(parseFloat(transferAmount) * 100_000_000))
 
       // Import Principal to convert string to Principal
@@ -713,6 +718,13 @@ export default function WalletPage() {
                 <Link href="/dashboard">
                   <RefreshCw className="h-4 w-4 mr-2" />
                   View Dashboard
+                </Link>
+              </Button>
+
+              <Button variant="outline" asChild className="w-full">
+                <Link href="/token-stats">
+                  <BarChart className="h-4 w-4 mr-2" />
+                  Token Statistics
                 </Link>
               </Button>
             </CardContent>
