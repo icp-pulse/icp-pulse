@@ -50,23 +50,31 @@ export function StepFundingRewards({
   const tokenInfo = getSelectedTokenInfo()
 
   // Calculate rewards based on distribution type
+  // Note: Platform fee (10%) is deducted for self-funded and crowdfunded polls
   const calculateRewards = () => {
+    // Calculate net fund after platform fee (90% of total for self-funded/crowdfunded)
+    const netFund = (fundingSource === 'self-funded' || fundingSource === 'crowdfunded')
+      ? totalFundAmount * 0.9
+      : totalFundAmount // Treasury-funded doesn't have platform fee
+
     if (rewardDistributionType === 'equal-split' && maxResponses > 0) {
-      const calculatedRewardPerVote = totalFundAmount / maxResponses
+      const calculatedRewardPerVote = netFund / maxResponses
       return {
         rewardPerVote: calculatedRewardPerVote,
         maxVotes: maxResponses,
-        totalFund: totalFundAmount
+        totalFund: totalFundAmount,
+        netFund
       }
     } else if (rewardDistributionType === 'fixed' && rewardPerVote > 0) {
-      const calculatedMaxVotes = Math.floor(totalFundAmount / rewardPerVote)
+      const calculatedMaxVotes = Math.floor(netFund / rewardPerVote)
       return {
         rewardPerVote,
         maxVotes: calculatedMaxVotes,
-        totalFund: totalFundAmount
+        totalFund: totalFundAmount,
+        netFund
       }
     }
-    return { rewardPerVote: 0, maxVotes: 0, totalFund: totalFundAmount }
+    return { rewardPerVote: 0, maxVotes: 0, totalFund: totalFundAmount, netFund }
   }
 
   const rewards = calculateRewards()
@@ -208,9 +216,12 @@ export function StepFundingRewards({
               value={rewardDistributionType}
               onValueChange={(value: RewardDistributionType) => {
                 setValue('rewardDistributionType', value)
-                // Auto-calculate based on type
+                // Auto-calculate based on type using net fund (after platform fee)
                 if (value === 'equal-split' && maxResponses > 0 && totalFundAmount > 0) {
-                  setValue('rewardPerVote', totalFundAmount / maxResponses)
+                  const netFund = (fundingSource === 'self-funded' || fundingSource === 'crowdfunded')
+                    ? totalFundAmount * 0.9
+                    : totalFundAmount
+                  setValue('rewardPerVote', netFund / maxResponses)
                 }
               }}
               className="space-y-3"
@@ -268,7 +279,11 @@ export function StepFundingRewards({
                   onChange: (e) => {
                     const value = parseFloat(e.target.value) || 0
                     if (rewardDistributionType === 'equal-split' && maxResponses > 0) {
-                      setValue('rewardPerVote', value / maxResponses)
+                      // Calculate reward per vote using net fund (after platform fee)
+                      const netFund = (fundingSource === 'self-funded' || fundingSource === 'crowdfunded')
+                        ? value * 0.9
+                        : value
+                      setValue('rewardPerVote', netFund / maxResponses)
                     }
                   }
                 })}
@@ -325,13 +340,44 @@ export function StepFundingRewards({
                 Funding Summary
               </h4>
               <div className="space-y-2 text-sm">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-700 dark:text-gray-300">Total Fund:</span>
-                  <span className="font-mono font-semibold text-blue-900 dark:text-blue-100">
-                    {totalFundAmount.toFixed(2)} {tokenInfo.symbol}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
+                {/* Platform Fee Breakdown - Only for self-funded and crowdfunded */}
+                {(fundingSource === 'self-funded' || fundingSource === 'crowdfunded') && (
+                  <>
+                    <div className="flex justify-between items-center">
+                      <span className="text-gray-700 dark:text-gray-300">Total Amount:</span>
+                      <span className="font-mono font-semibold text-blue-900 dark:text-blue-100">
+                        {totalFundAmount.toFixed(2)} {tokenInfo.symbol}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center text-xs">
+                      <span className="text-gray-600 dark:text-gray-400 flex items-center gap-1">
+                        <AlertCircle className="h-3 w-3" />
+                        Platform Fee (10%):
+                      </span>
+                      <span className="font-mono text-amber-600 dark:text-amber-400">
+                        -{(totalFundAmount * 0.1).toFixed(2)} {tokenInfo.symbol}
+                      </span>
+                    </div>
+                    <div className="flex justify-between items-center pt-1 border-t border-blue-200 dark:border-blue-700">
+                      <span className="text-gray-700 dark:text-gray-300 font-medium">Net Reward Fund:</span>
+                      <span className="font-mono font-semibold text-green-700 dark:text-green-300">
+                        {(totalFundAmount * 0.9).toFixed(2)} {tokenInfo.symbol}
+                      </span>
+                    </div>
+                  </>
+                )}
+
+                {/* Treasury-funded shows full amount (no platform fee) */}
+                {fundingSource === 'treasury-funded' && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-700 dark:text-gray-300">Reward Fund:</span>
+                    <span className="font-mono font-semibold text-blue-900 dark:text-blue-100">
+                      {totalFundAmount.toFixed(2)} {tokenInfo.symbol}
+                    </span>
+                  </div>
+                )}
+
+                <div className="flex justify-between items-center pt-2 border-t border-blue-200 dark:border-blue-700">
                   <span className="text-gray-700 dark:text-gray-300">Reward per Vote:</span>
                   <span className="font-mono font-semibold text-green-700 dark:text-green-300">
                     {rewards.rewardPerVote.toFixed(6)} {tokenInfo.symbol}
@@ -350,6 +396,19 @@ export function StepFundingRewards({
                   </span>
                 </div>
               </div>
+
+              {/* Platform Fee Info Box */}
+              {(fundingSource === 'self-funded' || fundingSource === 'crowdfunded') && (
+                <div className="mt-3 pt-3 border-t border-blue-200 dark:border-blue-700">
+                  <div className="flex gap-2 text-xs text-blue-700 dark:text-blue-300">
+                    <Info className="h-3.5 w-3.5 flex-shrink-0 mt-0.5" />
+                    <p>
+                      A 10% platform fee is deducted from your funding to support True Pulse development and operations.
+                      The remaining 90% goes directly to voter rewards.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
           )}
 

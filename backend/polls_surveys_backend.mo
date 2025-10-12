@@ -575,7 +575,11 @@ persistent actor class polls_surveys_backend() = this {
       rewardDistributionType = distribution_type;
     };
 
-    // For self-funded polls, pull the funding from creator
+    // Calculate platform fee (10%) and net funding amount
+    let platformFee = (totalFunding * Nat64.fromNat(PLATFORM_FEE_PERCENTAGE)) / 100;
+    let netFunding = totalFunding - platformFee; // Amount that goes to poll rewards
+
+    // For self-funded polls, pull the total funding (including fee) from creator
     if (funding_type == #SelfFunded and totalFunding > 0) {
       switch (tokenCanister) {
         case (?canister) {
@@ -591,6 +595,7 @@ persistent actor class polls_surveys_backend() = this {
               }) -> async { #Ok : Nat; #Err : { #BadFee : { expected_fee : Nat }; #BadBurn : { min_burn_amount : Nat }; #InsufficientFunds : { balance : Nat }; #InsufficientAllowance : { allowance : Nat }; #TooOld; #CreatedInFuture : { ledger_time : Nat64 }; #Duplicate : { duplicate_of : Nat }; #TemporarilyUnavailable; #GenericError : { error_code : Nat; message : Text } } };
             };
 
+            // Pull total funding from creator (net + fee)
             let transferArgs = {
               from = { owner = msg.caller; subaccount = null };
               to = { owner = Principal.fromActor(this); subaccount = null };
@@ -601,7 +606,18 @@ persistent actor class polls_surveys_backend() = this {
             };
 
             switch (await tokenActor.icrc2_transfer_from(transferArgs)) {
-              case (#Ok(_)) { /* Transfer successful, continue */ };
+              case (#Ok(_)) {
+                // Track platform fee collected
+                switch (Map.get(treasuryFees, phash, canister)) {
+                  case (?existingFees) {
+                    Map.set(treasuryFees, phash, canister, existingFees + platformFee);
+                  };
+                  case null {
+                    Map.set(treasuryFees, phash, canister, platformFee);
+                  };
+                };
+                // Transfer successful, continue with net funding for poll
+              };
               case (#Err(error)) {
                 let errorMsg = switch (error) {
                   case (#InsufficientFunds { balance }) { "Insufficient funds. Balance: " # Nat.toText(balance) };
@@ -622,6 +638,7 @@ persistent actor class polls_surveys_backend() = this {
     };
 
     // Calculate maxResponses and rewardPerResponse based on distribution type
+    // Use netFunding (after 10% fee deduction) for reward calculations
     let (calculatedMaxResponses, calculatedRewardPerResponse) : (Nat, Nat64) = switch (distribution_type) {
       case (#EqualSplit) {
         // For equal split, use the maxResponses from config and calculate reward per response
@@ -630,13 +647,13 @@ persistent actor class polls_surveys_backend() = this {
           case null 100; // Default to 100 if not specified
         };
         let rewardPerResp : Nat64 = if (targetResponses > 0) {
-          totalFunding / Nat64.fromNat(targetResponses)
+          netFunding / Nat64.fromNat(targetResponses)
         } else { 0 : Nat64 };
         (targetResponses, rewardPerResp)
       };
       case (#Fixed) {
         // For fixed reward, use the provided reward and calculate max responses
-        let maxResp = if (rewardPerVote > 0) { Nat64.toNat(totalFunding / rewardPerVote) } else { 0 };
+        let maxResp = if (rewardPerVote > 0) { Nat64.toNat(netFunding / rewardPerVote) } else { 0 };
         (maxResp, rewardPerVote)
       };
     };
@@ -649,11 +666,11 @@ persistent actor class polls_surveys_backend() = this {
       tokenCanister = tokenCanister;
       tokenSymbol = tokenSymbol;
       tokenDecimals = tokenDecimals;
-      totalFund = totalFunding;
+      totalFund = netFunding; // Store net funding (after fee deduction)
       rewardPerResponse = calculatedRewardPerResponse;
       maxResponses = calculatedMaxResponses;
       currentResponses = 0;
-      remainingFund = totalFunding;
+      remainingFund = netFunding; // Remaining fund is also net amount
       fundingType = funding_type;
       contributors = [];
       pendingClaims = [];
@@ -1383,6 +1400,13 @@ persistent actor class polls_surveys_backend() = this {
   // Storage for OpenAI API key
   private var openaiApiKey : Text = "";
 
+  // Platform fee configuration (10% fee)
+  private let PLATFORM_FEE_PERCENTAGE : Nat = 10; // 10% platform fee
+
+  // Treasury tracking - store collected fees by token
+  private var treasuryFees = Map.new<Principal, Nat64>(); // Token canister -> total fees collected
+  private var treasuryFeesICP : Nat64 = 0; // ICP fees collected separately
+
   // Initialize rewards map from stable array
   private func initializeRewards() {
     for (reward in rewardsArray.vals()) {
@@ -1806,6 +1830,72 @@ persistent actor class polls_surveys_backend() = this {
       case null {
         defaultOptions
       };
+    }
+  };
+
+  // Treasury management types and functions
+  type TreasuryFee = {
+    tokenCanister: Principal;
+    tokenSymbol: Text;
+    tokenDecimals: Nat8;
+    totalFeesCollected: Nat64;
+  };
+
+  // Get all collected platform fees by token
+  public query func get_treasury_fees() : async [TreasuryFee] {
+    var fees : [TreasuryFee] = [];
+
+    // Iterate through all collected fees
+    for ((canister, amount) in Map.entries(treasuryFees)) {
+      // Get token symbol and decimals from cache
+      let (symbol, decimals) = switch (Map.get(tokenInfo, phash, canister)) {
+        case (?info) { info };
+        case null { ("UNKNOWN", 8 : Nat8) }; // Fallback if token info not in cache
+      };
+
+      fees := Array.append(fees, [{
+        tokenCanister = canister;
+        tokenSymbol = symbol;
+        tokenDecimals = decimals;
+        totalFeesCollected = amount;
+      }]);
+    };
+
+    // Add ICP fees if any
+    if (treasuryFeesICP > 0) {
+      fees := Array.append(fees, [{
+        tokenCanister = Principal.fromText("ryjl3-tyaaa-aaaaa-aaaba-cai"); // ICP ledger canister
+        tokenSymbol = "ICP";
+        tokenDecimals = 8 : Nat8;
+        totalFeesCollected = treasuryFeesICP;
+      }]);
+    };
+
+    fees
+  };
+
+  // Get platform fee percentage
+  public query func get_platform_fee_percentage() : async Nat {
+    PLATFORM_FEE_PERCENTAGE
+  };
+
+  // Get total fees collected for a specific token
+  public query func get_token_treasury_fees(tokenCanister: Principal) : async ?TreasuryFee {
+    switch (Map.get(treasuryFees, phash, tokenCanister)) {
+      case (?amount) {
+        let (symbol, decimals) = switch (Map.get(tokenInfo, phash, tokenCanister)) {
+          case (?info) { info };
+          case null { ("UNKNOWN", 8 : Nat8) };
+        };
+
+        ?{
+          tokenCanister = tokenCanister;
+          tokenSymbol = symbol;
+          tokenDecimals = decimals;
+          totalFeesCollected = amount;
+        }
+      };
+      case null { null }
     }
   };
 }
