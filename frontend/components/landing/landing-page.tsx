@@ -56,7 +56,7 @@ export function LandingPage() {
     <div className="min-h-screen bg-white dark:bg-gray-900">
       {/* Early Adopter Airdrop Banner */}
       {showBanner && (
-        <div className="relative bg-gradient-to-r from-purple-600 via-blue-600 to-indigo-600 text-white">
+        <div className="relative bg-gradient-to-r from-purple-600 via-blue-600 to-indigo-600 text-white pt-16 md:pt-20">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3 flex-1">
