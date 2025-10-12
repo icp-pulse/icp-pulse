@@ -31,7 +31,7 @@ export function MobileBottomNav({ onChatboxToggle }: MobileBottomNavProps) {
       id: 'create',
       label: 'Create',
       icon: <Plus size={26} />,
-      href: '/polls',
+      href: '/polls/new',
       isCenter: true,
     },
     {

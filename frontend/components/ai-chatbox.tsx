@@ -363,19 +363,16 @@ export function AIChatbox({ onOptionsGenerated, isOpen: externalIsOpen, onToggle
       {/* Floating Button - Hidden on mobile/tablet */}
       <Button
         onClick={toggleChatbox}
-        className={`fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg transition-all duration-300 ease-in-out z-50 lg:block ${
+        className={`fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg transition-all duration-300 ease-in-out z-40 hidden lg:flex lg:items-center lg:justify-center ${
           isOpen ? 'scale-0 opacity-0' : 'scale-100 opacity-100 hover:scale-110'
-        } hidden`}
-        style={{
-          boxShadow: isOpen ? '' : '0 0 20px rgba(59, 130, 246, 0.5), 0 0 40px rgba(59, 130, 246, 0.3)',
-        }}
+        }`}
         size="icon"
       >
         <MessageCircle className="h-6 w-6" />
       </Button>
 
       {/* Chatbox - Positioned above mobile nav on mobile/tablet, floating on desktop */}
-      <Card className={`fixed bottom-[90px] lg:bottom-6 lg:right-6 right-4 left-4 lg:left-auto lg:w-80 w-auto h-96 shadow-xl transition-all duration-300 ease-in-out z-40 bg-white dark:bg-gray-900 ${
+      <Card className={`fixed bottom-[90px] lg:bottom-6 lg:right-6 right-4 left-4 lg:left-auto lg:w-80 w-auto h-96 shadow-xl transition-all duration-300 ease-in-out z-50 bg-white dark:bg-gray-900 ${
         isOpen
           ? 'scale-100 opacity-100 translate-y-0'
           : 'scale-95 opacity-0 translate-y-4 pointer-events-none'
@@ -466,21 +463,13 @@ export function AIChatbox({ onOptionsGenerated, isOpen: externalIsOpen, onToggle
                     )}
 
                     {message.pollCreated && message.pollId && (
-                      <div className="mt-2 pt-2 border-t border-green-200 dark:border-green-700 flex gap-2">
+                      <div className="mt-2 pt-2 border-t border-green-200 dark:border-green-700">
                         <Button
                           size="sm"
-                          className="text-xs flex-1"
-                          onClick={() => router.push(`/polls/edit?id=${message.pollId}`)}
-                        >
-                          View Details
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="text-xs flex-1"
+                          className="text-xs w-full"
                           onClick={() => router.push(`/results?pollId=${message.pollId}`)}
                         >
-                          View Results
+                          View Details
                         </Button>
                       </div>
                     )}
