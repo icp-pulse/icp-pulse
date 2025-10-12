@@ -15,13 +15,12 @@
     0 2px 8px rgba(0, 0, 0, 0.08),
     inset 0 1px 0 rgba(255, 255, 255, 0.3);
   border: 1px solid rgba(255, 255, 255, 0.2);
-  animation: slideUpIn 0.6s cubic-bezier(0.4, 0, 0.2, 1);
   /* Hide on desktop */
   display: none;
 }
 
 /* Show only on mobile and tablet */
-@media (max-width: 767px) {
+@media (max-width: 1023px) {
   .mobile-bottom-nav {
     display: block;
   }
@@ -55,16 +54,7 @@
   color: #999999;
   flex: 1;
   text-decoration: none;
-  animation: navItemFadeIn 0.5s ease-out;
-  animation-fill-mode: both;
 }
-
-/* Staggered animation for nav items */
-.nav-item:nth-child(1) { animation-delay: 0.1s; }
-.nav-item:nth-child(2) { animation-delay: 0.2s; }
-.nav-item:nth-child(3) { animation-delay: 0.3s; }
-.nav-item:nth-child(4) { animation-delay: 0.4s; }
-.nav-item:nth-child(5) { animation-delay: 0.5s; }
 
 .nav-item:hover {
   color: #333333;
@@ -91,22 +81,6 @@
   position: relative;
   z-index: 2;
   border: none;
-  animation: centerButtonPulse 4s ease-in-out infinite;
-}
-
-/* Glow ring effect for center button */
-.nav-item.center-item::before {
-  content: '';
-  position: absolute;
-  top: -3px;
-  left: -3px;
-  right: -3px;
-  bottom: -3px;
-  border-radius: 50%;
-  background: rgba(0, 122, 255, 0.2);
-  z-index: -1;
-  opacity: 0;
-  animation: centerButtonGlow 4s ease-in-out infinite;
 }
 
 .nav-item.center-item .nav-icon {
@@ -126,7 +100,6 @@
   box-shadow:
     0 6px 16px rgba(0, 122, 255, 0.35),
     0 2px 6px rgba(0, 0, 0, 0.15);
-  animation: none;
 }
 
 .nav-item.center-item.active {
@@ -248,20 +221,8 @@
 
 /* Reduce motion for accessibility */
 @media (prefers-reduced-motion: reduce) {
-  .mobile-bottom-nav,
-  .nav-item,
-  .nav-icon,
-  .nav-label,
-  .active-indicator,
-  .nav-item.center-item,
-  .nav-item.center-item::before {
-    animation: none !important;
+  * {
     transition: none !important;
-  }
-
-  .nav-item:hover,
-  .nav-item:hover .nav-icon {
-    transform: none !important;
   }
 }
 
@@ -281,60 +242,4 @@
   outline: none;
 }
 
-/* Animations */
-@keyframes slideUpIn {
-  from {
-    transform: translateY(100%);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0);
-    opacity: 1;
-  }
-}
-
-@keyframes navItemFadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* Center button pulse animation */
-@keyframes centerButtonPulse {
-  0% {
-    box-shadow:
-      0 4px 12px rgba(0, 122, 255, 0.25),
-      0 1px 4px rgba(0, 0, 0, 0.1);
-  }
-  50% {
-    box-shadow:
-      0 6px 16px rgba(0, 122, 255, 0.35),
-      0 2px 6px rgba(0, 0, 0, 0.12);
-  }
-  100% {
-    box-shadow:
-      0 4px 12px rgba(0, 122, 255, 0.25),
-      0 1px 4px rgba(0, 0, 0, 0.1);
-  }
-}
-
-/* Center button glow ring animation */
-@keyframes centerButtonGlow {
-  0% {
-    opacity: 0;
-    transform: scale(0.9);
-  }
-  50% {
-    opacity: 0.4;
-    transform: scale(1.05);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(0.9);
-  }
-}
+/* Animations removed for better UX */
