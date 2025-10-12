@@ -199,9 +199,74 @@ export const airdropIDL = ({ IDL }: any) => {
     'firstActivity': IDL.Opt(IDL.Int),
   })
 
+  // Quest Types
+  const QuestType = IDL.Variant({
+    'CreateFirstPoll': IDL.Null,
+    'VoteInPoll': IDL.Null,
+    'CreateFirstSurvey': IDL.Null,
+    'CompleteSurvey': IDL.Null,
+    'ClaimFirstReward': IDL.Null,
+    'VoteMultiple': IDL.Nat,
+    'Custom': IDL.Text,
+  })
+
+  const QuestRequirements = IDL.Record({
+    'minPolls': IDL.Nat,
+    'minVotes': IDL.Nat,
+    'minSurveys': IDL.Nat,
+    'minSubmissions': IDL.Nat,
+    'minRewards': IDL.Nat,
+  })
+
+  const Quest = IDL.Record({
+    'id': IDL.Nat,
+    'campaignId': IDL.Nat,
+    'name': IDL.Text,
+    'description': IDL.Text,
+    'questType': QuestType,
+    'points': IDL.Nat,
+    'requirements': QuestRequirements,
+    'icon': IDL.Text,
+    'order': IDL.Nat,
+    'isActive': IDL.Bool,
+  })
+
+  const QuestProgress = IDL.Record({
+    'pollsCreated': IDL.Nat,
+    'votescast': IDL.Nat,
+    'surveysCreated': IDL.Nat,
+    'surveysCompleted': IDL.Nat,
+    'rewardsClaimed': IDL.Nat,
+  })
+
+  const UserQuestInfo = IDL.Record({
+    'questId': IDL.Nat,
+    'campaignId': IDL.Nat,
+    'name': IDL.Text,
+    'description': IDL.Text,
+    'questType': QuestType,
+    'points': IDL.Nat,
+    'requirements': QuestRequirements,
+    'progress': QuestProgress,
+    'completed': IDL.Bool,
+    'completedAt': IDL.Opt(IDL.Int),
+    'claimed': IDL.Bool,
+    'icon': IDL.Text,
+    'order': IDL.Nat,
+  })
+
+  const UserPointsSummary = IDL.Record({
+    'campaignId': IDL.Nat,
+    'userPoints': IDL.Nat,
+    'totalPoints': IDL.Nat,
+    'percentageShare': IDL.Nat,
+    'estimatedPulse': IDL.Nat,
+  })
+
   const Result = IDL.Variant({ 'ok': IDL.Nat, 'err': IDL.Text })
   const Result_1 = IDL.Variant({ 'ok': IDL.Text, 'err': IDL.Text })
   const Result_2 = IDL.Variant({ 'ok': UserActivity, 'err': IDL.Text })
+  const Result_3 = IDL.Variant({ 'ok': IDL.Bool, 'err': IDL.Text })
 
   return IDL.Service({
     'initialize': IDL.Func([IDL.Principal, IDL.Principal], [Result_1], []),
@@ -230,6 +295,29 @@ export const airdropIDL = ({ IDL }: any) => {
       [Result_2],
       []
     ),
+    // Quest system functions
+    'create_quest': IDL.Func(
+      [IDL.Nat, IDL.Text, IDL.Text, QuestType, IDL.Nat, QuestRequirements, IDL.Text, IDL.Nat],
+      [Result],
+      []
+    ),
+    'update_quest': IDL.Func(
+      [IDL.Nat, IDL.Text, IDL.Text, QuestType, IDL.Nat, QuestRequirements, IDL.Text, IDL.Nat],
+      [Result_1],
+      []
+    ),
+    'update_quest_progress': IDL.Func(
+      [IDL.Principal, IDL.Nat, IDL.Opt(IDL.Nat), IDL.Opt(IDL.Nat), IDL.Opt(IDL.Nat), IDL.Opt(IDL.Nat), IDL.Opt(IDL.Nat)],
+      [Result_3],
+      []
+    ),
+    'get_campaign_quests': IDL.Func([IDL.Nat], [IDL.Vec(Quest)], ['query']),
+    'get_user_quests': IDL.Func([IDL.Principal, IDL.Nat], [IDL.Vec(UserQuestInfo)], ['query']),
+    'get_quest': IDL.Func([IDL.Nat], [IDL.Opt(Quest)], ['query']),
+    'get_user_points': IDL.Func([IDL.Principal, IDL.Nat], [UserPointsSummary], ['query']),
+    'claim_quest_rewards': IDL.Func([IDL.Nat], [Result], []),
+    'has_claimed_quest_rewards': IDL.Func([IDL.Principal, IDL.Nat], [IDL.Bool], ['query']),
+    'deactivate_quest': IDL.Func([IDL.Nat], [Result_1], []),
   })
 }
 

@@ -1,4 +1,4 @@
-import { Folder, ClipboardList, BarChart3, Download, Settings, TrendingUp, Gift } from "lucide-react";
+import { Folder, ClipboardList, BarChart3, Download, Settings, TrendingUp, Gift, Trophy } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@lib/utils";
 import Link from "next/link";
@@ -6,8 +6,8 @@ import { useRouter } from "next/navigation";
 import { useIsAdmin } from "@/components/AdminGuard";
 
 interface SidebarProps {
-  activeTab: "projects" | "surveys" | "polls";
-  onTabChange: (tab: "projects" | "surveys" | "polls") => void;
+  activeTab: "projects" | "surveys" | "polls" | "airdrops" | "quests";
+  onTabChange: (tab: "projects" | "surveys" | "polls" | "airdrops" | "quests") => void;
   isCollapsed: boolean;
 }
 
@@ -31,11 +31,18 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed }: Sidebar
     refetchOnWindowFocus: false,
   });
 
-  const navItems = [
-    { id: "projects" as const, icon: Folder, label: "Projects", count: Number(stats?.projectCount || 0) },
-    { id: "surveys" as const, icon: ClipboardList, label: "Surveys", count: Number(stats?.surveyCount || 0) },
-    { id: "polls" as const, icon: BarChart3, label: "Polls", count: Number(stats?.pollCount || 0) },
+  const baseNavItems = [
+    { id: "projects" as const, icon: Folder, label: "Projects", count: Number(stats?.projectCount || 0), adminOnly: false },
+    { id: "surveys" as const, icon: ClipboardList, label: "Surveys", count: Number(stats?.surveyCount || 0), adminOnly: false },
+    { id: "polls" as const, icon: BarChart3, label: "Polls", count: Number(stats?.pollCount || 0), adminOnly: false },
   ];
+
+  const adminNavItems = [
+    { id: "airdrops" as const, icon: Gift, label: "Airdrops", count: 0, adminOnly: true },
+    { id: "quests" as const, icon: Trophy, label: "Quests", count: 0, adminOnly: true },
+  ];
+
+  const navItems = isAdmin ? [...baseNavItems, ...adminNavItems] : baseNavItems;
 
   return (
     <aside className={cn(
@@ -85,14 +92,6 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed }: Sidebar
                   Analytics
                 </Link>
               </li>
-              {isAdmin && (
-                <li>
-                  <Link href="/admin/airdrops" className="w-full flex items-center px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
-                    <Gift className="w-4 h-4 mr-3" />
-                    Airdrops
-                  </Link>
-                </li>
-              )}
               <li>
                 <button className="w-full flex items-center px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
                   <Download className="w-4 h-4 mr-3" />

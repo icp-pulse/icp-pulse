@@ -7,7 +7,7 @@ import ProjectModal from "@/components/projects/project-modal";
 interface HeaderProps {
   title: string;
   description: string;
-  activeTab: "projects" | "surveys" | "polls";
+  activeTab: "projects" | "surveys" | "polls" | "airdrops" | "quests";
 }
 
 export default function Header({ title, description, activeTab }: HeaderProps) {
@@ -22,6 +22,10 @@ export default function Header({ title, description, activeTab }: HeaderProps) {
         return "Create Survey";
       case "polls":
         return "Create Poll";
+      case "airdrops":
+        return "Create Campaign";
+      case "quests":
+        return "Create Quest";
       default:
         return "Create";
     }
