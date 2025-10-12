@@ -17,16 +17,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" suppressHydrationWarning>
       <body className="min-h-screen bg-white text-gray-900 dark:bg-[#0b0b0d] dark:text-gray-100">
         <ThemeProvider attribute="class" enableSystem defaultTheme="system">
-          <AnalyticsProvider>
-            <Providers>
-              <IcpAuthProvider>
-                <ConditionalLayout>
-                  {children}
-                </ConditionalLayout>
-                <AIChatbox />
-              </IcpAuthProvider>
-            </Providers>
-          </AnalyticsProvider>
+          <Providers>
+            <IcpAuthProvider>
+              <ConditionalLayout>
+                {children}
+              </ConditionalLayout>
+              <AIChatbox />
+            </IcpAuthProvider>
+          </Providers>
         </ThemeProvider>
       </body>
     </html>
