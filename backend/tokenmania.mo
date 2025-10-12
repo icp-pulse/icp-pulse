@@ -12,6 +12,9 @@ import Int "mo:base/Int";
 import Nat "mo:base/Nat";
 import Nat8 "mo:base/Nat8";
 import Nat64 "mo:base/Nat64";
+import Map "mo:map/Map";
+import { phash } "mo:map/Map";
+import Iter "mo:base/Iter";
 
 persistent actor class Tokenmania() = this {
 
@@ -423,8 +426,19 @@ persistent actor class Tokenmania() = this {
   // Used only during upgrades.
   var persistedLog : [Transaction] = [];
 
+  // ========== BALANCE CACHE FOR OPTIMIZED HOLDER QUERIES ==========
+  // Maintains real-time balance for each principal to avoid log scanning
+  transient var balanceCache = Map.new<Principal, Nat>();
+
+  // Stable storage for balance cache (persists across upgrades)
+  var stableBalanceCache : [(Principal, Nat)] = [];
+
+  // Flag to track if cache has been initialized from log
+  var cacheInitialized : Bool = false;
+
   system func preupgrade() {
     persistedLog := Buffer.toArray(log);
+    stableBalanceCache := Iter.toArray(Map.entries(balanceCache));
   };
 
   system func postupgrade() {
@@ -432,11 +446,112 @@ persistent actor class Tokenmania() = this {
     for (tx in Array.vals(persistedLog)) {
       log.add(tx);
     };
+
+    // Restore balance cache from stable storage
+    for ((principal, bal) in stableBalanceCache.vals()) {
+      Map.set(balanceCache, phash, principal, bal);
+    };
+
+    // If cache is empty but log has transactions, initialize cache from log
+    if (Map.size(balanceCache) == 0 and log.size() > 0) {
+      initializeBalanceCache();
+    };
+    cacheInitialized := true;
+  };
+
+  // Helper function to update balance in cache
+  private func updateBalanceCache(principal : Principal, delta : Int) {
+    let currentBalance = switch (Map.get(balanceCache, phash, principal)) {
+      case (?bal) { bal };
+      case null { 0 };
+    };
+
+    let newBalance = if (delta >= 0) {
+      currentBalance + Int.abs(delta)
+    } else {
+      let absDelta = Int.abs(delta);
+      if (currentBalance >= absDelta) {
+        currentBalance - absDelta
+      } else {
+        0 // Should not happen in correct implementation
+      }
+    };
+
+    if (newBalance > 0) {
+      Map.set(balanceCache, phash, principal, newBalance);
+    } else {
+      // Remove from map if balance is zero to save memory
+      ignore Map.remove(balanceCache, phash, principal);
+    };
+  };
+
+  // Initialize balance cache from transaction log (one-time migration)
+  private func initializeBalanceCache() {
+    // Clear existing cache
+    balanceCache := Map.new<Principal, Nat>();
+
+    // Collect all unique principals
+    let principals = Buffer.Buffer<Principal>(100);
+    for (tx in log.vals()) {
+      switch (tx.operation) {
+        case (#Mint(args)) {
+          if (not hasPrincipal(principals, args.to.owner)) {
+            principals.add(args.to.owner);
+          };
+        };
+        case (#Transfer(args)) {
+          if (not hasPrincipal(principals, args.from.owner)) {
+            principals.add(args.from.owner);
+          };
+          if (not hasPrincipal(principals, args.to.owner)) {
+            principals.add(args.to.owner);
+          };
+        };
+        case (#Burn(args)) {
+          if (not hasPrincipal(principals, args.from.owner)) {
+            principals.add(args.from.owner);
+          };
+        };
+        case (#Approve(args)) {
+          if (not hasPrincipal(principals, args.from.owner)) {
+            principals.add(args.from.owner);
+          };
+        };
+      };
+    };
+
+    // Calculate and cache balance for each principal
+    for (principal in principals.vals()) {
+      let bal = balance({ owner = principal; subaccount = null }, log);
+      if (bal > 0) {
+        Map.set(balanceCache, phash, principal, bal);
+      };
+    };
   };
 
   func recordTransaction(tx : Transaction) : TxIndex {
     let idx = log.size();
     log.add(tx);
+
+    // Update balance cache based on transaction type
+    switch (tx.operation) {
+      case (#Mint(args)) {
+        updateBalanceCache(args.to.owner, Int.abs(args.amount));
+      };
+      case (#Transfer(args)) {
+        updateBalanceCache(args.from.owner, -Int.abs(args.amount + tx.fee));
+        updateBalanceCache(args.to.owner, Int.abs(args.amount));
+      };
+      case (#Burn(args)) {
+        updateBalanceCache(args.from.owner, -Int.abs(args.amount));
+      };
+      case (#Approve(args)) {
+        if (tx.fee > 0) {
+          updateBalanceCache(args.from.owner, -Int.abs(tx.fee));
+        };
+      };
+    };
+
     idx;
   };
 
@@ -808,51 +923,29 @@ persistent actor class Tokenmania() = this {
     Buffer.toArray(result);
   };
 
-  // Get all unique token holders by scanning the transaction log
+  // Get all unique token holders using the balance cache
   // Returns an array of (Principal, Balance) tuples
-  // Note: This can be expensive for large transaction logs
+  // This is now O(m) where m is the number of holders, instead of O(n*m)
   public query func get_all_holders() : async [(Principal, Nat)] {
-    let holders = Buffer.Buffer<(Principal, Nat)>(100);
-    let seen = Buffer.Buffer<Principal>(100);
+    // Return all entries from balance cache (only holders with balance > 0)
+    Iter.toArray(Map.entries(balanceCache))
+  };
 
-    // Scan all transactions and collect unique principals
-    for (tx in log.vals()) {
-      switch (tx.operation) {
-        case (#Mint(args)) {
-          if (not hasPrincipal(seen, args.to.owner)) {
-            seen.add(args.to.owner);
-          };
-        };
-        case (#Transfer(args)) {
-          if (not hasPrincipal(seen, args.from.owner)) {
-            seen.add(args.from.owner);
-          };
-          if (not hasPrincipal(seen, args.to.owner)) {
-            seen.add(args.to.owner);
-          };
-        };
-        case (#Burn(args)) {
-          if (not hasPrincipal(seen, args.from.owner)) {
-            seen.add(args.from.owner);
-          };
-        };
-        case (#Approve(args)) {
-          if (not hasPrincipal(seen, args.from.owner)) {
-            seen.add(args.from.owner);
-          };
-        };
-      };
+  // Get the total number of token holders (holders with balance > 0)
+  public query func get_holder_count() : async Nat {
+    Map.size(balanceCache)
+  };
+
+  // Admin function to manually initialize/rebuild the balance cache
+  // Useful for existing deployments or to fix cache inconsistencies
+  public shared ({ caller }) func rebuild_balance_cache() : async Result<Text, Text> {
+    if (not Principal.equal(caller, init.minting_account.owner)) {
+      return #Err("Only minting account owner can rebuild cache");
     };
 
-    // Get balance for each unique principal
-    for (principal in seen.vals()) {
-      let bal = balance({ owner = principal; subaccount = null }, log);
-      if (bal > 0) {
-        holders.add((principal, bal));
-      };
-    };
-
-    Buffer.toArray(holders);
+    initializeBalanceCache();
+    cacheInitialized := true;
+    #Ok("Balance cache rebuilt successfully with " # Nat.toText(Map.size(balanceCache)) # " holders")
   };
 
   // Helper function to check if principal already in list

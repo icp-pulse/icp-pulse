@@ -10,7 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { User, Settings, Shield, LogOut, Copy } from 'lucide-react'
+import { User, Settings, Shield, LogOut, Copy, TrendingUp } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
 function truncatePrincipal(p: string) {
@@ -58,6 +58,10 @@ export function UserMenu() {
         <DropdownMenuItem onClick={() => router.push('/wallet')} className="cursor-pointer">
           <User className="h-4 w-4 mr-2" />
           Profile & Wallet
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => router.push('/token-stats')} className="cursor-pointer">
+          <TrendingUp className="h-4 w-4 mr-2" />
+          Token Stats
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => router.push('/admin')} className="cursor-pointer">
           <Shield className="h-4 w-4 mr-2" />

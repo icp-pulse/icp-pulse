@@ -661,6 +661,7 @@ export function LandingPage() {
                 <li><a href="/projects" className="hover:text-white transition-colors">Projects</a></li>
                 <li><a href="/surveys" className="hover:text-white transition-colors">Surveys</a></li>
                 <li><a href="/polls" className="hover:text-white transition-colors">Polls</a></li>
+                <li><a href="/token-stats" className="hover:text-white transition-colors">Token Stats</a></li>
                 <li><a href="/admin" className="hover:text-white transition-colors">Admin</a></li>
               </ul>
             </div>

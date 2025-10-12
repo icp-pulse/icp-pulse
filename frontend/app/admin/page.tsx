@@ -9,8 +9,9 @@ import SurveyAdmin from '@/components/admin/survey-admin'
 import PollAdmin from '@/components/admin/poll-admin'
 import AirdropAdmin from '@/components/admin/airdrop-admin'
 import QuestAdmin from '@/components/admin/quest-admin'
+import TokenHoldersAdmin from '@/components/admin/token-holders-admin'
 
-export type TabType = "projects" | "surveys" | "polls" | "airdrops" | "quests";
+export type TabType = "projects" | "surveys" | "polls" | "airdrops" | "quests" | "holders";
 
 function AdminDashboardContent() {
   const searchParams = useSearchParams()
@@ -19,7 +20,7 @@ function AdminDashboardContent() {
   // Set initial tab from URL parameter
   useEffect(() => {
     const tabParam = searchParams.get('tab') as TabType
-    if (tabParam && ['projects', 'surveys', 'polls', 'airdrops', 'quests'].includes(tabParam)) {
+    if (tabParam && ['projects', 'surveys', 'polls', 'airdrops', 'quests', 'holders'].includes(tabParam)) {
       setActiveTab(tabParam)
     }
   }, [searchParams])
@@ -49,6 +50,9 @@ function AdminDashboardContent() {
             )}
             {activeTab === 'quests' && (
               <QuestAdmin />
+            )}
+            {activeTab === 'holders' && (
+              <TokenHoldersAdmin />
             )}
           </div>
         </main>

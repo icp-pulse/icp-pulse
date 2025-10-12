@@ -338,17 +338,33 @@ export function CampaignCarouselBanner() {
 
           {/* CTA Button */}
           <div className="flex items-center gap-3">
-            {currentSlideData.type === 'announcement' && (
-              <a
-                href={(currentSlideData.data as Announcement).ctaLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 px-4 py-2 text-sm bg-white text-purple-600 hover:bg-gray-100 rounded-lg font-medium whitespace-nowrap transition-colors"
-              >
-                {(currentSlideData.data as Announcement).ctaText}
-                <ArrowRight className="w-4 h-4" />
-              </a>
-            )}
+            {currentSlideData.type === 'announcement' && (() => {
+              const announcement = currentSlideData.data as Announcement
+              const isExternalLink = announcement.ctaLink.startsWith('http')
+
+              if (isExternalLink) {
+                return (
+                  <a
+                    href={announcement.ctaLink}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 px-4 py-2 text-sm bg-white text-purple-600 hover:bg-gray-100 rounded-lg font-medium whitespace-nowrap transition-colors"
+                  >
+                    {announcement.ctaText}
+                    <ArrowRight className="w-4 h-4" />
+                  </a>
+                )
+              } else {
+                return (
+                  <Link href={announcement.ctaLink}>
+                    <button className="flex items-center gap-2 px-4 py-2 text-sm bg-white text-purple-600 hover:bg-gray-100 rounded-lg font-medium whitespace-nowrap transition-colors">
+                      {announcement.ctaText}
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+                  </Link>
+                )
+              }
+            })()}
 
             {currentSlideData.type === 'airdrop' && (
               <Link href="/airdrop">
