@@ -7,6 +7,7 @@ import { ThemeToggle } from '@/components/ThemeToggle'
 import { LoginButton } from '@/components/LoginButton'
 import { UserMenu } from '@/components/UserMenu'
 import { MobileBottomNav } from '@/components/layout/mobile-bottom-nav'
+import { AIChatbox } from '@/components/ai-chatbox'
 import { Menu, X } from 'lucide-react'
 import { useIcpAuth } from '@/components/IcpAuthProvider'
 
@@ -20,6 +21,7 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
   const isLandingPage = pathname === '/'
   const isAdminPage = pathname?.startsWith('/admin')
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [chatboxOpen, setChatboxOpen] = useState(false)
 
   const navLinks = [
     { href: '/dashboard', label: 'Dashboard' },
@@ -46,7 +48,7 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
               </Link>
 
               {/* Desktop Navigation */}
-              <nav className="hidden md:flex items-center gap-1">
+              <nav className="hidden lg:flex items-center gap-1">
                 {navLinks.map((link) => (
                   <Link
                     key={link.href}
@@ -59,7 +61,7 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
               </nav>
 
               {/* Desktop Actions */}
-              <div className="hidden md:flex items-center gap-3">
+              <div className="hidden lg:flex items-center gap-3">
                 {!isAuthenticated && <LoginButton />}
                 {isAuthenticated && <UserMenu />}
                 <ThemeToggle />
@@ -68,7 +70,7 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
               {/* Mobile Menu Button */}
               <button
                 onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                className="md:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+                className="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
               >
                 {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
               </button>
@@ -76,7 +78,7 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
 
             {/* Mobile Navigation */}
             {mobileMenuOpen && (
-              <div className="md:hidden mt-4 pb-4 border-t border-gray-200 dark:border-gray-800 pt-4">
+              <div className="lg:hidden mt-4 pb-4 border-t border-gray-200 dark:border-gray-800 pt-4">
                 <nav className="flex flex-col gap-2">
                   {navLinks.map((link) => (
                     <Link
@@ -111,7 +113,7 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
         </Link>
 
         {/* Desktop Navigation */}
-        <nav className="hidden md:flex items-center gap-1">
+        <nav className="hidden lg:flex items-center gap-1">
           {navLinks.map((link) => (
             <Link
               key={link.href}
@@ -128,7 +130,7 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
         </nav>
 
         {/* Desktop Actions */}
-        <div className="hidden md:flex items-center gap-3">
+        <div className="hidden lg:flex items-center gap-3">
           {!isAuthenticated && <LoginButton />}
           {isAuthenticated && <UserMenu />}
           <ThemeToggle />
@@ -137,7 +139,7 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
         {/* Mobile Menu Button - Only show on mobile for additional actions */}
         <button
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          className="md:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
+          className="lg:hidden p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800"
         >
           {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
@@ -145,7 +147,7 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
 
       {/* Mobile Top Menu - For additional actions only */}
       {mobileMenuOpen && (
-        <div className="md:hidden mb-4 pb-4 border-b border-gray-200 dark:border-gray-800">
+        <div className="lg:hidden mb-4 pb-4 border-b border-gray-200 dark:border-gray-800">
           <div className="flex items-center gap-3 px-4">
             {!isAuthenticated && <LoginButton />}
             {isAuthenticated && <UserMenu />}
@@ -157,7 +159,10 @@ export function ConditionalLayout({ children }: ConditionalLayoutProps) {
       <main className="mobile-main-content">{children}</main>
 
       {/* Mobile Bottom Navigation - Primary navigation on mobile */}
-      <MobileBottomNav />
+      <MobileBottomNav onChatboxToggle={() => setChatboxOpen(!chatboxOpen)} />
+
+      {/* AI Chatbox - Controlled by bottom nav on mobile, floating button on desktop */}
+      <AIChatbox isOpen={chatboxOpen} onToggle={() => setChatboxOpen(!chatboxOpen)} />
     </div>
   )
 }

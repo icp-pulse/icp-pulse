@@ -35,12 +35,18 @@ interface Message {
 
 interface AIChatboxProps {
   onOptionsGenerated?: (options: string[]) => void
+  isOpen?: boolean
+  onToggle?: () => void
 }
 
-export function AIChatbox({ onOptionsGenerated }: AIChatboxProps = {}) {
+export function AIChatbox({ onOptionsGenerated, isOpen: externalIsOpen, onToggle }: AIChatboxProps = {}) {
   const { isAuthenticated, identity } = useIcpAuth()
   const router = useRouter()
-  const [isOpen, setIsOpen] = useState(false)
+  const [internalIsOpen, setInternalIsOpen] = useState(false)
+
+  // Use external control if provided, otherwise use internal state
+  const isOpen = externalIsOpen !== undefined ? externalIsOpen : internalIsOpen
+  const setIsOpen = onToggle || setInternalIsOpen
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
@@ -62,7 +68,11 @@ export function AIChatbox({ onOptionsGenerated }: AIChatboxProps = {}) {
   }, [messages, isLoading])
 
   const toggleChatbox = () => {
-    setIsOpen(!isOpen)
+    if (onToggle) {
+      onToggle()
+    } else {
+      setIsOpen(!isOpen)
+    }
   }
 
   const sendMessage = async () => {
@@ -277,7 +287,12 @@ export function AIChatbox({ onOptionsGenerated }: AIChatboxProps = {}) {
           [Principal.fromText(tokenCanisterId)],
           totalFundE8s,
           rewardPerVoteE8s,
-          'self-funded'
+          'self-funded',
+          [], // maxResponses
+          [], // allowAnonymous
+          [], // allowMultiple
+          [], // visibility
+          []  // rewardDistributionType
         )
 
         if ('err' in result) {
@@ -296,7 +311,12 @@ export function AIChatbox({ onOptionsGenerated }: AIChatboxProps = {}) {
           totalFundE8s,
           fundingEnabled,
           rewardPerVoteE8s > 0n ? [rewardPerVoteE8s] : [],
-          []
+          [], // fundingType
+          [], // maxResponses
+          [], // allowAnonymous
+          [], // allowMultiple
+          [], // visibility
+          []  // rewardDistributionType
         )
       }
 
@@ -340,12 +360,12 @@ export function AIChatbox({ onOptionsGenerated }: AIChatboxProps = {}) {
 
   return (
     <>
-      {/* Floating Button */}
+      {/* Floating Button - Hidden on mobile/tablet */}
       <Button
         onClick={toggleChatbox}
-        className={`fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg transition-all duration-300 ease-in-out z-50 ${
-          isOpen ? 'scale-0 opacity-0' : 'scale-100 opacity-100 hover:scale-110 animate-pulse'
-        }`}
+        className={`fixed bottom-6 right-6 h-14 w-14 rounded-full shadow-lg transition-all duration-300 ease-in-out z-50 lg:block ${
+          isOpen ? 'scale-0 opacity-0' : 'scale-100 opacity-100 hover:scale-110'
+        } hidden`}
         style={{
           boxShadow: isOpen ? '' : '0 0 20px rgba(59, 130, 246, 0.5), 0 0 40px rgba(59, 130, 246, 0.3)',
         }}
@@ -354,8 +374,8 @@ export function AIChatbox({ onOptionsGenerated }: AIChatboxProps = {}) {
         <MessageCircle className="h-6 w-6" />
       </Button>
 
-      {/* Chatbox */}
-      <Card className={`fixed bottom-6 right-6 w-80 h-96 shadow-xl transition-all duration-300 ease-in-out z-40 bg-white dark:bg-gray-900 ${
+      {/* Chatbox - Positioned above mobile nav on mobile/tablet, floating on desktop */}
+      <Card className={`fixed bottom-[90px] lg:bottom-6 lg:right-6 right-4 left-4 lg:left-auto lg:w-80 w-auto h-96 shadow-xl transition-all duration-300 ease-in-out z-40 bg-white dark:bg-gray-900 ${
         isOpen
           ? 'scale-100 opacity-100 translate-y-0'
           : 'scale-95 opacity-0 translate-y-4 pointer-events-none'

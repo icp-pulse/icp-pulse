@@ -2,11 +2,15 @@
 
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
-import { Home, BarChart3, Plus, Trophy, Gift } from 'lucide-react'
+import { Home, BarChart3, Plus, Trophy, MessageCircle } from 'lucide-react'
 import { useIcpAuth } from '@/components/IcpAuthProvider'
 import './mobile-bottom-nav.css'
 
-export function MobileBottomNav() {
+interface MobileBottomNavProps {
+  onChatboxToggle?: () => void
+}
+
+export function MobileBottomNav({ onChatboxToggle }: MobileBottomNavProps) {
   const pathname = usePathname()
   const { isAuthenticated } = useIcpAuth()
 
@@ -37,10 +41,10 @@ export function MobileBottomNav() {
       href: '/quests',
     },
     {
-      id: 'rewards',
-      label: 'Rewards',
-      icon: <Gift size={22} />,
-      href: '/rewards',
+      id: 'chatbox',
+      label: 'AI Chat',
+      icon: <MessageCircle size={22} />,
+      isButton: true,
     },
   ]
 
@@ -54,13 +58,31 @@ export function MobileBottomNav() {
     <nav className="mobile-bottom-nav">
       <div className="nav-container">
         {navigationItems.map((item) => {
-          const isActive = pathname === item.href ||
-            (item.href !== '/dashboard' && pathname.startsWith(item.href))
+          const isActive = item.href && (pathname === item.href ||
+            (item.href !== '/dashboard' && pathname.startsWith(item.href)))
 
+          // Render button for chatbox trigger
+          if (item.isButton) {
+            return (
+              <button
+                key={item.id}
+                onClick={onChatboxToggle}
+                className={`nav-item ${item.isCenter ? 'center-item' : ''}`}
+                data-page={item.id}
+              >
+                <div className="nav-icon">
+                  {item.icon}
+                </div>
+                <span className="nav-label">{item.label}</span>
+              </button>
+            )
+          }
+
+          // Render link for navigation items
           return (
             <Link
               key={item.id}
-              href={item.href}
+              href={item.href!}
               className={`nav-item ${isActive ? 'active' : ''} ${item.isCenter ? 'center-item' : ''}`}
               data-page={item.id}
             >
