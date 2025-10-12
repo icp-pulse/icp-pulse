@@ -256,10 +256,12 @@ export default function WalletPage() {
     const calculateEffectiveRate = async () => {
       if (!showBuyModal) {
         setEffectiveRate(null)
+        setLoadingRate(false)
         return
       }
 
       try {
+        setLoadingRate(true)
         const { createActor: createSwapActor } = await import('../../../src/declarations/swap')
         const { HttpAgent } = await import('@dfinity/agent')
 
@@ -290,6 +292,8 @@ export default function WalletPage() {
       } catch (error) {
         console.error('Error calculating effective rate:', error)
         setEffectiveRate(null)
+      } finally {
+        setLoadingRate(false)
       }
     }
 
@@ -798,7 +802,7 @@ export default function WalletPage() {
                     <div className="p-4 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
                       <div className="text-sm text-purple-700 dark:text-purple-300">
                         <strong>Exchange Rate:</strong><br />
-                        {effectiveRate || 'Loading...'}
+                        {loadingRate ? 'Loading...' : (effectiveRate || 'Loading...')}
                       </div>
                     </div>
 
