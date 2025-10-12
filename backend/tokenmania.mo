@@ -740,4 +740,92 @@ persistent actor class Tokenmania() = this {
   public query func icrc2_allowance({ account : Account; spender : Account }) : async Allowance {
     allowance(account, spender, Nat64.fromNat(Int.abs(Time.now())));
   };
+
+  // ========== TRANSACTION HISTORY QUERIES ==========
+
+  // Get total number of transactions in the ledger
+  public query func get_transaction_count() : async Nat {
+    log.size();
+  };
+
+  // Get a specific transaction by index
+  public query func get_transaction(index : TxIndex) : async ?Transaction {
+    if (index < log.size()) {
+      ?log.get(index);
+    } else {
+      null;
+    };
+  };
+
+  // Get a range of transactions (for pagination)
+  // Returns transactions from start_index up to (but not including) end_index
+  public query func get_transactions(start_index : Nat, length : Nat) : async [Transaction] {
+    let end_index = Nat.min(start_index + length, log.size());
+    let result = Buffer.Buffer<Transaction>(length);
+
+    var i = start_index;
+    while (i < end_index) {
+      result.add(log.get(i));
+      i += 1;
+    };
+
+    result.toArray();
+  };
+
+  // Get all unique token holders by scanning the transaction log
+  // Returns an array of (Principal, Balance) tuples
+  // Note: This can be expensive for large transaction logs
+  public query func get_all_holders() : async [(Principal, Nat)] {
+    let holders = Buffer.Buffer<(Principal, Nat)>(100);
+    let seen = Buffer.Buffer<Principal>(100);
+
+    // Scan all transactions and collect unique principals
+    for (tx in log.vals()) {
+      switch (tx.operation) {
+        case (#Mint(args)) {
+          if (not hasPrincipal(seen, args.to.owner)) {
+            seen.add(args.to.owner);
+          };
+        };
+        case (#Transfer(args)) {
+          if (not hasPrincipal(seen, args.from.owner)) {
+            seen.add(args.from.owner);
+          };
+          if (not hasPrincipal(seen, args.to.owner)) {
+            seen.add(args.to.owner);
+          };
+        };
+        case (#Burn(args)) {
+          if (not hasPrincipal(seen, args.from.owner)) {
+            seen.add(args.from.owner);
+          };
+        };
+        case (#Approve(args)) {
+          if (not hasPrincipal(seen, args.from.owner)) {
+            seen.add(args.from.owner);
+          };
+        };
+      };
+    };
+
+    // Get balance for each unique principal
+    for (principal in seen.vals()) {
+      let bal = balance({ owner = principal; subaccount = null }, log);
+      if (bal > 0) {
+        holders.add((principal, bal));
+      };
+    };
+
+    holders.toArray();
+  };
+
+  // Helper function to check if principal already in list
+  private func hasPrincipal(list : Buffer.Buffer<Principal>, p : Principal) : Bool {
+    for (item in list.vals()) {
+      if (Principal.equal(item, p)) {
+        return true;
+      };
+    };
+    false;
+  };
 };
