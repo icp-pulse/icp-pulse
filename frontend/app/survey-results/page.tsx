@@ -1,12 +1,13 @@
 "use client"
 
 import { useEffect, useState, Suspense } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { useIcpAuth } from '@/components/IcpAuthProvider'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ArrowLeft, Download, Users, Calendar, CheckCircle } from 'lucide-react'
+import { SurveyBreadcrumb } from '@/components/surveys/survey-breadcrumb'
 
 interface Answer {
   questionId: bigint
@@ -46,6 +47,7 @@ function SurveyResultsContent() {
   const { identity, isAuthenticated } = useIcpAuth()
   const searchParams = useSearchParams()
   const surveyId = searchParams.get('surveyId')
+  const router = useRouter()
 
   const [survey, setSurvey] = useState<Survey | null>(null)
   const [submissions, setSubmissions] = useState<Submission[]>([])
@@ -191,12 +193,17 @@ function SurveyResultsContent() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
-      {/* Header */}
+      {/* Breadcrumb Navigation */}
+      <SurveyBreadcrumb surveyTitle={survey.title} surveyId={surveyId!} currentPage="results" />
+
+      {/* Header with Navigation */}
       <div className="mb-6">
-        <Button variant="ghost" onClick={() => window.history.back()} className="mb-4">
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back to Surveys
-        </Button>
+        <div className="flex items-center gap-2 mb-4">
+          <Button variant="outline" onClick={() => router.push('/admin?tab=surveys')}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back to Surveys
+          </Button>
+        </div>
 
         <div className="flex items-start justify-between">
           <div>
@@ -310,6 +317,18 @@ function SurveyResultsContent() {
             </Card>
           ))
         )}
+      </div>
+
+      {/* Mobile Bottom Navigation - Only visible on mobile */}
+      <div className="mt-8 md:hidden">
+        <Button
+          variant="outline"
+          onClick={() => router.push('/admin?tab=surveys')}
+          className="w-full"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Surveys
+        </Button>
       </div>
     </div>
   )
