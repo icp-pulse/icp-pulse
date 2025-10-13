@@ -12,9 +12,11 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useIcpAuth } from '@/components/IcpAuthProvider'
 import { LoginButton } from '@/components/LoginButton'
 import { useRouter } from 'next/navigation'
-import { Clock, Users, Vote, CheckCircle, BarChart3, Search, Filter, TrendingUp, Grid, List, Plus, ArrowUpDown, Flame, Star, Eye, Wallet } from 'lucide-react'
+import { Clock, Users, Vote, CheckCircle, BarChart3, Search, Filter, TrendingUp, Grid, List, Plus, ArrowUpDown, Flame, Star, Eye, Wallet, User } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
 import { analytics } from '@/lib/analytics'
+import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { Progress } from '@/components/ui/progress'
 
 // Use the actual backend types
 import type { Poll as BackendPoll, PollSummary } from '@/../../src/declarations/polls_surveys_backend/polls_surveys_backend.did'
@@ -40,12 +42,28 @@ export default function PollsPage() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [projectFilter, setProjectFilter] = useState('all')
   const [sortBy, setSortBy] = useState('recent')
-  const [viewMode, setViewMode] = useState<'table' | 'grid'>('table')
+  const [viewMode, setViewMode] = useState<'table' | 'grid'>('grid')
+  const [userVotes, setUserVotes] = useState<Record<string, bigint>>({}) // pollId -> optionId mapping
   const { identity, isAuthenticated } = useIcpAuth()
   const router = useRouter()
 
   useEffect(() => {
     fetchData()
+    // Load user votes from localStorage
+    const storedVotes = localStorage.getItem(`userVotes_${identity?.getPrincipal().toString()}`)
+    if (storedVotes) {
+      try {
+        const parsed = JSON.parse(storedVotes)
+        // Convert string option IDs back to bigint
+        const votesMap: Record<string, bigint> = {}
+        Object.keys(parsed).forEach(pollId => {
+          votesMap[pollId] = BigInt(parsed[pollId])
+        })
+        setUserVotes(votesMap)
+      } catch (e) {
+        console.error('Error loading user votes from localStorage:', e)
+      }
+    }
   }, [identity, isAuthenticated]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fetchData = async () => {
@@ -233,6 +251,18 @@ export default function PollsPage() {
         // Close the vote dialog
         setOpenVoteDialog(null)
 
+        // Save vote to localStorage and state
+        const pollIdStr = pollId.toString()
+        const newVotes = { ...userVotes, [pollIdStr]: optionId }
+        setUserVotes(newVotes)
+
+        // Save to localStorage (convert bigints to strings for JSON)
+        const votesToStore: Record<string, string> = {}
+        Object.keys(newVotes).forEach(key => {
+          votesToStore[key] = newVotes[key].toString()
+        })
+        localStorage.setItem(`userVotes_${identity?.getPrincipal().toString()}`, JSON.stringify(votesToStore))
+
         // Optimistically update local state
         setPolls(prevPolls => prevPolls.map(poll => {
           if (poll.id === pollId) {
@@ -342,6 +372,26 @@ export default function PollsPage() {
     return volumes[Number(poll.id) % volumes.length]
   }
 
+  const formatTimeAgo = (timestamp: bigint) => {
+    const now = Date.now()
+    const createdAt = Number(timestamp) / 1_000_000 // Convert nanoseconds to milliseconds
+    const diffMs = now - createdAt
+    const diffMins = Math.floor(diffMs / (1000 * 60))
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60))
+    const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24))
+
+    if (diffDays > 0) return `${diffDays}d ago`
+    if (diffHours > 0) return `${diffHours}h ago`
+    if (diffMins > 0) return `${diffMins}m ago`
+    return 'Just now'
+  }
+
+  const formatPrincipal = (principal: any) => {
+    const principalStr = principal.toString()
+    if (principalStr.length <= 12) return principalStr
+    return `${principalStr.slice(0, 6)}...${principalStr.slice(-4)}`
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -402,6 +452,73 @@ export default function PollsPage() {
               <Plus className="h-4 w-4 mr-2" />
               Create Poll
             </Button>
+          </div>
+
+          {/* Stats Overview */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+            <Card className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 border-blue-200 dark:border-blue-800">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-blue-600 dark:text-blue-400">Active Polls</p>
+                    <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
+                      {polls.filter(p => 'active' in p.status).length}
+                    </p>
+                  </div>
+                  <div className="w-12 h-12 bg-blue-200 dark:bg-blue-800/50 rounded-full flex items-center justify-center">
+                    <BarChart3 className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-900/20 dark:to-green-800/20 border-green-200 dark:border-green-800">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-green-600 dark:text-green-400">Voted Today</p>
+                    <p className="text-2xl font-bold text-green-900 dark:text-green-100">
+                      {polls.filter(p => hasUserVoted(p)).length}
+                    </p>
+                  </div>
+                  <div className="w-12 h-12 bg-green-200 dark:bg-green-800/50 rounded-full flex items-center justify-center">
+                    <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-900/20 dark:to-purple-800/20 border-purple-200 dark:border-purple-800">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-purple-600 dark:text-purple-400">Points Earned</p>
+                    <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">
+                      {polls.filter(p => hasUserVoted(p)).reduce((acc, p) => acc + (p.fundingInfo && p.fundingInfo.length > 0 && p.fundingInfo[0] ? Number(p.fundingInfo[0].rewardPerResponse) / Math.pow(10, p.fundingInfo[0].tokenDecimals) : 0), 0).toFixed(0)}
+                    </p>
+                  </div>
+                  <div className="w-12 h-12 bg-purple-200 dark:bg-purple-800/50 rounded-full flex items-center justify-center">
+                    <Star className="w-6 h-6 text-purple-600 dark:text-purple-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-900/20 dark:to-orange-800/20 border-orange-200 dark:border-orange-800">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-orange-600 dark:text-orange-400">Streak</p>
+                    <p className="text-2xl font-bold text-orange-900 dark:text-orange-100">
+                      {polls.filter(p => hasUserVoted(p)).length > 0 ? '1' : '0'} 🔥
+                    </p>
+                  </div>
+                  <div className="w-12 h-12 bg-orange-200 dark:bg-orange-800/50 rounded-full flex items-center justify-center">
+                    <Flame className="w-6 h-6 text-orange-600 dark:text-orange-400" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Tabs Navigation */}
@@ -617,12 +734,17 @@ export default function PollsPage() {
                               </span>
                             </TableCell>
                             <TableCell className="text-right">
-                              {Number(poll.rewardFund) > 0 ? (
-                                <div className="font-medium text-green-600">
-                                  {(Number(poll.rewardFund) / 100_000_000).toFixed(2)} ICP
+                              {poll.fundingInfo && poll.fundingInfo.length > 0 && poll.fundingInfo[0] ? (
+                                <div>
+                                  <div className="font-medium text-green-600">
+                                    {(Number(poll.fundingInfo[0].totalFund) / Math.pow(10, poll.fundingInfo[0].tokenDecimals)).toFixed(2)} {poll.fundingInfo[0].tokenSymbol}
+                                  </div>
+                                  <div className="text-xs text-gray-500">
+                                    {(Number(poll.fundingInfo[0].remainingFund) / Math.pow(10, poll.fundingInfo[0].tokenDecimals)).toFixed(2)} left
+                                  </div>
                                 </div>
                               ) : (
-                                <span className="text-gray-400">-</span>
+                                <span className="text-gray-400">No rewards</span>
                               )}
                             </TableCell>
                             <TableCell className="text-right">
@@ -701,65 +823,174 @@ export default function PollsPage() {
                     const userVoted = hasUserVoted(poll)
                     const isActive = 'active' in poll.status
                     const timeLeft = formatTimeLeft(poll.closesAt)
-                    const isVoting = votingPoll === poll.id
+                    const timeAgo = formatTimeAgo(poll.createdAt)
+                    const creatorShort = formatPrincipal(poll.createdBy)
 
                     return (
                       <Card key={poll.id} className="overflow-hidden hover:shadow-lg transition-shadow">
-                        <CardHeader className="pb-3">
-                          <div className="flex items-center gap-3 mb-2">
-                            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center">
-                              <span className="text-white text-xs font-bold">
-                                {poll.title.slice(0, 2).toUpperCase()}
-                              </span>
+                        {/* Creator Header */}
+                        <CardHeader className="pb-3 border-b">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-3">
+                              <Avatar className="w-10 h-10">
+                                <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-semibold">
+                                  <User className="w-5 h-5" />
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <p className="font-semibold text-sm text-gray-900 dark:text-gray-100">
+                                  {creatorShort}
+                                </p>
+                                <div className="flex items-center gap-2 text-xs text-gray-500">
+                                  <span>{timeAgo}</span>
+                                  {project && (
+                                    <>
+                                      <span>•</span>
+                                      <span>{project.name}</span>
+                                    </>
+                                  )}
+                                </div>
+                              </div>
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <CardTitle className="text-sm truncate">{poll.title}</CardTitle>
-                              {project && (
-                                <p className="text-xs text-gray-500">{project.name}</p>
+                            <Badge variant={isActive ? "default" : "secondary"} className="text-xs">
+                              {isActive ? 'Active' : 'Closed'}
+                            </Badge>
+                          </div>
+                        </CardHeader>
+
+                        {/* Poll Content */}
+                        <CardContent className="pt-4">
+                          <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 mb-2">
+                            {poll.title}
+                          </h3>
+                          <p className="text-sm text-gray-600 dark:text-gray-400 mb-4 line-clamp-2">
+                            {poll.description}
+                          </p>
+
+                          {/* Poll Options */}
+                          <div className="space-y-3 mb-4">
+                            {poll.options.map((option) => {
+                              const percentage = getVotePercentage(option.votes, poll.totalVotes)
+                              const userVotedOptionId = userVotes[poll.id.toString()]
+                              const userVotedThis = userVoted && userVotedOptionId === option.id
+
+                              return (
+                                <div
+                                  key={option.id}
+                                  className={`p-3 rounded-lg border transition-all ${
+                                    isActive && !userVoted ? 'cursor-pointer' : 'cursor-default'
+                                  } ${
+                                    userVotedThis
+                                      ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700'
+                                      : 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700 hover:border-blue-300 dark:hover:border-blue-700'
+                                  }`}
+                                  onClick={() => {
+                                    if (isActive && !userVoted) {
+                                      setOpenVoteDialog(poll.id)
+                                      setVotingOption(option.id)
+                                    }
+                                  }}
+                                >
+                                  <div className="flex items-center justify-between mb-2">
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                                        {option.text}
+                                      </span>
+                                      {userVotedThis && (
+                                        <CheckCircle className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                                      )}
+                                    </div>
+                                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                      {percentage}%
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center gap-2">
+                                    <Progress value={percentage} className="h-2 flex-1" />
+                                    <span className="text-xs text-gray-500 min-w-[60px] text-right">
+                                      {Number(option.votes)} votes
+                                    </span>
+                                  </div>
+                                </div>
+                              )
+                            })}
+                          </div>
+
+                          {/* Footer Stats and Actions */}
+                          <div className="flex items-center justify-between pt-3 border-t">
+                            <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
+                              <div className="flex items-center gap-1">
+                                <Users className="w-4 h-4" />
+                                <span>{Number(poll.totalVotes)} votes</span>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Clock className="w-4 h-4" />
+                                <span>{timeLeft}</span>
+                              </div>
+                              {poll.fundingInfo && poll.fundingInfo.length > 0 && poll.fundingInfo[0] && (
+                                <div className="flex items-center gap-1 text-green-600 dark:text-green-400 font-medium">
+                                  <Star className="w-4 h-4" />
+                                  <span>
+                                    {(Number(poll.fundingInfo[0].rewardPerResponse) / Math.pow(10, poll.fundingInfo[0].tokenDecimals)).toFixed(2)} {poll.fundingInfo[0].tokenSymbol}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
+                            <div>
+                              {isActive && !userVoted ? (
+                                <AlertDialog open={openVoteDialog === poll.id && votingOption !== null} onOpenChange={(open) => {
+                                  if (!open) {
+                                    setOpenVoteDialog(null)
+                                    setVotingOption(null)
+                                  }
+                                }}>
+                                  <AlertDialogContent>
+                                    <AlertDialogHeader>
+                                      <AlertDialogTitle>Confirm your vote</AlertDialogTitle>
+                                      <AlertDialogDescription>
+                                        Are you sure you want to vote for this option? This action cannot be undone.
+                                      </AlertDialogDescription>
+                                    </AlertDialogHeader>
+                                    <AlertDialogFooter>
+                                      <AlertDialogCancel onClick={() => {
+                                        setOpenVoteDialog(null)
+                                        setVotingOption(null)
+                                      }}>
+                                        Cancel
+                                      </AlertDialogCancel>
+                                      <AlertDialogAction
+                                        onClick={() => {
+                                          if (votingOption !== null) {
+                                            handleVote(poll.id, votingOption)
+                                          }
+                                        }}
+                                        className="bg-blue-600 hover:bg-blue-700"
+                                      >
+                                        Confirm Vote
+                                      </AlertDialogAction>
+                                    </AlertDialogFooter>
+                                  </AlertDialogContent>
+                                </AlertDialog>
+                              ) : userVoted ? (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => router.push(`/results?pollId=${poll.id}`)}
+                                >
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View Details
+                                </Button>
+                              ) : (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => router.push(`/results?pollId=${poll.id}`)}
+                                >
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  View Results
+                                </Button>
                               )}
                             </div>
                           </div>
-                          <div className="flex items-center justify-between text-xs">
-                            <Badge variant={isActive ? "default" : "secondary"}>
-                              {isActive ? 'Active' : 'Closed'}
-                            </Badge>
-                            {userVoted && (
-                              <Badge variant="outline">
-                                <CheckCircle className="h-3 w-3 mr-1" />
-                                Voted
-                              </Badge>
-                            )}
-                          </div>
-                        </CardHeader>
-                        <CardContent className="pt-0">
-                          <div className="flex items-center justify-between text-sm mb-3">
-                            <span className="text-gray-500">Total Votes</span>
-                            <span className="font-medium">{Number(poll.totalVotes)}</span>
-                          </div>
-                          <div className="flex items-center justify-between text-sm mb-4">
-                            <span className="text-gray-500">Time Left</span>
-                            <span className="font-medium">{timeLeft}</span>
-                          </div>
-                          {isActive && !userVoted ? (
-                            <Button
-                              size="sm"
-                              className="w-full bg-blue-600 hover:bg-blue-700"
-                              onClick={() => router.push(`/results?pollId=${poll.id}`)}
-                            >
-                              <Vote className="h-4 w-4 mr-2" />
-                              Vote Now
-                            </Button>
-                          ) : (
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="w-full"
-                              onClick={() => router.push(`/results?pollId=${poll.id}`)}
-                            >
-                              <Eye className="h-4 w-4 mr-2" />
-                              View Results
-                            </Button>
-                          )}
                         </CardContent>
                       </Card>
                     )
