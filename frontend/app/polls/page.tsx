@@ -160,6 +160,25 @@ export default function PollsPage() {
     }
   }
 
+  // Refresh a single poll after voting
+  const refreshSinglePoll = async (pollId: bigint) => {
+    try {
+      const { createBackendWithIdentity } = await import('@/lib/icp')
+      const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
+      const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
+      const backend = await createBackendWithIdentity({ canisterId, host, identity })
+
+      const pollData = await backend.get_poll(pollId)
+      if (pollData && pollData.length > 0 && pollData[0]) {
+        setPolls(prevPolls => prevPolls.map(poll =>
+          poll.id === pollId ? pollData[0] : poll
+        ))
+      }
+    } catch (err) {
+      console.error('Error refreshing poll:', err)
+    }
+  }
+
   // Filter and sort polls
   useEffect(() => {
     let filtered = [...polls]
@@ -313,9 +332,6 @@ export default function PollsPage() {
       const success = await backend.vote(pollId, optionId)
 
       if (success) {
-        // Close the vote dialog
-        setOpenVoteDialog(null)
-
         // Save vote to localStorage and state
         const pollIdStr = pollId.toString()
         const newVotes = { ...userVotes, [pollIdStr]: optionId }
@@ -350,7 +366,10 @@ export default function PollsPage() {
         }))
 
         // Refresh poll data in the background
-        fetchData()
+        refreshSinglePoll(pollId)
+
+        // Close the vote dialog
+        setOpenVoteDialog(null)
 
         // Show success dialog with options
         setVoteSuccessDialog(pollId)
@@ -374,7 +393,7 @@ export default function PollsPage() {
         })
 
         // Refresh to get latest state
-        await fetchData()
+        await refreshSinglePoll(pollId)
       }
     } catch (err) {
       console.error('Error voting:', err)
@@ -861,7 +880,7 @@ export default function PollsPage() {
                                       })}
                                     </div>
                                     <AlertDialogFooter>
-                                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                      <AlertDialogCancel disabled={votingPoll === poll.id}>Cancel</AlertDialogCancel>
                                     </AlertDialogFooter>
                                   </AlertDialogContent>
                                 </AlertDialog>
@@ -1032,10 +1051,13 @@ export default function PollsPage() {
                                       </AlertDialogDescription>
                                     </AlertDialogHeader>
                                     <AlertDialogFooter>
-                                      <AlertDialogCancel onClick={() => {
-                                        setOpenVoteDialog(null)
-                                        setVotingOption(null)
-                                      }}>
+                                      <AlertDialogCancel
+                                        disabled={votingPoll === poll.id}
+                                        onClick={() => {
+                                          setOpenVoteDialog(null)
+                                          setVotingOption(null)
+                                        }}
+                                      >
                                         Cancel
                                       </AlertDialogCancel>
                                       <AlertDialogAction
@@ -1044,9 +1066,17 @@ export default function PollsPage() {
                                             handleVote(poll.id, votingOption)
                                           }
                                         }}
+                                        disabled={votingPoll === poll.id}
                                         className="bg-blue-600 hover:bg-blue-700"
                                       >
-                                        Confirm Vote
+                                        {votingPoll === poll.id ? (
+                                          <>
+                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                            Submitting...
+                                          </>
+                                        ) : (
+                                          'Confirm Vote'
+                                        )}
                                       </AlertDialogAction>
                                     </AlertDialogFooter>
                                   </AlertDialogContent>
