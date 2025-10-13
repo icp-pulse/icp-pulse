@@ -150,6 +150,36 @@ export default function PollAdmin() {
     return diffDays
   }
 
+  const getFundingTypeString = (fundingType: any): string => {
+    if (!fundingType) return ''
+    if (fundingType.SelfFunded !== undefined) return 'Self-Funded'
+    if (fundingType.Crowdfunded !== undefined) return 'Crowdfunded'
+    if (fundingType.TreasuryFunded !== undefined) return 'Treasury-Funded'
+    return ''
+  }
+
+  const getFundingTypeColor = (type: string) => {
+    switch (type) {
+      case 'Self-Funded':
+        return 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300 border-green-200 dark:border-green-800'
+      case 'Crowdfunded':
+        return 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300 border-blue-200 dark:border-blue-800'
+      case 'Treasury-Funded':
+        return 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-300 border-purple-200 dark:border-purple-800'
+      default:
+        return 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300 border-gray-200 dark:border-gray-800'
+    }
+  }
+
+  const formatFundAmount = (amount: bigint, decimals: number): string => {
+    const divisor = BigInt(10 ** decimals)
+    const quotient = amount / divisor
+    const remainder = amount % divisor
+    if (remainder === 0n) return quotient.toString()
+    const decimal = remainder.toString().padStart(decimals, '0').replace(/0+$/, '')
+    return decimal ? `${quotient}.${decimal}` : quotient.toString()
+  }
+
   // Status transition handlers
   const handleStatusTransition = async (pollId: any, action: string) => {
     if (!identity) return
@@ -454,6 +484,11 @@ export default function PollAdmin() {
                   <Badge variant="outline" className="text-xs">
                     {poll.project || 'Unknown Project'}
                   </Badge>
+                  {poll.fundingInfo && poll.fundingInfo.length > 0 && poll.fundingInfo[0] && (
+                    <Badge className={`w-fit text-xs ${getFundingTypeColor(getFundingTypeString(poll.fundingInfo[0].fundingType))}`}>
+                      {getFundingTypeString(poll.fundingInfo[0].fundingType)}
+                    </Badge>
+                  )}
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -516,6 +551,14 @@ export default function PollAdmin() {
                     <span className="text-gray-500">Expires</span>
                     <span className="font-medium">{poll.closesAt ? new Date(Number(poll.closesAt) / 1_000_000).toLocaleDateString() : 'Unknown'}</span>
                   </div>
+                  {poll.fundingInfo && poll.fundingInfo.length > 0 && poll.fundingInfo[0] && (
+                    <div className="flex items-center justify-between text-sm">
+                      <span className="text-gray-500">Deposited</span>
+                      <span className="font-medium">
+                        {formatFundAmount(poll.fundingInfo[0].totalFund, poll.fundingInfo[0].tokenDecimals)} {poll.fundingInfo[0].tokenSymbol}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {/* Status Management (only for creators) */}

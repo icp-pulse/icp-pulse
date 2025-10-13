@@ -1,6 +1,8 @@
 import Principal "mo:base/Principal";
 import Result "mo:base/Result";
 import Nat "mo:base/Nat";
+import Array "mo:base/Array";
+import Time "mo:base/Time";
 
 persistent actor class SwapCanister() = this {
 
@@ -66,6 +68,22 @@ persistent actor class SwapCanister() = this {
     icrc2_transfer_from : (TransferFromArgs) -> async TransferFromResult;
   };
 
+  // Transaction history types
+  public type SwapDirection = {
+    #BuyPulse;    // ckUSDC → PULSE
+    #SellPulse;   // PULSE → ckUSDC
+  };
+
+  public type SwapTransaction = {
+    timestamp: Int;           // Time.now()
+    user: Principal;          // User who performed swap
+    direction: SwapDirection; // Buy or sell PULSE
+    inputAmount: Nat;         // Amount sent by user
+    outputAmount: Nat;        // Amount received by user
+    exchangeRate: Nat;        // Exchange rate at time (PULSE per ckUSDC)
+    spreadBps: Nat;          // Spread in basis points
+  };
+
   // State variables
   private var owner : Principal = Principal.fromText("aaaaa-aa");
   private var pulseTokenCanister : ?Principal = null;
@@ -80,6 +98,10 @@ persistent actor class SwapCanister() = this {
 
   // Track if canister is initialized
   private var initialized : Bool = false;
+
+  // Store last 100 swap transactions (using stable array)
+  private stable var swapHistory : [SwapTransaction] = [];
+  private let MAX_HISTORY_SIZE : Nat = 100;
 
   // Initialize the swap canister with token canisters
   public shared ({ caller }) func initialize(
@@ -128,6 +150,37 @@ persistent actor class SwapCanister() = this {
 
     spreadBasisPoints := newSpreadBasisPoints;
     #ok("Spread updated successfully to " # Nat.toText(newSpreadBasisPoints) # " basis points");
+  };
+
+  // Helper function to record swap transactions
+  private func recordSwap(
+    user: Principal,
+    direction: SwapDirection,
+    inputAmount: Nat,
+    outputAmount: Nat
+  ) {
+    let transaction : SwapTransaction = {
+      timestamp = Time.now();
+      user = user;
+      direction = direction;
+      inputAmount = inputAmount;
+      outputAmount = outputAmount;
+      exchangeRate = pulsePerCkUSDC;
+      spreadBps = spreadBasisPoints;
+    };
+
+    // Add new transaction to history
+    let newHistory = Array.append(swapHistory, [transaction]);
+
+    // Keep only last MAX_HISTORY_SIZE transactions
+    if (newHistory.size() > MAX_HISTORY_SIZE) {
+      swapHistory := Array.tabulate<SwapTransaction>(
+        MAX_HISTORY_SIZE,
+        func(i) = newHistory[newHistory.size() - MAX_HISTORY_SIZE + i]
+      );
+    } else {
+      swapHistory := newHistory;
+    };
   };
 
   // Swap ckUSDC for PULSE
@@ -231,6 +284,8 @@ persistent actor class SwapCanister() = this {
 
     switch (transferResult) {
       case (#Ok(_)) {
+        // Record successful swap
+        recordSwap(caller, #BuyPulse, ckUSDCAmount, pulseAmount);
         #ok(pulseAmount);
       };
       case (#Err(_)) {
@@ -344,6 +399,8 @@ persistent actor class SwapCanister() = this {
 
     switch (transferResult) {
       case (#Ok(_)) {
+        // Record successful swap
+        recordSwap(caller, #SellPulse, pulseAmount, ckUSDCAmount);
         #ok(ckUSDCAmount);
       };
       case (#Err(_)) {
@@ -513,5 +570,22 @@ persistent actor class SwapCanister() = this {
       owner = Principal.fromActor(this);
       subaccount = null;
     });
+  };
+
+  // Get recent swap transactions (returns newest first)
+  public query func getSwapHistory(limit: Nat) : async [SwapTransaction] {
+    let size = swapHistory.size();
+    if (size == 0) {
+      return [];
+    };
+
+    let actualLimit = if (limit > size) { size } else { limit };
+    let startIndex = if (size > actualLimit) { size - actualLimit } else { 0 };
+
+    // Return transactions in reverse order (newest first)
+    Array.tabulate<SwapTransaction>(
+      actualLimit,
+      func(i) = swapHistory[size - 1 - i]
+    );
   };
 };
