@@ -36,7 +36,13 @@ persistent actor class polls_surveys_backend() = this {
   type PollId = Nat;
   type SurveyId = Nat;
 
-  type Status = { #active; #closed };
+  type Status = {
+    #active;        // Poll is accepting responses
+    #paused;        // Poll is visible but not accepting responses
+    #claimsOpen;    // Users can claim their rewards
+    #claimsEnded;   // Reward claiming period has ended
+    #closed;        // Poll permanently closed
+  };
 
   // Custom token types
   type TokenType = {
@@ -832,23 +838,9 @@ persistent actor class polls_surveys_backend() = this {
     switch (pollOpt) {
       case null { return #err("Poll not found") };
       case (?poll) {
-        // Check if poll is closed, time expired, budget depleted, or max responses reached
-        let canClaim = (poll.status == #closed) or
-                      (poll.closesAt <= now()) or
-                      (switch (poll.fundingInfo) {
-                        case (?info) {
-                          // Can claim if budget depleted OR maxResponses reached (if set)
-                          (info.remainingFund < info.rewardPerResponse) or
-                          (switch (info.maxResponses) {
-                            case null { false };  // No max set, wait for other conditions
-                            case (?max) { info.currentResponses >= max };
-                          })
-                        };
-                        case null { false };
-                      });
-
-        if (not canClaim) {
-          return #err("Poll must be closed or reach max responses before rewards can be claimed");
+        // Check if poll status allows claiming - must be in claimsOpen status
+        if (poll.status != #claimsOpen) {
+          return #err("Rewards can only be claimed when poll is in 'Claims Open' status");
         };
 
         switch (poll.fundingInfo) {
@@ -941,14 +933,8 @@ persistent actor class polls_surveys_backend() = this {
     for (poll in polls.vals()) {
       switch (poll.fundingInfo) {
         case (?info) {
-          // Check if poll is claimable
-          let pollClosed = (poll.status == #closed) or
-                          (poll.closesAt <= now()) or
-                          (info.remainingFund < info.rewardPerResponse) or
-                          (switch (info.maxResponses) {
-                            case null { false };
-                            case (?max) { info.currentResponses >= max };
-                          });
+          // Check if poll is claimable - must be in claimsOpen status
+          let pollClosed = (poll.status == #claimsOpen);
 
           // Find user's pending claims in this poll
           var userAmount : Nat64 = 0;
@@ -1008,7 +994,10 @@ persistent actor class polls_surveys_backend() = this {
     // First, find the poll and validate the vote
     switch (findPoll(pollId)) {
       case (?poll) {
-        if ((poll.status == #closed) or (poll.closesAt <= now())) { return false };
+        // Only active polls accept votes
+        if (poll.status != #active) { return false };
+        // Also check if time has expired
+        if (poll.closesAt <= now()) { return false };
 
         // Check one vote per principal
         var already = false;
@@ -1064,13 +1053,141 @@ persistent actor class polls_surveys_backend() = this {
     }
   };
 
-  public shared func close_poll(pollId : PollId) : async Bool {
-    var closed = false;
-    polls := Array.tabulate<Poll>(polls.size(), func i {
-      let p = polls[i];
-      if (p.id == pollId) { closed := true; { p with status = #closed } } else { p }
-    });
-    closed
+  // Poll status transition functions with authorization
+
+  // Pause an active poll (only creator can pause)
+  public shared (msg) func pause_poll(pollId : PollId) : async Result.Result<Text, Text> {
+    let pollOpt = findPoll(pollId);
+    switch (pollOpt) {
+      case null { return #err("Poll not found") };
+      case (?poll) {
+        // Check authorization
+        if (poll.createdBy != msg.caller) {
+          return #err("Only poll creator can pause the poll");
+        };
+
+        // Check current status
+        if (poll.status != #active) {
+          return #err("Only active polls can be paused");
+        };
+
+        // Update poll status
+        polls := Array.tabulate<Poll>(polls.size(), func i {
+          let p = polls[i];
+          if (p.id == pollId) { { p with status = #paused } } else { p }
+        });
+
+        #ok("Poll paused successfully")
+      };
+    }
+  };
+
+  // Resume a paused poll (only creator can resume)
+  public shared (msg) func resume_poll(pollId : PollId) : async Result.Result<Text, Text> {
+    let pollOpt = findPoll(pollId);
+    switch (pollOpt) {
+      case null { return #err("Poll not found") };
+      case (?poll) {
+        // Check authorization
+        if (poll.createdBy != msg.caller) {
+          return #err("Only poll creator can resume the poll");
+        };
+
+        // Check current status
+        if (poll.status != #paused) {
+          return #err("Only paused polls can be resumed");
+        };
+
+        // Update poll status
+        polls := Array.tabulate<Poll>(polls.size(), func i {
+          let p = polls[i];
+          if (p.id == pollId) { { p with status = #active } } else { p }
+        });
+
+        #ok("Poll resumed successfully")
+      };
+    }
+  };
+
+  // Start rewards claiming period (only creator can start)
+  public shared (msg) func start_rewards_claiming(pollId : PollId) : async Result.Result<Text, Text> {
+    let pollOpt = findPoll(pollId);
+    switch (pollOpt) {
+      case null { return #err("Poll not found") };
+      case (?poll) {
+        // Check authorization
+        if (poll.createdBy != msg.caller) {
+          return #err("Only poll creator can start rewards claiming");
+        };
+
+        // Check current status - can transition from active or paused
+        if (poll.status != #active and poll.status != #paused) {
+          return #err("Can only start claiming from active or paused polls");
+        };
+
+        // Update poll status
+        polls := Array.tabulate<Poll>(polls.size(), func i {
+          let p = polls[i];
+          if (p.id == pollId) { { p with status = #claimsOpen } } else { p }
+        });
+
+        #ok("Rewards claiming period started")
+      };
+    }
+  };
+
+  // End rewards claiming period (only creator can end)
+  public shared (msg) func end_rewards_claiming(pollId : PollId) : async Result.Result<Text, Text> {
+    let pollOpt = findPoll(pollId);
+    switch (pollOpt) {
+      case null { return #err("Poll not found") };
+      case (?poll) {
+        // Check authorization
+        if (poll.createdBy != msg.caller) {
+          return #err("Only poll creator can end rewards claiming");
+        };
+
+        // Check current status
+        if (poll.status != #claimsOpen) {
+          return #err("Rewards claiming must be open to end it");
+        };
+
+        // Update poll status
+        polls := Array.tabulate<Poll>(polls.size(), func i {
+          let p = polls[i];
+          if (p.id == pollId) { { p with status = #claimsEnded } } else { p }
+        });
+
+        #ok("Rewards claiming period ended")
+      };
+    }
+  };
+
+  // Close poll permanently (only creator can close)
+  public shared (msg) func close_poll(pollId : PollId) : async Result.Result<Text, Text> {
+    let pollOpt = findPoll(pollId);
+    switch (pollOpt) {
+      case null { return #err("Poll not found") };
+      case (?poll) {
+        // Check authorization
+        if (poll.createdBy != msg.caller) {
+          return #err("Only poll creator can close the poll");
+        };
+
+        // Can close from any status except already closed
+        if (poll.status == #closed) {
+          return #err("Poll is already closed");
+        };
+
+        // Update poll status
+        polls := Array.tabulate<Poll>(polls.size(), func i {
+          let p = polls[i];
+          if (p.id == pollId) { { p with status = #closed } } else { p }
+        });
+
+        #ok("Poll closed successfully")
+      };
+    }
   };
 
   // Distribute custom token rewards for a poll
@@ -1751,12 +1868,144 @@ persistent actor class polls_surveys_backend() = this {
     http_request: CanisterHttpRequestArgs -> async HttpResponsePayload;
   };
 
-  // Transform function to clean up the HTTP response
+  // Helper to get first N characters of text
+  private func textPrefix(text: Text, maxLen: Nat) : Text {
+    let chars = Iter.toArray(Text.toIter(text));
+    let len = chars.size();
+    let takeLen = if (len < maxLen) { len } else { maxLen };
+    Text.fromIter(
+      Array.tabulate<Char>(takeLen, func(i) {
+        chars[i]
+      }).vals()
+    )
+  };
+
+  // Helper to find pattern in text
+  private func findPattern(text: Text, pattern: Text, startFrom: Nat) : ?Nat {
+    let textChars = Iter.toArray(Text.toIter(text));
+    let patternChars = Iter.toArray(Text.toIter(pattern));
+    let textLen = textChars.size();
+    let patternLen = patternChars.size();
+
+    if (patternLen == 0 or startFrom + patternLen > textLen) {
+      return null;
+    };
+
+    var i = startFrom;
+    while (i + patternLen <= textLen) {
+      var matches = true;
+      var j = 0;
+      while (j < patternLen) {
+        if (textChars[i + j] != patternChars[j]) {
+          matches := false;
+          j := patternLen; // break
+        };
+        j += 1;
+      };
+      if (matches) {
+        return ?i;
+      };
+      i += 1;
+    };
+    null
+  };
+
+  // Helper to extract only the content field from OpenAI response for consensus
+  // OpenAI returns: {"id":"...","choices":[{"message":{"content":"[...]"}}],...}
+  // We extract just the content value to achieve consensus
+  private func extractContent(body: Blob) : Blob {
+    switch (Text.decodeUtf8(body)) {
+      case (?responseText) {
+        // DEBUG: Log raw OpenAI response BEFORE extraction
+        Debug.print("RAW OpenAI Response (before extraction): " # responseText);
+        Debug.print("Raw response length: " # Nat.toText(Text.size(responseText)));
+
+        let chars = Iter.toArray(Text.toIter(responseText));
+        let len = chars.size();
+
+        // Find "content" first, then look for : and " after it (handles any spacing)
+        let contentKeyPattern = "\"content\"";
+        let contentKeyPos = findPattern(responseText, contentKeyPattern, 0);
+
+        switch (contentKeyPos) {
+          case null {
+            Debug.print("ERROR: Could not find 'content' key in response!");
+            return Text.encodeUtf8("{\"choices\":[{\"message\":{\"content\":\"\"}}]}");
+          };
+          case (?keyPos) {
+            Debug.print("Found 'content' key at position: " # Nat.toText(keyPos));
+
+            // Now find the opening quote of the value (skip : and any whitespace)
+            var searchPos = keyPos + Text.size(contentKeyPattern);
+            Debug.print("Searching for value starting from position: " # Nat.toText(searchPos));
+
+            // Skip whitespace and colon and more whitespace
+            while (searchPos < len and (chars[searchPos] == ' ' or chars[searchPos] == ':')) {
+              searchPos += 1;
+            };
+
+            // Now we should be at the opening quote of the content value
+            if (searchPos >= len or chars[searchPos] != '\"') {
+              Debug.print("ERROR: Could not find opening quote for content value at position " # Nat.toText(searchPos));
+              return Text.encodeUtf8("{\"choices\":[{\"message\":{\"content\":\"\"}}]}");
+            };
+
+            let startIdx = searchPos + 1; // Start after the opening quote
+            Debug.print("Content value starts at position: " # Nat.toText(startIdx));
+            Debug.print("Content start index: " # Nat.toText(startIdx));
+            Debug.print("Total response length: " # Nat.toText(len));
+            var endIdx = startIdx;
+            var escapeNext = false;
+            var iterations = 0;
+
+            while (endIdx < len) {
+              iterations += 1;
+              let currentChar = chars[endIdx];
+
+              if (escapeNext) {
+                escapeNext := false;
+              } else if (currentChar == '\\') {
+                escapeNext := true;
+              } else if (currentChar == '\"') {
+                // Found closing quote
+                Debug.print("Found closing quote at position: " # Nat.toText(endIdx));
+                Debug.print("Iterations to find closing quote: " # Nat.toText(iterations));
+                let contentLen = if (endIdx > startIdx) { endIdx - startIdx } else { 0 };
+                Debug.print("Calculated content length: " # Nat.toText(contentLen));
+
+                let content = Text.fromIter(
+                  Array.tabulate<Char>(contentLen, func(i) {
+                    chars[startIdx + i]
+                  }).vals()
+                );
+
+                Debug.print("Extracted content from OpenAI: " # content);
+                Debug.print("Content length: " # Nat.toText(Text.size(content)));
+
+                // Return normalized JSON with only the content
+                let normalized = "{\"choices\":[{\"message\":{\"content\":\"" # content # "\"}}]}";
+                return Text.encodeUtf8(normalized);
+              };
+              endIdx += 1;
+            };
+
+            // Reached end without finding closing quote
+            Text.encodeUtf8("{\"choices\":[{\"message\":{\"content\":\"\"}}]}")
+          };
+        };
+      };
+      case null {
+        Text.encodeUtf8("{\"choices\":[{\"message\":{\"content\":\"\"}}]}")
+      }
+    }
+  };
+
+  // Transform function to normalize HTTP response for consensus
   public query func transform(args: TransformArgs) : async HttpResponsePayload {
     {
       status = args.response.status;
       headers = [];
-      body = args.response.body;
+      body = extractContent(args.response.body);
     }
   };
 
@@ -1773,16 +2022,23 @@ persistent actor class polls_surveys_backend() = this {
   };
 
   // Generate poll options using OpenAI
-  public func generate_poll_options(topic: Text) : async ?[Text] {
+  public func generate_poll_options(topic: Text) : async Result.Result<[Text], Text> {
     if (Text.size(openaiApiKey) == 0) {
-      return null; // No API key set
+      Debug.print("AI Generation Error: No OpenAI API key configured");
+      return #err("NO_API_KEY");
     };
 
     let apiKey = openaiApiKey;
     let ic : ManagementCanisterActor = actor("aaaaa-aa");
 
-    // Construct the OpenAI API request with simpler prompt
-    let requestBody = "{\"model\":\"gpt-4o-mini\",\"messages\":[{\"role\":\"system\",\"content\":\"You are a helpful assistant. Return ONLY a JSON array of 4 poll option strings, nothing else. Format: [\\\"option1\\\",\\\"option2\\\",\\\"option3\\\",\\\"option4\\\"]\"},{\"role\":\"user\",\"content\":\"Generate 4 poll options for: " # topic # "\"}],\"temperature\":0.7,\"max_tokens\":150}";
+    // Construct the OpenAI API request with deterministic temperature for consensus
+    // NOTE: temperature MUST be 0 for IC consensus - each replica makes independent requests
+    let requestBody = "{\"model\":\"gpt-4o-mini\",\"messages\":[{\"role\":\"system\",\"content\":\"You are a helpful assistant. Return ONLY a JSON array of 4 poll option strings, nothing else. Format: [\\\"option1\\\",\\\"option2\\\",\\\"option3\\\",\\\"option4\\\"]\"},{\"role\":\"user\",\"content\":\"Generate 4 poll options for: " # topic # "\"}],\"temperature\":0,\"max_tokens\":150}";
+
+    // DEBUG: Log the request we're sending to OpenAI
+    Debug.print("=== SENDING REQUEST TO OPENAI ===");
+    Debug.print("Poll topic: " # topic);
+    Debug.print("Request body: " # requestBody);
 
     let requestBodyBlob = Text.encodeUtf8(requestBody);
 
@@ -1806,73 +2062,182 @@ persistent actor class polls_surveys_backend() = this {
     try {
       let response = await ic.http_request(request);
 
+      Debug.print("OpenAI Response Status: " # Nat.toText(response.status));
+      Debug.print("Response body size: " # Nat.toText(response.body.size()));
+
+      // DEBUG: Log the actual response.body (this is AFTER transform)
+      switch (Text.decodeUtf8(response.body)) {
+        case (?bodyText) {
+          Debug.print("Response body (after transform, first 1000 chars): " # textPrefix(bodyText, 1000));
+        };
+        case null {
+          Debug.print("Could not decode response.body as UTF-8");
+        };
+      };
+
       if (response.status == 200) {
         let responseText = switch (Text.decodeUtf8(response.body)) {
           case (?text) { text };
           case null {
-            // Return default options if can't decode
-            return ?["Option 1", "Option 2", "Option 3", "Option 4"];
+            Debug.print("AI Generation Error: Could not decode response body as UTF-8");
+            return #err("DECODE_ERROR: Could not decode response as UTF-8");
           };
         };
 
+        Debug.print("OpenAI Response (already transformed): " # responseText);
+        Debug.print("Response length: " # Nat.toText(Text.size(responseText)));
+
         // Parse the OpenAI response to extract the poll options
-        let parsed = parseOpenAIResponse(responseText);
-        ?parsed
+        switch (parseOpenAIResponse(responseText)) {
+          case (#ok(options)) {
+            Debug.print("Successfully parsed " # Nat.toText(options.size()) # " options from AI response");
+            #ok(options)
+          };
+          case (#err(errMsg)) {
+            Debug.print("AI Generation Parse Error: " # errMsg);
+            #err("PARSE_ERROR: " # errMsg)
+          };
+        };
       } else {
-        // Return default options if status is not 200
-        ?["Option A", "Option B", "Option C", "Option D"]
+        // Log the error response
+        let errorBody = switch (Text.decodeUtf8(response.body)) {
+          case (?text) { text };
+          case null { "(could not decode error body)" };
+        };
+        Debug.print("AI Generation HTTP Error: Status " # Nat.toText(response.status) # ", Body: " # errorBody);
+        #err("HTTP_ERROR_" # Nat.toText(response.status) # ": " # errorBody)
       }
     } catch (error) {
-      // Return default options if error occurs
-      ?["Choice 1", "Choice 2", "Choice 3", "Choice 4"]
+      Debug.print("AI Generation Exception: " # Error.message(error));
+      #err("NETWORK_ERROR: " # Error.message(error))
     }
   };
 
-  // Helper function to parse OpenAI response
-  private func parseOpenAIResponse(response: Text) : [Text] {
-    // Simple parser to extract JSON array from OpenAI response
-    // The response format is: {"choices":[{"message":{"content":"[\"option1\",\"option2\",\"option3\",\"option4\"]"}}]}
+  // Helper function to parse normalized OpenAI response from transform
+  // Transform returns: {"choices":[{"message":{"content":"[\"opt1\",\"opt2\",...]"}}]}
+  private func parseOpenAIResponse(response: Text) : Result.Result<[Text], Text> {
+    Debug.print("Parsing response: " # response);
 
-    // Find the content field
-    var startIdx = 0;
-    var found = false;
-    let searchStr = "\"content\":\"";
+    // Response format after transform: {"choices":[{"message":{"content":"CONTENT_HERE"}}]}
+    // The content itself is a JSON array string like: [\"option1\",\"option2\",...]
 
-    // This is a simplified implementation - for production use a proper JSON parser
-    // For now, return default options if parsing fails
-    let defaultOptions = [
-      "Option 1",
-      "Option 2",
-      "Option 3",
-      "Option 4"
-    ];
+    let contentPattern = "\"content\":\"";
+    let chars = Iter.toArray(Text.toIter(response));
+    let len = chars.size();
 
-    // Extract content between quotes after "content":"
-    // Look for pattern: "content":"[\"...\",\"...\",\"...\",\"...\"]"
-    let textLength = Text.size(response);
-    var contentStart : ?Nat = null;
-    var i = 0;
+    // Find "content":" pattern
+    let contentPos = findPattern(response, contentPattern, 0);
 
-    // Find start of content array
-    label findContent for (char in response.chars()) {
-      if (i > 0 and i + 1 < textLength) {
-        // Look for opening bracket of array in content
-        if (char == '[') {
-          contentStart := ?i;
-          break findContent;
+    switch (contentPos) {
+      case null {
+        Debug.print("Could not find content pattern");
+        #err("Could not find content field in response")
+      };
+      case (?pos) {
+        // Extract everything between "content":" and the next unescaped "
+        let startIdx = pos + Text.size(contentPattern);
+        var endIdx = startIdx;
+        var escapeNext = false;
+
+        // Find the closing quote of the content value
+        while (endIdx < len) {
+          if (escapeNext) {
+            escapeNext := false;
+          } else if (chars[endIdx] == '\\') {
+            escapeNext := true;
+          } else if (chars[endIdx] == '\"') {
+            // Found the closing quote - extract content
+            let contentLen = if (endIdx > startIdx) { endIdx - startIdx } else { 0 };
+
+            if (contentLen == 0) {
+              Debug.print("Content is empty");
+              return #err("Content field is empty");
+            };
+
+            let content = Text.fromIter(
+              Array.tabulate<Char>(contentLen, func(i) {
+                chars[startIdx + i]
+              }).vals()
+            );
+
+            Debug.print("Extracted content: " # content);
+
+            // Now parse the JSON array from content
+            // Content should be like: [\"option1\",\"option2\",...]
+            // But the backslashes might be escaped, so it could be raw text
+            return parseJSONArray(content);
+          };
+          endIdx += 1;
         };
+
+        Debug.print("Did not find closing quote for content");
+        #err("Malformed content field")
+      };
+    }
+  };
+
+  // Parse a JSON array string into Text array
+  private func parseJSONArray(jsonArray: Text) : Result.Result<[Text], Text> {
+    let chars = Iter.toArray(Text.toIter(jsonArray));
+    let len = chars.size();
+
+    // Find opening bracket
+    var arrayStart : ?Nat = null;
+    var i = 0;
+    while (i < len) {
+      if (chars[i] == '[') {
+        arrayStart := ?i;
+        i := len; // break
       };
       i += 1;
     };
 
-    switch (contentStart) {
+    switch (arrayStart) {
+      case null { #err("No opening bracket found in JSON array") };
       case (?start) {
-        // Extract the array content - simplified version
-        // In production, use a proper JSON parser library
-        defaultOptions
-      };
-      case null {
-        defaultOptions
+        // Parse array elements
+        var options : [Text] = [];
+        var currentOption : Text = "";
+        var inString = false;
+        var escapeNext = false;
+        var idx = start + 1;
+
+        while (idx < len) {
+          let char = chars[idx];
+
+          if (escapeNext) {
+            // Previous char was \, so this is escaped
+            currentOption := currentOption # Text.fromChar(char);
+            escapeNext := false;
+          } else if (char == '\\') {
+            escapeNext := true;
+          } else if (char == '\"') {
+            if (inString) {
+              // End of string - save it
+              if (Text.size(currentOption) > 0) {
+                options := Array.append(options, [currentOption]);
+              };
+              currentOption := "";
+              inString := false;
+            } else {
+              // Start of string
+              inString := true;
+            };
+          } else if (inString) {
+            currentOption := currentOption # Text.fromChar(char);
+          } else if (char == ']') {
+            // End of array
+            idx := len; // break
+          };
+
+          idx += 1;
+        };
+
+        if (options.size() >= 2) {
+          #ok(options)
+        } else {
+          #err("Parsed array has fewer than 2 options. Found: " # Nat.toText(options.size()))
+        }
       };
     }
   };
