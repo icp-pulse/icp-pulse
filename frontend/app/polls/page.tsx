@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -44,11 +44,14 @@ export default function PollsPage() {
   const [sortBy, setSortBy] = useState('recent')
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('grid')
   const [userVotes, setUserVotes] = useState<Record<string, bigint>>({}) // pollId -> optionId mapping
+  const [page, setPage] = useState(0)
+  const [hasMore, setHasMore] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const { identity, isAuthenticated } = useIcpAuth()
   const router = useRouter()
 
   useEffect(() => {
-    fetchData()
+    fetchData(0)
     // Load user votes from localStorage
     const storedVotes = localStorage.getItem(`userVotes_${identity?.getPrincipal().toString()}`)
     if (storedVotes) {
@@ -66,49 +69,78 @@ export default function PollsPage() {
     }
   }, [identity, isAuthenticated]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const fetchData = async () => {
+  const fetchData = async (pageNum: number = 0) => {
     if (!isAuthenticated) {
       setLoading(false)
       return
     }
-    
+
     try {
-      setLoading(true)
+      if (pageNum === 0) {
+        setLoading(true)
+      } else {
+        setLoadingMore(true)
+      }
+
       const { createBackendWithIdentity } = await import('@/lib/icp')
       const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
       const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
       const backend = await createBackendWithIdentity({ canisterId, host, identity })
-      
-      // Fetch projects first
-      const projectData = await backend.list_projects(0n, 100n)
-      setProjects(projectData)
-      
-      // Fetch polls from all projects
-      let allPolls: BackendPoll[] = []
-      for (const project of projectData) {
+
+      // Fetch projects first (only on initial load)
+      if (pageNum === 0) {
+        const projectData = await backend.list_projects(0n, 100n)
+        setProjects(projectData)
+      }
+
+      // Pagination settings
+      const POLLS_PER_PAGE = 15
+      const offset = BigInt(pageNum * POLLS_PER_PAGE)
+
+      // Fetch polls with pagination
+      let newPolls: BackendPoll[] = []
+      const currentProjects = pageNum === 0 ? await backend.list_projects(0n, 100n) : projects
+
+      for (const project of currentProjects) {
         try {
-          const projectPolls = await backend.list_polls_by_project(project.id, 0n, 50n)
-          
+          const projectPolls = await backend.list_polls_by_project(project.id, offset, BigInt(POLLS_PER_PAGE))
+
           // Get detailed poll information
           for (const pollSummary of projectPolls) {
             const poll = await backend.get_poll(pollSummary.id)
             if (poll && poll.length > 0 && poll[0]) {
-              allPolls.push(poll[0])
+              newPolls.push(poll[0])
             }
+
+            // Stop if we've reached the desired number of polls for this page
+            if (newPolls.length >= POLLS_PER_PAGE) break
           }
+
+          // Stop fetching from other projects if we have enough polls
+          if (newPolls.length >= POLLS_PER_PAGE) break
         } catch (err) {
           console.error(`Error fetching polls for project ${project.id}:`, err)
         }
       }
-      
-      setPolls(allPolls)
-      setFilteredPolls(allPolls)
 
-      // Track page view
-      analytics.track('page_viewed', {
-        path: '/polls',
-        page_title: 'Browse Polls'
-      })
+      // Update state
+      if (pageNum === 0) {
+        setPolls(newPolls)
+        setFilteredPolls(newPolls)
+      } else {
+        setPolls(prev => [...prev, ...newPolls])
+      }
+
+      // Check if there are more polls to load
+      setHasMore(newPolls.length === POLLS_PER_PAGE)
+
+      // Track page view (only on initial load)
+      if (pageNum === 0) {
+        analytics.track('page_viewed', {
+          path: '/polls',
+          page_title: 'Browse Polls'
+        })
+      }
     } catch (err) {
       console.error('Error fetching data:', err)
       setError('Failed to load polls')
@@ -120,7 +152,11 @@ export default function PollsPage() {
         action: 'fetch_data'
       })
     } finally {
-      setLoading(false)
+      if (pageNum === 0) {
+        setLoading(false)
+      } else {
+        setLoadingMore(false)
+      }
     }
   }
 
@@ -167,6 +203,35 @@ export default function PollsPage() {
 
     setFilteredPolls(filtered)
   }, [polls, searchQuery, statusFilter, projectFilter, sortBy])
+
+  // Intersection Observer for infinite scroll
+  const observerTarget = useRef(null)
+
+  useEffect(() => {
+    if (!hasMore || loadingMore) return
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore) {
+          setPage(prev => prev + 1)
+        }
+      },
+      { threshold: 0.1 }
+    )
+
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current)
+    }
+
+    return () => observer.disconnect()
+  }, [hasMore, loadingMore])
+
+  // Load more when page changes
+  useEffect(() => {
+    if (page > 0) {
+      fetchData(page)
+    }
+  }, [page]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleVote = async (pollId: bigint, optionId: bigint) => {
     if (!isAuthenticated || votingPoll) return
@@ -874,6 +939,10 @@ export default function PollsPage() {
                               const userVotedOptionId = userVotes[poll.id.toString()]
                               const userVotedThis = userVoted && userVotedOptionId === option.id
 
+                              // Determine if this is the leading option
+                              const maxVotes = Math.max(...poll.options.map(o => Number(o.votes)))
+                              const isLeading = Number(option.votes) === maxVotes && maxVotes > 0
+
                               return (
                                 <div
                                   key={option.id}
@@ -905,7 +974,19 @@ export default function PollsPage() {
                                     </span>
                                   </div>
                                   <div className="flex items-center gap-2">
-                                    <Progress value={percentage} className="h-2 flex-1" />
+                                    {/* Custom bar chart with dynamic colors */}
+                                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden flex-1">
+                                      <div
+                                        className={`h-full rounded-full transition-all duration-500 ${
+                                          userVotedThis
+                                            ? 'bg-blue-500 dark:bg-blue-600'
+                                            : isLeading && poll.totalVotes > 0n
+                                              ? 'bg-green-500 dark:bg-green-600'
+                                              : 'bg-gray-400 dark:bg-gray-500'
+                                        }`}
+                                        style={{ width: `${percentage}%` }}
+                                      />
+                                    </div>
                                     <span className="text-xs text-gray-500 min-w-[60px] text-right">
                                       {Number(option.votes)} votes
                                     </span>
@@ -995,6 +1076,18 @@ export default function PollsPage() {
                       </Card>
                     )
                   })}
+
+                  {/* Infinite scroll sentinel and loading indicator */}
+                  {hasMore && (
+                    <div ref={observerTarget} className="col-span-full flex justify-center py-8">
+                      {loadingMore && (
+                        <div className="flex items-center gap-2 text-gray-600 dark:text-gray-400">
+                          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900 dark:border-gray-100"></div>
+                          <span>Loading more polls...</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </TabsContent>
