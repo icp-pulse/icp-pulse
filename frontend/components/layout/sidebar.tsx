@@ -1,4 +1,4 @@
-import { Folder, ClipboardList, BarChart3, Download, Settings, TrendingUp, Gift, Trophy, Wallet, Coins } from "lucide-react";
+import { Folder, ClipboardList, BarChart3, Download, Settings, TrendingUp, Gift, Trophy, Wallet, Coins, Droplets } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { cn } from "@lib/utils";
 import Link from "next/link";
@@ -117,6 +117,12 @@ export default function Sidebar({ activeTab, onTabChange, isCollapsed }: Sidebar
                 <Link href="/token-stats" className="w-full flex items-center px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
                   <Coins className="w-4 h-4 mr-3" />
                   Token Stats
+                </Link>
+              </li>
+              <li>
+                <Link href="/liquidity" className="w-full flex items-center px-3 py-2 text-sm text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg transition-colors">
+                  <Droplets className="w-4 h-4 mr-3" />
+                  Liquidity Pool
                 </Link>
               </li>
               <li>
