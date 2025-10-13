@@ -30,6 +30,7 @@ export function WalletBalance({ compact = false, showRefresh = true }: WalletBal
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [retryCount, setRetryCount] = useState(0)
+  const [pulseUsdValue, setPulseUsdValue] = useState<number>(0.12) // Default fallback, will be updated from swap canister
 
   const formatTokenAmount = (amount: bigint, decimals: number): string => {
     const divisor = BigInt(10 ** decimals)
@@ -68,6 +69,30 @@ export function WalletBalance({ compact = false, showRefresh = true }: WalletBal
 
       const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
       const tokenBalances: TokenBalance[] = []
+
+      // Fetch PULSE exchange rate from swap canister to calculate USD value
+      try {
+        const { createActor: createSwapActor } = await import('../../src/declarations/swap')
+        const { HttpAgent } = await import('@dfinity/agent')
+
+        const swapAgent = HttpAgent.createSync({ host })
+        if (process.env.NEXT_PUBLIC_DFX_NETWORK === 'local') {
+          await swapAgent.fetchRootKey()
+        }
+
+        const swapActor = createSwapActor(process.env.NEXT_PUBLIC_SWAP_CANISTER_ID!, { agent: swapAgent })
+
+        // Get how much ckUSDC you receive for 1 PULSE (100_000_000 e8s)
+        const onePulse = 100_000_000n
+        const ckUSDCAmount = await swapActor.calculateCkUSDCAmount(onePulse)
+
+        // Convert ckUSDC e6s to dollars (ckUSDC has 6 decimals)
+        const usdValue = Number(ckUSDCAmount) / 1_000_000
+        setPulseUsdValue(usdValue)
+      } catch (error) {
+        console.warn('Failed to fetch PULSE exchange rate, using fallback value:', error)
+        // Keep the default fallback value of 0.12
+      }
 
       // Get user principal based on auth method
       let userPrincipal: any
@@ -344,9 +369,14 @@ export function WalletBalance({ compact = false, showRefresh = true }: WalletBal
   }
 
   const getTokenUSDValue = (symbol: string): number | undefined => {
+    // For PULSE, use the dynamic exchange rate from swap canister
+    if (symbol === 'PULSE') {
+      return pulseUsdValue
+    }
+
+    // Static USD values for other tokens (fallback values)
     const usdValues: Record<string, number> = {
       'ICP': 8.50,
-      'PULSE': 0.12,
       'ckBTC': 65000,
       'ckETH': 2500,
       'ckUSDC': 1.00,
