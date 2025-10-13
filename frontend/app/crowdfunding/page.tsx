@@ -139,8 +139,10 @@ export default function CrowdfundingPage() {
           const bFunding = b.fundingInfo?.[0]?.totalFund || 0n
           return Number(bFunding) - Number(aFunding)
         case 'progress':
-          const aProgress = a.fundingInfo?.[0] ? (Number(a.fundingInfo[0].currentResponses) / Number(a.fundingInfo[0].maxResponses)) : 0
-          const bProgress = b.fundingInfo?.[0] ? (Number(b.fundingInfo[0].currentResponses) / Number(b.fundingInfo[0].maxResponses)) : 0
+          const aMax = a.fundingInfo?.[0]?.maxResponses[0]
+          const bMax = b.fundingInfo?.[0]?.maxResponses[0]
+          const aProgress = a.fundingInfo?.[0] && aMax ? (Number(a.fundingInfo[0].currentResponses) / Number(aMax)) : 0
+          const bProgress = b.fundingInfo?.[0] && bMax ? (Number(b.fundingInfo[0].currentResponses) / Number(bMax)) : 0
           return bProgress - aProgress
         case 'contributors':
           const aContributors = Number(a.fundingInfo?.[0]?.contributors.length || 0)
@@ -365,8 +367,9 @@ export default function CrowdfundingPage() {
               const totalFundDisplay = Number(fundingInfo.totalFund) / Math.pow(10, tokenDecimals)
               const rewardPerResponse = Number(fundingInfo.rewardPerResponse) / Math.pow(10, tokenDecimals)
               const contributorCount = fundingInfo.contributors.length
-              const fundingProgress = Number(fundingInfo.maxResponses) > 0
-                ? (Number(fundingInfo.currentResponses) / Number(fundingInfo.maxResponses)) * 100
+              const maxResponses = fundingInfo.maxResponses.length > 0 ? fundingInfo.maxResponses[0] : null
+              const fundingProgress = maxResponses && Number(maxResponses) > 0
+                ? (Number(fundingInfo.currentResponses) / Number(maxResponses)) * 100
                 : 0
               const isActive = 'active' in item.status
               const timeLeft = formatTimeLeft(item.closesAt)
@@ -424,12 +427,12 @@ export default function CrowdfundingPage() {
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-gray-600 dark:text-gray-400">Progress</span>
                         <span className="font-medium">
-                          {fundingInfo.currentResponses}/{fundingInfo.maxResponses} funded
+                          {fundingInfo.currentResponses.toString()}/{maxResponses ? maxResponses.toString() : 'Unlimited'} funded
                         </span>
                       </div>
                       <Progress value={fundingProgress} className="h-2" />
                       <div className="flex items-center justify-between text-xs text-gray-500">
-                        <span>{fundingProgress.toFixed(1)}% funded</span>
+                        <span>{maxResponses ? `${fundingProgress.toFixed(1)}% funded` : 'Budget-based'}</span>
                         <span className="flex items-center gap-1">
                           <Clock className="h-3 w-3" />
                           {timeLeft}
