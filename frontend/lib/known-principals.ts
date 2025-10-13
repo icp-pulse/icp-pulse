@@ -12,6 +12,20 @@ export interface PrincipalInfo {
 }
 
 export const KNOWN_PRINCIPALS: Record<string, PrincipalInfo> = {
+  // Minting Account & Treasury
+  'amjys-ncnt7-asur4-tubzo-hg6f4-5x5vi-udwtl-myst6-bphlp-tnmpu-7qe': {
+    label: 'PULSE Treasury & Minting Account',
+    type: 'treasury',
+    description: 'Token deployer account holding unminted reserves'
+  },
+
+  // IDO Platform
+  'eay2e-iyaaa-aaaai-atlyq-cai': {
+    label: 'IDO Platform',
+    type: 'canister',
+    description: 'Initial DEX Offering platform for token distribution'
+  },
+
   // ICP Pulse Canisters (from canister_ids.json)
   '27ftn-piaaa-aaaao-a4p6a-cai': {
     label: 'Airdrop Canister',
