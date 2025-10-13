@@ -73,10 +73,10 @@ export function StepPollOptions({
             onClick={onGenerateWithAI}
             variant="outline"
             disabled={aiGenerating}
-            className="border-purple-300 text-purple-700 hover:bg-purple-50 dark:border-purple-700 dark:text-purple-400 dark:hover:bg-purple-900/20"
+            className="border-purple-300 text-purple-700 hover:bg-purple-50 dark:border-purple-700 dark:text-purple-400 dark:hover:bg-purple-900/20 px-3 md:px-4"
           >
-            <Sparkles className="w-4 h-4 mr-2" />
-            {aiGenerating ? 'Generating...' : 'AI Generate Options'}
+            <Sparkles className="w-4 h-4 md:mr-2" />
+            <span className="hidden md:inline">{aiGenerating ? 'Generating...' : 'AI Generate Options'}</span>
           </Button>
         </div>
       )}
@@ -91,60 +91,96 @@ export function StepPollOptions({
 
       {/* Options List */}
       <div className="space-y-3">
-        {fields.map((field, index) => {
-          const optionText = watch(`options.${index}.text`) || ''
-          const isFilled = optionText.trim() !== ''
-
-          return (
-            <div
-              key={field.id}
-              className="group flex items-start gap-3 p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-300 dark:hover:border-blue-600 transition-colors"
-            >
-              {/* Drag Handle (visual only for now) */}
-              <div className="mt-2 cursor-move opacity-0 group-hover:opacity-50 transition-opacity">
-                <GripVertical className="h-5 w-5 text-gray-400" />
+        {aiGenerating ? (
+          // Loading skeleton placeholders during AI generation
+          <>
+            <div className="flex items-center justify-center py-4">
+              <div className="flex items-center gap-2 text-purple-600 dark:text-purple-400">
+                <Sparkles className="w-5 h-5 animate-pulse" />
+                <span className="font-medium">Generating options with AI...</span>
               </div>
-
-              {/* Option Number Badge */}
-              <Badge
-                variant={isFilled ? "default" : "outline"}
-                className="min-w-[32px] h-8 flex items-center justify-center mt-1"
+            </div>
+            {[1, 2, 3, 4].map((num) => (
+              <div
+                key={`skeleton-${num}`}
+                className="flex items-start gap-3 p-4 border border-gray-200 dark:border-gray-700 rounded-lg animate-pulse"
               >
-                {index + 1}
-              </Badge>
+                {/* Skeleton Drag Handle */}
+                <div className="mt-2">
+                  <div className="h-5 w-5 bg-gray-200 dark:bg-gray-700 rounded" />
+                </div>
 
-              {/* Option Input */}
-              <div className="flex-1 space-y-2">
-                <Input
-                  {...register(`options.${index}.text`)}
-                  placeholder={`Option ${index + 1} - e.g., "${
-                    index === 0 ? 'Yes' : index === 1 ? 'No' : 'Maybe'
-                  }"`}
-                  className="text-base"
-                />
-                {errors.options?.[index]?.text && (
-                  <div className="flex items-center gap-2 text-sm text-red-600">
-                    <AlertCircle className="h-4 w-4" />
-                    {errors.options[index]?.text?.message}
-                  </div>
+                {/* Skeleton Badge */}
+                <div className="min-w-[32px] h-8 bg-gray-200 dark:bg-gray-700 rounded mt-1" />
+
+                {/* Skeleton Input */}
+                <div className="flex-1">
+                  <div className="h-10 bg-gray-200 dark:bg-gray-700 rounded" />
+                </div>
+
+                {/* Skeleton Button */}
+                <div className="mt-1">
+                  <div className="h-8 w-8 bg-gray-200 dark:bg-gray-700 rounded" />
+                </div>
+              </div>
+            ))}
+          </>
+        ) : (
+          fields.map((field, index) => {
+            const optionText = watch(`options.${index}.text`) || ''
+            const isFilled = optionText.trim() !== ''
+
+            return (
+              <div
+                key={field.id}
+                className="group flex items-start gap-3 p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-blue-300 dark:hover:border-blue-600 transition-colors"
+              >
+                {/* Drag Handle (visual only for now) */}
+                <div className="mt-2 cursor-move opacity-0 group-hover:opacity-50 transition-opacity">
+                  <GripVertical className="h-5 w-5 text-gray-400" />
+                </div>
+
+                {/* Option Number Badge */}
+                <Badge
+                  variant={isFilled ? "default" : "outline"}
+                  className="min-w-[32px] h-8 flex items-center justify-center mt-1"
+                >
+                  {index + 1}
+                </Badge>
+
+                {/* Option Input */}
+                <div className="flex-1 space-y-2">
+                  <Input
+                    {...register(`options.${index}.text`)}
+                    placeholder={`Option ${index + 1} - e.g., "${
+                      index === 0 ? 'Yes' : index === 1 ? 'No' : 'Maybe'
+                    }"`}
+                    className="text-base"
+                  />
+                  {errors.options?.[index]?.text && (
+                    <div className="flex items-center gap-2 text-sm text-red-600">
+                      <AlertCircle className="h-4 w-4" />
+                      {errors.options[index]?.text?.message}
+                    </div>
+                  )}
+                </div>
+
+                {/* Remove Button */}
+                {fields.length > 2 && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => removeOption(index)}
+                    className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 mt-1"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
                 )}
               </div>
-
-              {/* Remove Button */}
-              {fields.length > 2 && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => removeOption(index)}
-                  className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 mt-1"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </Button>
-              )}
-            </div>
-          )
-        })}
+            )
+          })
+        )}
 
         {/* Error Message for Options Array */}
         {errors.options && typeof errors.options.message === 'string' && (
@@ -160,7 +196,8 @@ export function StepPollOptions({
         type="button"
         onClick={addOption}
         variant="outline"
-        className="w-full border-dashed border-2 hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
+        disabled={aiGenerating}
+        className="w-full border-dashed border-2 hover:border-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
       >
         <Plus className="w-4 h-4 mr-2" />
         Add Another Option

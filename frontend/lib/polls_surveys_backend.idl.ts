@@ -2,7 +2,13 @@
 import { IDL } from '@dfinity/candid'
 
 export const idlFactory = ({ IDL: I = IDL }) => {
-  const Status = I.Variant({ active: I.Null, closed: I.Null })
+  const Status = I.Variant({
+    active: I.Null,
+    paused: I.Null,
+    claimsOpen: I.Null,
+    claimsEnded: I.Null,
+    closed: I.Null
+  })
   const ScopeType = I.Variant({ project: I.Null, product: I.Null })
 
   const TokenType = I.Variant({ ICP: I.Null, ICRC1: I.Principal })
@@ -163,7 +169,13 @@ export const idlFactory = ({ IDL: I = IDL }) => {
     list_polls_by_product: I.Func([I.Nat, I.Nat, I.Nat], [I.Vec(PollSummary)], ['query']),
     get_poll: I.Func([I.Nat], [I.Opt(Poll)], ['query']),
     vote: I.Func([I.Nat, I.Nat], [I.Bool], []),
-    close_poll: I.Func([I.Nat], [I.Bool], []),
+
+    // Poll status transition functions
+    pause_poll: I.Func([I.Nat], [I.Variant({ ok: I.Text, err: I.Text })], []),
+    resume_poll: I.Func([I.Nat], [I.Variant({ ok: I.Text, err: I.Text })], []),
+    start_rewards_claiming: I.Func([I.Nat], [I.Variant({ ok: I.Text, err: I.Text })], []),
+    end_rewards_claiming: I.Func([I.Nat], [I.Variant({ ok: I.Text, err: I.Text })], []),
+    close_poll: I.Func([I.Nat], [I.Variant({ ok: I.Text, err: I.Text })], []),
 
     create_survey: I.Func([I.Text, I.Nat, I.Text, I.Text, I.Int, I.Nat, I.Bool, I.Vec(QuestionInput), I.Bool, I.Opt(I.Nat64)], [I.Nat], []),
     get_survey: I.Func([I.Nat], [I.Opt(Survey)], ['query']),
@@ -177,7 +189,7 @@ export const idlFactory = ({ IDL: I = IDL }) => {
     update_survey_funding: I.Func([I.Nat, I.Nat64, I.Nat64], [I.Bool], []),
     set_openai_api_key: I.Func([I.Text], [I.Bool], []),
     has_openai_api_key: I.Func([], [I.Bool], ['query']),
-    generate_poll_options: I.Func([I.Text], [I.Opt(I.Vec(I.Text))], []),
+    generate_poll_options: I.Func([I.Text], [I.Variant({ ok: I.Vec(I.Text), err: I.Text })], []),
 
     // Analytics
     get_analytics_overview: I.Func([], [AnalyticsOverview], ['query']),

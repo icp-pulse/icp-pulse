@@ -1,20 +1,32 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { Plus, Search, Filter, MoreHorizontal, Edit, Trash2, Eye, Vote, Users, TrendingUp, Clock } from 'lucide-react'
+import { Plus, Search, Filter, MoreHorizontal, Edit, Trash2, Eye, Vote, Users, TrendingUp, Clock, Pause, Play, Gift, Ban, XCircle, Copy, FileDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { useIcpAuth } from '@/components/IcpAuthProvider'
 import { useRouter } from 'next/navigation'
+import { toast } from '@/hooks/use-toast'
 
 // Helper function to convert ICP Status variant to string
 function statusToString(status: any): string {
   if (!status) return 'unknown'
-  if (status.active !== undefined) return 'active'
-  if (status.closed !== undefined) return 'closed'
+  if (status.active !== undefined) return 'Active'
+  if (status.paused !== undefined) return 'Paused'
+  if (status.claimsOpen !== undefined) return 'Claims Open'
+  if (status.claimsEnded !== undefined) return 'Claims Ended'
+  if (status.closed !== undefined) return 'Closed'
   if (typeof status === 'string') return status
   return 'unknown'
 }
@@ -25,7 +37,7 @@ export default function PollAdmin() {
   const [polls, setPolls] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const { identity, isAuthenticated } = useIcpAuth()
+  const { identity, isAuthenticated, authProvider, principalText } = useIcpAuth()
   const router = useRouter()
 
   // Fetch polls from ICP backend
@@ -95,17 +107,17 @@ export default function PollAdmin() {
   })
 
   const getStatusColor = (status: string) => {
-    switch (status) {
+    switch (status.toLowerCase()) {
       case 'active':
         return 'bg-green-100 text-green-800 border-green-200'
-      case 'draft':
-        return 'bg-gray-100 text-gray-800 border-gray-200'
-      case 'completed':
-        return 'bg-blue-100 text-blue-800 border-blue-200'
-      case 'expired':
-        return 'bg-red-100 text-red-800 border-red-200'
       case 'paused':
         return 'bg-yellow-100 text-yellow-800 border-yellow-200'
+      case 'claims open':
+        return 'bg-blue-100 text-blue-800 border-blue-200'
+      case 'claims ended':
+        return 'bg-purple-100 text-purple-800 border-purple-200'
+      case 'closed':
+        return 'bg-gray-100 text-gray-800 border-gray-200'
       default:
         return 'bg-gray-100 text-gray-800 border-gray-200'
     }
@@ -136,6 +148,79 @@ export default function PollAdmin() {
     const diffTime = expiry.getTime() - now.getTime()
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
     return diffDays
+  }
+
+  // Status transition handlers
+  const handleStatusTransition = async (pollId: any, action: string) => {
+    if (!identity) return
+
+    try {
+      const { createBackendWithIdentity } = await import('@/lib/icp')
+      const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
+      const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
+      const backend = await createBackendWithIdentity({ canisterId, host, identity })
+
+      let result: any
+
+      switch (action) {
+        case 'pause':
+          result = await backend.pause_poll(pollId)
+          break
+        case 'resume':
+          result = await backend.resume_poll(pollId)
+          break
+        case 'start_claiming':
+          result = await backend.start_rewards_claiming(pollId)
+          break
+        case 'end_claiming':
+          result = await backend.end_rewards_claiming(pollId)
+          break
+        case 'close':
+          result = await backend.close_poll(pollId)
+          break
+        default:
+          return
+      }
+
+      if ('ok' in result) {
+        // Success - reload polls
+        window.location.reload()
+      } else if ('err' in result) {
+        alert(`Error: ${result.err}`)
+      }
+    } catch (error) {
+      console.error('Error updating poll status:', error)
+      alert('Failed to update poll status')
+    }
+  }
+
+  // Check if current user is the creator of a poll
+  const isCreator = (poll: any) => {
+    let userPrincipal: string | null = null
+
+    // Handle Plug wallet authentication
+    if (authProvider === 'plug') {
+      userPrincipal = principalText
+      console.log('Checking creator (Plug):', { userPrincipal, authProvider })
+    }
+    // Handle Internet Identity / NFID authentication
+    else if (identity) {
+      userPrincipal = identity.getPrincipal().toText()
+      console.log('Checking creator (II/NFID):', { userPrincipal, authProvider })
+    } else {
+      console.log('No identity available')
+      return false
+    }
+
+    if (!userPrincipal) {
+      console.log('Could not determine user principal')
+      return false
+    }
+
+    const pollCreator = poll.createdBy?.toText?.() || poll.createdBy?.toString()
+    const match = userPrincipal === pollCreator
+    console.log('Creator comparison:', { userPrincipal, pollCreator, match })
+    return match
   }
 
   return (
@@ -239,17 +324,17 @@ export default function PollAdmin() {
           />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-40">
+          <SelectTrigger className="w-48">
             <Filter className="w-4 h-4 mr-2" />
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="all">All Status</SelectItem>
-            <SelectItem value="active">Active</SelectItem>
-            <SelectItem value="draft">Draft</SelectItem>
-            <SelectItem value="completed">Completed</SelectItem>
-            <SelectItem value="expired">Expired</SelectItem>
-            <SelectItem value="paused">Paused</SelectItem>
+            <SelectItem value="Active">Active</SelectItem>
+            <SelectItem value="Paused">Paused</SelectItem>
+            <SelectItem value="Claims Open">Claims Open</SelectItem>
+            <SelectItem value="Claims Ended">Claims Ended</SelectItem>
+            <SelectItem value="Closed">Closed</SelectItem>
           </SelectContent>
         </Select>
       </div>
@@ -293,9 +378,76 @@ export default function PollAdmin() {
                       {poll.description}
                     </CardDescription>
                   </div>
-                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                    <MoreHorizontal className="w-4 h-4" />
-                  </Button>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                        <MoreHorizontal className="w-4 h-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                      <DropdownMenuItem onClick={() => {
+                        navigator.clipboard.writeText(`${window.location.origin}/polls/${poll.id}`)
+                        toast({
+                          title: "Link copied!",
+                          description: "Poll link has been copied to clipboard",
+                        })
+                      }}>
+                        <Copy className="w-4 h-4 mr-2" />
+                        Copy Link
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => router.push(`/results?pollId=${poll.id}`)}>
+                        <FileDown className="w-4 h-4 mr-2" />
+                        Export Results
+                      </DropdownMenuItem>
+
+                      {isCreator(poll) && (
+                        <>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuLabel>Status Management</DropdownMenuLabel>
+                          {statusToString(poll.status) === 'Active' && (
+                            <>
+                              <DropdownMenuItem onClick={() => handleStatusTransition(poll.id, 'pause')}>
+                                <Pause className="w-4 h-4 mr-2" />
+                                Pause Poll
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleStatusTransition(poll.id, 'start_claiming')}>
+                                <Gift className="w-4 h-4 mr-2" />
+                                Start Claiming
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                          {statusToString(poll.status) === 'Paused' && (
+                            <>
+                              <DropdownMenuItem onClick={() => handleStatusTransition(poll.id, 'resume')}>
+                                <Play className="w-4 h-4 mr-2" />
+                                Resume Poll
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleStatusTransition(poll.id, 'start_claiming')}>
+                                <Gift className="w-4 h-4 mr-2" />
+                                Start Claiming
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                          {statusToString(poll.status) === 'Claims Open' && (
+                            <DropdownMenuItem onClick={() => handleStatusTransition(poll.id, 'end_claiming')}>
+                              <Ban className="w-4 h-4 mr-2" />
+                              End Claiming
+                            </DropdownMenuItem>
+                          )}
+                          {statusToString(poll.status) !== 'Closed' && (
+                            <DropdownMenuItem
+                              onClick={() => handleStatusTransition(poll.id, 'close')}
+                              className="text-red-600"
+                            >
+                              <XCircle className="w-4 h-4 mr-2" />
+                              Close Poll
+                            </DropdownMenuItem>
+                          )}
+                        </>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   <Badge className={`w-fit ${getStatusColor(statusToString(poll.status))}`}>
@@ -370,6 +522,113 @@ export default function PollAdmin() {
                     <span className="font-medium">{poll.closesAt ? new Date(Number(poll.closesAt) / 1_000_000).toLocaleDateString() : 'Unknown'}</span>
                   </div>
                 </div>
+
+                {/* Status Management (only for creators) */}
+                {isCreator(poll) && (
+                  <div className="pt-3 border-t">
+                    <p className="text-xs font-medium text-gray-500 mb-2">Poll Status Management</p>
+                    <div className="flex flex-wrap gap-2">
+                      {statusToString(poll.status) === 'Active' && (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleStatusTransition(poll.id, 'pause')}
+                            className="text-xs"
+                          >
+                            <Pause className="w-3 h-3 mr-1" />
+                            Pause
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleStatusTransition(poll.id, 'start_claiming')}
+                            className="text-xs"
+                          >
+                            <Gift className="w-3 h-3 mr-1" />
+                            Start Claiming
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleStatusTransition(poll.id, 'close')}
+                            className="text-xs text-red-600 hover:bg-red-50"
+                          >
+                            <XCircle className="w-3 h-3 mr-1" />
+                            Close
+                          </Button>
+                        </>
+                      )}
+                      {statusToString(poll.status) === 'Paused' && (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleStatusTransition(poll.id, 'resume')}
+                            className="text-xs"
+                          >
+                            <Play className="w-3 h-3 mr-1" />
+                            Resume
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleStatusTransition(poll.id, 'start_claiming')}
+                            className="text-xs"
+                          >
+                            <Gift className="w-3 h-3 mr-1" />
+                            Start Claiming
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleStatusTransition(poll.id, 'close')}
+                            className="text-xs text-red-600 hover:bg-red-50"
+                          >
+                            <XCircle className="w-3 h-3 mr-1" />
+                            Close
+                          </Button>
+                        </>
+                      )}
+                      {statusToString(poll.status) === 'Claims Open' && (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleStatusTransition(poll.id, 'end_claiming')}
+                            className="text-xs"
+                          >
+                            <Ban className="w-3 h-3 mr-1" />
+                            End Claiming
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleStatusTransition(poll.id, 'close')}
+                            className="text-xs text-red-600 hover:bg-red-50"
+                          >
+                            <XCircle className="w-3 h-3 mr-1" />
+                            Close
+                          </Button>
+                        </>
+                      )}
+                      {statusToString(poll.status) === 'Claims Ended' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleStatusTransition(poll.id, 'close')}
+                          className="text-xs text-red-600 hover:bg-red-50"
+                        >
+                          <XCircle className="w-3 h-3 mr-1" />
+                          Close
+                        </Button>
+                      )}
+                      {statusToString(poll.status) === 'Closed' && (
+                        <p className="text-xs text-gray-500 italic">Poll is permanently closed</p>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Actions */}
                 <div className="flex gap-2 pt-2">

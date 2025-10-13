@@ -79,7 +79,7 @@ export function LandingPage() {
               <div className="flex flex-1 border-2 border-gray-300 dark:border-gray-600 rounded-full overflow-hidden focus-within:border-blue-500 dark:focus-within:border-blue-400 transition-colors shadow-lg">
                 <Input
                   type="text"
-                  placeholder="What question do you want answered? e.g., Which feature should we build next?"
+                  placeholder="What do you want to know?"
                   value={question}
                   onChange={(e) => setQuestion(e.target.value)}
                   onKeyPress={handleKeyPress}
@@ -88,10 +88,10 @@ export function LandingPage() {
                 <Button
                   size="lg"
                   onClick={handleGetAnswers}
-                  className="h-16 px-8 whitespace-nowrap bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-none border-0 text-base font-semibold"
+                  className="h-16 px-4 md:px-8 whitespace-nowrap bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-none border-0 text-base font-semibold"
                 >
-                  <Sparkles className="w-5 h-5 mr-2" />
-                  Get Answers
+                  <Sparkles className="w-5 h-5 md:mr-2" />
+                  <span className="hidden md:inline">Get Answers</span>
                 </Button>
               </div>
             </div>

@@ -272,45 +272,50 @@ function NewPollPageContent() {
       return
     }
 
-    if (!isAuthenticated) {
-      setAiError('Please login to use AI generation')
-      return
-    }
-
     setAiGenerating(true)
     setAiError(null)
 
     try {
-      const { createBackendWithIdentity } = await import('@/lib/icp')
-      const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
-      const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
-      const backend = await createBackendWithIdentity({ canisterId, host, identity })
-
-      const hasKey = await backend.has_openai_api_key()
-      if (!hasKey) {
-        setAiError('OpenAI API key not configured in backend.')
-        return
+      // Clear existing options immediately when generation starts
+      const numFieldsToRemove = fields.length
+      for (let i = 0; i < numFieldsToRemove; i++) {
+        remove(0)
       }
 
-      const result = await backend.generate_poll_options(title)
+      // Call our Next.js API route instead of the backend canister
+      const response = await fetch('/api/generate-poll-options', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ title }),
+      })
 
-      if (result && result.length > 0 && result[0]) {
-        // Clear existing options - remove from the end to avoid index issues
-        const numFieldsToRemove = fields.length
-        for (let i = 0; i < numFieldsToRemove; i++) {
-          remove(0)
-        }
-        // Add generated options
-        result[0].forEach((optionText: string) => {
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to generate options')
+      }
+
+      // Add generated options
+      if (data.options && Array.isArray(data.options)) {
+        data.options.forEach((optionText: string) => {
           append({ text: optionText })
         })
         setAiError(null)
       } else {
-        setAiError('Failed to generate options. Please try again.')
+        throw new Error('Invalid response format')
       }
     } catch (err) {
       console.error('Error generating options:', err)
-      setAiError(err instanceof Error ? err.message : 'Failed to generate options')
+      const errorMessage = err instanceof Error ? err.message : 'Failed to generate options'
+      setAiError(errorMessage)
+
+      // Restore default empty options if exception occurred
+      if (fields.length === 0) {
+        append({ text: '' })
+        append({ text: '' })
+      }
     } finally {
       setAiGenerating(false)
     }
