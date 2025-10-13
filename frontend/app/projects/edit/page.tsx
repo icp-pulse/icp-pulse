@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ArrowLeft } from 'lucide-react'
+import { ProjectBreadcrumb } from '@/components/projects/project-breadcrumb'
 
 const schema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -54,6 +55,7 @@ function EditProjectContent() {
   const [pending, startTransition] = useTransition()
   const [err, setErr] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [projectName, setProjectName] = useState<string>('')
   const { identity, isAuthenticated } = useIcpAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -94,6 +96,7 @@ function EditProjectContent() {
 
         if (project && project.length > 0) {
           const p = project[0]
+          setProjectName(p.name)
           setValue('name', p.name)
           setValue('description', p.description)
           setValue('status', p.status as any)
@@ -136,12 +139,16 @@ function EditProjectContent() {
   }
 
   return (
-    <div className="max-w-xl mx-auto space-y-6 py-8">
+    <div className="max-w-xl mx-auto space-y-6 py-8 px-4">
+      {/* Breadcrumb Navigation */}
+      <ProjectBreadcrumb projectName={projectName} projectId={projectId!} currentPage="edit" />
+
+      {/* Header */}
       <div className="flex items-center gap-4">
         <Button
           variant="ghost"
           size="sm"
-          onClick={() => router.push('/admin')}
+          onClick={() => router.push('/admin?tab=projects')}
         >
           <ArrowLeft className="h-4 w-4 mr-2" />
           Back
@@ -156,7 +163,7 @@ function EditProjectContent() {
           startTransition(async () => {
             try {
               await updateProjectAction(Number(projectId), v, identity, isAuthenticated)
-              router.push('/admin')
+              router.push('/admin?tab=projects')
             } catch (e: any) {
               setErr(e.message || 'Error')
             }
@@ -211,7 +218,7 @@ function EditProjectContent() {
           <Button
             type="button"
             variant="outline"
-            onClick={() => router.push('/admin')}
+            onClick={() => router.push('/admin?tab=projects')}
             className="flex-1"
           >
             Cancel
