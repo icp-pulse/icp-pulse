@@ -13,9 +13,11 @@ import {
   Download,
   CheckCircle,
   Loader2,
-  ArrowUpDown
+  ArrowUpDown,
+  Tag
 } from 'lucide-react'
 import { toast } from '@/hooks/use-toast'
+import { getPrincipalLabel, getPrincipalInfo, getPrincipalBadgeColor, isKnownPrincipal } from '@/lib/known-principals'
 
 interface TokenHolder {
   principal: string
@@ -105,8 +107,13 @@ export default function TokenHoldersAdmin() {
     if (!holders) return
 
     const csv = [
-      ['Principal', 'Balance (PULSE)', 'Balance (e8s)'],
-      ...holders.map(h => [h.principal, formatTokenAmount(h.balance), h.balance.toString()])
+      ['Principal', 'Label', 'Balance (PULSE)', 'Balance (e8s)', 'Type'],
+      ...holders.map(h => {
+        const label = getPrincipalLabel(h.principal) || ''
+        const info = getPrincipalInfo(h.principal)
+        const type = info?.type || ''
+        return [h.principal, label, formatTokenAmount(h.balance), h.balance.toString(), type]
+      })
     ].map(row => row.join(',')).join('\n')
 
     const blob = new Blob([csv], { type: 'text/csv' })
@@ -289,15 +296,28 @@ export default function TokenHoldersAdmin() {
                     ? (Number(holder.balance) / Number(totalSupply) * 100).toFixed(4)
                     : '0'
 
+                  const principalInfo = getPrincipalInfo(holder.principal)
+                  const hasLabel = isKnownPrincipal(holder.principal)
+
                   return (
                     <tr key={holder.principal} className="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                         {index + 1}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <code className="text-sm text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">
-                          {holder.principal}
-                        </code>
+                      <td className="px-6 py-4">
+                        <div className="space-y-2">
+                          {hasLabel && principalInfo && (
+                            <div className="flex items-center gap-2">
+                              <Tag className="w-3.5 h-3.5 text-gray-400" />
+                              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium border ${getPrincipalBadgeColor(principalInfo.type)}`}>
+                                {principalInfo.label}
+                              </span>
+                            </div>
+                          )}
+                          <code className="text-sm text-gray-900 dark:text-white bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded block">
+                            {holder.principal}
+                          </code>
+                        </div>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-right">
                         <span className="text-sm font-semibold text-gray-900 dark:text-white">

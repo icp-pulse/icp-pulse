@@ -277,12 +277,25 @@ persistent actor class Tokenmania() = this {
   };
 
   // Computes the total token supply.
+  // Only counts tokens that have left the minting account to other accounts.
+  // Self-mints and self-burns (minting account -> itself) are excluded as they represent unminted supply.
   func totalSupply(log : TxLog) : Tokens {
     var total = 0;
+    let minter = init.minting_account;
     for (tx in log.vals()) {
       switch (tx.operation) {
-        case (#Burn(args)) { total -= args.amount };
-        case (#Mint(args)) { total += args.amount };
+        case (#Burn(args)) {
+          // Exclude self-burns: minting account -> itself (unminted/unissued tokens)
+          if (not (accountsEqual(args.from, minter) and accountsEqual(args.to, minter))) {
+            total -= args.amount;
+          };
+        };
+        case (#Mint(args)) {
+          // Exclude self-mints: minting account -> itself (unminted/unissued tokens)
+          if (not (accountsEqual(args.from, minter) and accountsEqual(args.to, minter))) {
+            total += args.amount;
+          };
+        };
         case (#Transfer(_)) { total -= tx.fee };
         case (#Approve(_)) { total -= tx.fee };
       };
@@ -571,6 +584,16 @@ persistent actor class Tokenmania() = this {
         case (?txid) { return #Err(#Duplicate { duplicate_of = txid }) };
         case null {};
       };
+    };
+
+    // Handle self-transfer: minting account -> itself
+    // This represents unminted supply and should not count towards MAX_SUPPLY
+    if (accountsEqual(transfer.from, minter) and accountsEqual(transfer.to, minter)) {
+      if (Option.get(transfer.fee, 0) != 0) {
+        return #Err(#BadFee { expected_fee = 0 });
+      };
+      // Classify as Mint but skip MAX_SUPPLY check since it doesn't increase circulating supply
+      return #Ok((#Mint(transfer), 0));
     };
 
     let result = if (accountsEqual(transfer.from, minter)) {
