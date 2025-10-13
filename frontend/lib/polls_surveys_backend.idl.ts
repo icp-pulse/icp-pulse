@@ -22,7 +22,7 @@ export const idlFactory = ({ IDL: I = IDL }) => {
     tokenDecimals: I.Nat8,
     totalFund: I.Nat64,
     rewardPerResponse: I.Nat64,
-    maxResponses: I.Nat,
+    maxResponses: I.Opt(I.Nat),  // Optional - null means budget-based only
     currentResponses: I.Nat,
     remainingFund: I.Nat64,
     fundingType: FundingType,

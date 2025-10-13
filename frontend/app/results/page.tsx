@@ -367,7 +367,11 @@ function ResultsContent() {
                           <p><strong className="text-gray-900 dark:text-gray-100">Token:</strong> {poll.fundingInfo[0].tokenSymbol}</p>
                           <p><strong className="text-gray-900 dark:text-gray-100">Total Fund:</strong> {formatTokenAmount(poll.fundingInfo[0].totalFund)} {poll.fundingInfo[0].tokenSymbol}</p>
                           <p><strong className="text-gray-900 dark:text-gray-100">Reward Per Vote:</strong> {formatTokenAmount(poll.fundingInfo[0].rewardPerResponse)} {poll.fundingInfo[0].tokenSymbol}</p>
-                          <p><strong className="text-gray-900 dark:text-gray-100">Max Responses:</strong> {Number(poll.fundingInfo[0].maxResponses)}</p>
+                          <p><strong className="text-gray-900 dark:text-gray-100">Max Responses:</strong> {
+                            poll.fundingInfo[0].maxResponses[0]
+                              ? Number(poll.fundingInfo[0].maxResponses[0])
+                              : 'Unlimited (budget-based)'
+                          }</p>
                           <p><strong className="text-gray-900 dark:text-gray-100">Current Responses:</strong> {Number(poll.fundingInfo[0].currentResponses)}</p>
                           <p><strong className="text-gray-900 dark:text-gray-100">Remaining Fund:</strong> {formatTokenAmount(poll.fundingInfo[0].remainingFund)} {poll.fundingInfo[0].tokenSymbol}</p>
                         </div>

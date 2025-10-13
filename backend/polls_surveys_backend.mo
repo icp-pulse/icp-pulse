@@ -102,7 +102,7 @@ persistent actor class polls_surveys_backend() = this {
     tokenDecimals: Nat8;         // Token decimals
     totalFund: Nat64;           // Total tokens in smallest unit (e8s for ICP)
     rewardPerResponse: Nat64;    // Tokens per valid response in smallest unit
-    maxResponses: Nat;          // Maximum funded responses
+    maxResponses: ?Nat;          // Maximum funded responses (optional - if null, budget-based only)
     currentResponses: Nat;       // Current response count
     remainingFund: Nat64;       // Remaining token balance in smallest unit
     fundingType: FundingType;    // Self-funded, crowdfunded, or treasury-funded
@@ -456,19 +456,26 @@ persistent actor class polls_surveys_backend() = this {
           let totalFund = Nat64.fromNat(rewardFund) * 1_000_000; // Convert cents to e8s (rewardFund is in cents, so multiply by 1M instead of 100M)
 
           // Calculate maxResponses and rewardPerResponse based on distribution type
-          let (calculatedMaxResponses, calculatedRewardPerResponse) : (Nat, Nat64) = switch (distribution_type) {
+          let (calculatedMaxResponses, calculatedRewardPerResponse) : (?Nat, Nat64) = switch (distribution_type) {
             case (#EqualSplit) {
-              // For equal split, use the maxResponses from config and calculate reward per response
-              let targetResponses = switch (maxResponses) {
-                case (?target) target;
-                case null 100; // Default to 100 if not specified
+              // For equal split, use the maxResponses from config
+              let rewardPerResp : Nat64 = switch (maxResponses) {
+                case (?target) {
+                  if (target > 0) { totalFund / Nat64.fromNat(target) } else { 0 : Nat64 }
+                };
+                case null { 0 : Nat64 }; // No max responses specified
               };
-              let rewardPerResp : Nat64 = if (targetResponses > 0) { totalFund / Nat64.fromNat(targetResponses) } else { 0 : Nat64 };
-              (targetResponses, rewardPerResp)
+              (maxResponses, rewardPerResp)
             };
             case (#Fixed) {
-              // For fixed reward, use the provided reward and calculate max responses
-              let maxResp = if (reward > 0) { Nat64.toNat(totalFund / reward) } else { 0 };
+              // For fixed reward, optionally calculate max responses if user wants it
+              let maxResp : ?Nat = if (maxResponses != null) {
+                // User specified maxResponses, use it
+                maxResponses
+              } else {
+                // User didn't specify, leave as null (budget-based only)
+                null
+              };
               (maxResp, reward)
             };
           };
@@ -639,21 +646,26 @@ persistent actor class polls_surveys_backend() = this {
 
     // Calculate maxResponses and rewardPerResponse based on distribution type
     // Use netFunding (after 10% fee deduction) for reward calculations
-    let (calculatedMaxResponses, calculatedRewardPerResponse) : (Nat, Nat64) = switch (distribution_type) {
+    let (calculatedMaxResponses, calculatedRewardPerResponse) : (?Nat, Nat64) = switch (distribution_type) {
       case (#EqualSplit) {
-        // For equal split, use the maxResponses from config and calculate reward per response
-        let targetResponses = switch (maxResponses) {
-          case (?target) target;
-          case null 100; // Default to 100 if not specified
+        // For equal split, use the maxResponses from config
+        let rewardPerResp : Nat64 = switch (maxResponses) {
+          case (?target) {
+            if (target > 0) { netFunding / Nat64.fromNat(target) } else { 0 : Nat64 }
+          };
+          case null { 0 : Nat64 }; // No max responses specified
         };
-        let rewardPerResp : Nat64 = if (targetResponses > 0) {
-          netFunding / Nat64.fromNat(targetResponses)
-        } else { 0 : Nat64 };
-        (targetResponses, rewardPerResp)
+        (maxResponses, rewardPerResp)
       };
       case (#Fixed) {
-        // For fixed reward, use the provided reward and calculate max responses
-        let maxResp = if (rewardPerVote > 0) { Nat64.toNat(netFunding / rewardPerVote) } else { 0 };
+        // For fixed reward, optionally calculate max responses if user wants it
+        let maxResp : ?Nat = if (maxResponses != null) {
+          // User specified maxResponses, use it
+          maxResponses
+        } else {
+          // User didn't specify, leave as null (budget-based only)
+          null
+        };
         (maxResp, rewardPerVote)
       };
     };
@@ -765,9 +777,15 @@ persistent actor class polls_surveys_backend() = this {
                               let newContributors = Array.append(fi.contributors, [(msg.caller, amount)]);
                               let newTotalFund = fi.totalFund + amount;
                               let newRemainingFund = fi.remainingFund + amount;
-                              let newMaxResponses = if (fi.rewardPerResponse > 0) {
-                                Nat64.toNat(newTotalFund / fi.rewardPerResponse)
-                              } else { fi.maxResponses };
+                              // Only recalculate maxResponses if it was originally set
+                              let newMaxResponses = switch (fi.maxResponses) {
+                                case null { null };  // Keep as unlimited
+                                case (?_) {  // Was set, so recalculate
+                                  if (fi.rewardPerResponse > 0) {
+                                    ?Nat64.toNat(newTotalFund / fi.rewardPerResponse)
+                                  } else { fi.maxResponses }
+                                };
+                              };
 
                               let newFundingInfo = {
                                 fi with
@@ -814,11 +832,18 @@ persistent actor class polls_surveys_backend() = this {
     switch (pollOpt) {
       case null { return #err("Poll not found") };
       case (?poll) {
-        // Check if poll is closed or max responses reached (conditions for claiming)
+        // Check if poll is closed, time expired, budget depleted, or max responses reached
         let canClaim = (poll.status == #closed) or
                       (poll.closesAt <= now()) or
                       (switch (poll.fundingInfo) {
-                        case (?info) { info.currentResponses >= info.maxResponses };
+                        case (?info) {
+                          // Can claim if budget depleted OR maxResponses reached (if set)
+                          (info.remainingFund < info.rewardPerResponse) or
+                          (switch (info.maxResponses) {
+                            case null { false };  // No max set, wait for other conditions
+                            case (?max) { info.currentResponses >= max };
+                          })
+                        };
                         case null { false };
                       });
 
@@ -919,7 +944,11 @@ persistent actor class polls_surveys_backend() = this {
           // Check if poll is claimable
           let pollClosed = (poll.status == #closed) or
                           (poll.closesAt <= now()) or
-                          (info.currentResponses >= info.maxResponses);
+                          (info.remainingFund < info.rewardPerResponse) or
+                          (switch (info.maxResponses) {
+                            case null { false };
+                            case (?max) { info.currentResponses >= max };
+                          });
 
           // Find user's pending claims in this poll
           var userAmount : Nat64 = 0;
@@ -999,7 +1028,13 @@ persistent actor class polls_surveys_backend() = this {
             // Update funding info if enabled - add reward to pendingClaims instead of distributing
             let updatedFunding = switch (p.fundingInfo) {
               case (?funding) {
-                if (funding.currentResponses < funding.maxResponses) {
+                // Check budget availability AND optional maxResponses limit
+                let canAcceptVote = (funding.remainingFund >= funding.rewardPerResponse) and
+                                   (switch (funding.maxResponses) {
+                                     case null { true };  // No limit set, budget-based only
+                                     case (?max) { funding.currentResponses < max };
+                                   });
+                if (canAcceptVote) {
                   // Add reward to pending claims (escrow)
                   let newPendingClaims = Array.append(funding.pendingClaims, [(msg.caller, funding.rewardPerResponse)]);
                   ?{
@@ -1107,7 +1142,8 @@ persistent actor class polls_surveys_backend() = this {
       switch (rewardPerResponse) {
         case (?reward) {
           let totalFund = Nat64.fromNat(rewardFund) * 1_000_000; // Convert cents to e8s (rewardFund is in cents, so multiply by 1M instead of 100M)
-          let maxResponses = if (reward > 0) { Nat64.toNat(totalFund / reward) } else { 0 };
+          // For surveys, we currently auto-calculate maxResponses from budget (can be made optional in future)
+          let maxResponses : ?Nat = if (reward > 0) { ?Nat64.toNat(totalFund / reward) } else { ?0 };
           ?{
             tokenType = #ICP;
             tokenCanister = null;
@@ -1247,7 +1283,13 @@ persistent actor class polls_surveys_backend() = this {
             // Update funding info if enabled
             let updatedFunding = switch (s.fundingInfo) {
               case (?funding) {
-                if (funding.currentResponses < funding.maxResponses) {
+                // Check budget availability AND optional maxResponses limit
+                let canAcceptSubmission = (funding.remainingFund >= funding.rewardPerResponse) and
+                                         (switch (funding.maxResponses) {
+                                           case null { true };
+                                           case (?max) { funding.currentResponses < max };
+                                         });
+                if (canAcceptSubmission) {
                   ?{ funding with currentResponses = funding.currentResponses + 1; remainingFund = funding.remainingFund - funding.rewardPerResponse }
                 } else { ?funding }
               };
@@ -1324,8 +1366,10 @@ persistent actor class polls_surveys_backend() = this {
     surveys := Array.tabulate<Survey>(surveys.size(), func i {
       let s = surveys[i];
       if (s.id == surveyId and s.createdBy == msg.caller) {
-        // Calculate max responses
-        let maxResponses = Nat64.toNat(totalFund / rewardPerResponse);
+        // Calculate max responses (optional)
+        let maxResponses : ?Nat = if (rewardPerResponse > 0) {
+          ?Nat64.toNat(totalFund / rewardPerResponse)
+        } else { ?0 };
 
         // Get token info (use existing or default to ICP)
         let (tokenSymbol, tokenDecimals) = switch (s.fundingInfo) {

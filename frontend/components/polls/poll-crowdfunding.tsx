@@ -18,7 +18,7 @@ interface PollCrowdfundingProps {
     tokenDecimals: number
     totalFund: bigint
     rewardPerResponse: bigint
-    maxResponses: bigint
+    maxResponses: [] | [bigint]
     currentResponses: bigint
     remainingFund: bigint
     fundingType: { SelfFunded: null } | { Crowdfunded: null } | { TreasuryFunded: null }
@@ -45,8 +45,9 @@ export function PollCrowdfunding({ pollId, fundingInfo, onContribute }: PollCrow
   const totalFundDisplay = Number(fundingInfo.totalFund) / Math.pow(10, tokenDecimals)
   const rewardPerVote = Number(fundingInfo.rewardPerResponse) / Math.pow(10, tokenDecimals)
   const contributorCount = fundingInfo.contributors.length
-  const fundingProgress = Number(fundingInfo.maxResponses) > 0
-    ? (Number(fundingInfo.currentResponses) / Number(fundingInfo.maxResponses)) * 100
+  const maxResponses = fundingInfo.maxResponses.length > 0 ? fundingInfo.maxResponses[0] : null
+  const fundingProgress = maxResponses && Number(maxResponses) > 0
+    ? (Number(fundingInfo.currentResponses) / Number(maxResponses)) * 100
     : 0
 
   const handleContribute = async () => {
@@ -290,12 +291,12 @@ export function PollCrowdfunding({ pollId, fundingInfo, onContribute }: PollCrow
           <div className="flex items-center justify-between text-sm">
             <span className="text-gray-600 dark:text-gray-400">Funding Progress</span>
             <span className="font-medium">
-              {fundingInfo.currentResponses} / {fundingInfo.maxResponses} votes funded
+              {fundingInfo.currentResponses.toString()} / {maxResponses ? maxResponses.toString() : 'Unlimited'} votes funded
             </span>
           </div>
           <Progress value={fundingProgress} className="h-2" />
           <div className="text-xs text-gray-500 text-right">
-            {fundingProgress.toFixed(1)}% funded
+            {maxResponses ? `${fundingProgress.toFixed(1)}% funded` : 'Budget-based'}
           </div>
         </div>
 
