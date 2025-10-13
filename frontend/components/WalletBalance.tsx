@@ -47,6 +47,24 @@ export function WalletBalance({ compact = false, showRefresh = true }: WalletBal
     return trimmedRemainder ? `${quotient}.${trimmedRemainder}` : quotient.toString()
   }
 
+  const getTokenUSDValue = useCallback((symbol: string): number | undefined => {
+    // For PULSE, use the dynamic exchange rate from swap canister
+    if (symbol === 'PULSE') {
+      return pulseUsdValue
+    }
+
+    // Static USD values for other tokens (fallback values)
+    const usdValues: Record<string, number> = {
+      'ICP': 8.50,
+      'ckBTC': 65000,
+      'ckETH': 2500,
+      'ckUSDC': 1.00,
+      'CHAT': 0.05,
+      'SNS1': 0.25
+    }
+    return usdValues[symbol]
+  }, [pulseUsdValue])
+
   const fetchBalances = useCallback(async (isRetry: boolean = false) => {
     if (!isAuthenticated || !principalText) return
 
@@ -359,31 +377,13 @@ export function WalletBalance({ compact = false, showRefresh = true }: WalletBal
     } finally {
       setLoading(false)
     }
-  }, [isAuthenticated, identity, principalText, balances.length])
+  }, [isAuthenticated, identity, principalText, balances.length, getTokenUSDValue])
 
   const retryFetch = async () => {
     if (retryCount < 3) {
       setRetryCount(prev => prev + 1)
       await fetchBalances(true)
     }
-  }
-
-  const getTokenUSDValue = (symbol: string): number | undefined => {
-    // For PULSE, use the dynamic exchange rate from swap canister
-    if (symbol === 'PULSE') {
-      return pulseUsdValue
-    }
-
-    // Static USD values for other tokens (fallback values)
-    const usdValues: Record<string, number> = {
-      'ICP': 8.50,
-      'ckBTC': 65000,
-      'ckETH': 2500,
-      'ckUSDC': 1.00,
-      'CHAT': 0.05,
-      'SNS1': 0.25
-    }
-    return usdValues[symbol]
   }
 
   useEffect(() => {
