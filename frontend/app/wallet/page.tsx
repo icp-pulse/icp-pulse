@@ -639,7 +639,7 @@ export default function WalletPage() {
   }
 
   const transferPulse = async () => {
-    if (!identity || !isAuthenticated || !transferAmount || !recipientAddress) {
+    if (!isAuthenticated || !transferAmount || !recipientAddress) {
       setTransferResult({ success: false, message: 'Please fill in all fields' })
       return
     }
@@ -648,28 +648,60 @@ export default function WalletPage() {
       setIsTransferring(true)
       setTransferResult(null)
 
-      // Import tokenmania canister
+      // Import required modules
       const { createActor } = await import('../../../src/declarations/tokenmania')
       const { HttpAgent } = await import('@dfinity/agent')
+      const { Principal } = await import('@dfinity/principal')
 
       const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
-      const agent = HttpAgent.createSync({ host })
+      const pulseCanisterId = process.env.NEXT_PUBLIC_TOKENMANIA_CANISTER_ID!
 
-      if (process.env.NEXT_PUBLIC_DFX_NETWORK === 'local') {
-        await agent.fetchRootKey()
-      }
-
-      agent.replaceIdentity(identity)
-
-      const tokenmaniaActor = createActor(process.env.NEXT_PUBLIC_TOKENMANIA_CANISTER_ID!, { agent })
+      // Check if using Plug wallet
+      const isPlugWallet = !identity && typeof window !== 'undefined' && window.ic?.plug
 
       // Convert amount to smallest unit (8 decimals for PULSE)
       // Example: 1.5 PULSE = 150_000_000 e8s (smallest units)
       // Formula: display value * 100_000_000 = e8s value
       const amountInSmallestUnit = BigInt(Math.floor(parseFloat(transferAmount) * 100_000_000))
 
-      // Import Principal to convert string to Principal
-      const { Principal } = await import('@dfinity/principal')
+      let tokenmaniaActor: any
+
+      if (isPlugWallet && window.ic?.plug) {
+        // Use Plug wallet
+        await (window.ic.plug as any).createAgent({
+          whitelist: [pulseCanisterId],
+          host
+        })
+
+        if (window.ic.plug.createActor) {
+          // Use Plug's createActor method
+          const { idlFactory } = await import('../../../src/declarations/tokenmania')
+          tokenmaniaActor = await window.ic.plug.createActor({
+            canisterId: pulseCanisterId,
+            interfaceFactory: idlFactory
+          })
+        } else {
+          // Fallback to standard Actor if Plug's createActor is not available
+          const { Actor } = await import('@dfinity/agent')
+          const { idlFactory } = await import('../../../src/declarations/tokenmania')
+          tokenmaniaActor = Actor.createActor(idlFactory, {
+            agent: (window.ic.plug as any).agent,
+            canisterId: pulseCanisterId
+          })
+        }
+      } else if (identity) {
+        // Use II/NFID identity
+        const agent = HttpAgent.createSync({ host })
+
+        if (process.env.NEXT_PUBLIC_DFX_NETWORK === 'local') {
+          await agent.fetchRootKey()
+        }
+
+        agent.replaceIdentity(identity)
+        tokenmaniaActor = createActor(pulseCanisterId, { agent })
+      } else {
+        throw new Error('No valid authentication method available')
+      }
 
       // Perform transfer
       const result = await tokenmaniaActor.icrc1_transfer({
@@ -690,6 +722,7 @@ export default function WalletPage() {
           message: `Successfully transferred ${transferAmount} PULSE tokens! Transaction ID: ${result.Ok}`
         })
         setTransferAmount('')
+        setRecipientAddress('')
 
         analytics.track('button_clicked', {
           button_name: 'transfer_pulse',
