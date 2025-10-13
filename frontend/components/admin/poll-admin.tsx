@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { Plus, Search, Filter, MoreHorizontal, Edit, Trash2, Eye, Vote, Users, TrendingUp, Clock, Pause, Play, Gift, Ban, XCircle, Copy, FileDown } from 'lucide-react'
+import { Plus, Search, Filter, MoreHorizontal, Edit, Trash2, Vote, Users, TrendingUp, Clock, Pause, Play, Gift, Ban, XCircle, Copy, FileDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
@@ -201,25 +201,20 @@ export default function PollAdmin() {
     // Handle Plug wallet authentication
     if (authProvider === 'plug') {
       userPrincipal = principalText
-      console.log('Checking creator (Plug):', { userPrincipal, authProvider })
     }
     // Handle Internet Identity / NFID authentication
     else if (identity) {
       userPrincipal = identity.getPrincipal().toText()
-      console.log('Checking creator (II/NFID):', { userPrincipal, authProvider })
     } else {
-      console.log('No identity available')
-      return false
+        return false
     }
 
     if (!userPrincipal) {
-      console.log('Could not determine user principal')
       return false
     }
 
     const pollCreator = poll.createdBy?.toText?.() || poll.createdBy?.toString()
     const match = userPrincipal === pollCreator
-    console.log('Creator comparison:', { userPrincipal, pollCreator, match })
     return match
   }
 
@@ -632,15 +627,6 @@ export default function PollAdmin() {
 
                 {/* Actions */}
                 <div className="flex gap-2 pt-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="flex-1"
-                    onClick={() => router.push(`/results?pollId=${poll.id}`)}
-                  >
-                    <Eye className="w-4 h-4 mr-1" />
-                    View
-                  </Button>
                   <Button
                     variant="outline"
                     size="sm"

@@ -9,8 +9,10 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
-import { BarChart3, PieChart as PieChartIcon, Users, Calendar, Clock, Award, Eye } from 'lucide-react'
+import { BarChart3, PieChart as PieChartIcon, Users, Calendar, Clock, Award, Eye, ArrowLeft, FileText } from 'lucide-react'
 import type { Poll } from '@/../../src/declarations/polls_surveys_backend/polls_surveys_backend.did'
+import { PollBreadcrumb } from '@/components/polls/poll-breadcrumb'
+import { useRouter } from 'next/navigation'
 
 interface ChartData {
   name: string
@@ -30,6 +32,7 @@ function ResultsContent() {
   const { identity, isAuthenticated } = useIcpAuth()
   const searchParams = useSearchParams()
   const pollId = searchParams.get('pollId')
+  const router = useRouter()
 
   const [poll, setPoll] = useState<Poll | null>(null)
   const [loading, setLoading] = useState(true)
@@ -180,12 +183,33 @@ function ResultsContent() {
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-6xl">
-      {/* Header */}
+      {/* Breadcrumb Navigation */}
+      <PollBreadcrumb pollTitle={poll.title} pollId={pollId!} currentPage="results" />
+
+      {/* Header with Navigation */}
       <div className="mb-8">
-        <h1 className="text-3xl font-bold flex items-center gap-2 mb-4">
-          <BarChart3 className="h-8 w-8 text-primary" />
-          Poll Results
-        </h1>
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-3xl font-bold flex items-center gap-2">
+            <BarChart3 className="h-8 w-8 text-primary" />
+            Poll Results
+          </h1>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => router.push('/admin?tab=polls')}
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Polls
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => router.push(`/polls/edit?id=${pollId}`)}
+            >
+              <FileText className="h-4 w-4 mr-2" />
+              View Details
+            </Button>
+          </div>
+        </div>
         <Card>
           <CardHeader>
             <CardTitle className="text-xl">{poll.title}</CardTitle>
@@ -412,6 +436,18 @@ function ResultsContent() {
             </CardContent>
           </Card>
         </div>
+      </div>
+
+      {/* Mobile Bottom Navigation - Only visible on mobile */}
+      <div className="mt-8 md:hidden">
+        <Button
+          variant="outline"
+          onClick={() => router.push('/admin?tab=polls')}
+          className="w-full"
+        >
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Polls
+        </Button>
       </div>
     </div>
   )
