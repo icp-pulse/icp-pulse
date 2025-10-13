@@ -161,33 +161,133 @@ export default function PollsPage() {
       const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
       const backend = await createBackendWithIdentity({ canisterId, host, identity })
 
+      // Get fresh poll data to verify current state
+      const currentPoll = polls.find(p => p.id === pollId)
+      if (!currentPoll) {
+        throw new Error('Poll not found')
+      }
+
+      // Check if user has already voted
+      const userPrincipal = identity?.getPrincipal().toString()
+      const hasVoted = currentPoll.voterPrincipals.some(
+        principal => principal.toString() === userPrincipal
+      )
+
+      if (hasVoted) {
+        setError('You have already voted on this poll.')
+        setOpenVoteDialog(null)
+        toast({
+          title: "✗ Already voted",
+          description: "You have already cast your vote on this poll. Each user can only vote once.",
+          variant: "destructive",
+          className: "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800",
+          duration: 5000,
+        })
+        setVotingPoll(null)
+        setVotingOption(null)
+        return
+      }
+
+      // Check if poll is still active
+      const isActive = 'active' in currentPoll.status
+      if (!isActive) {
+        setError('This poll has ended and is no longer accepting votes.')
+        setOpenVoteDialog(null)
+        toast({
+          title: "✗ Poll ended",
+          description: "This poll has ended and is no longer accepting votes.",
+          variant: "destructive",
+          className: "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800",
+          duration: 5000,
+        })
+        setVotingPoll(null)
+        setVotingOption(null)
+        return
+      }
+
+      // Check if poll has reached max responses
+      if (currentPoll.config && currentPoll.config.length > 0) {
+        const config = currentPoll.config[0]
+        if (config && config.maxResponses && config.maxResponses.length > 0) {
+          const maxResponses = config.maxResponses[0]
+          if (maxResponses !== undefined && currentPoll.totalVotes >= maxResponses) {
+            setError('This poll has reached its maximum number of responses.')
+            setOpenVoteDialog(null)
+            toast({
+              title: "✗ Poll full",
+              description: "This poll has reached its maximum number of responses and is no longer accepting votes.",
+              variant: "destructive",
+              className: "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800",
+              duration: 5000,
+            })
+            setVotingPoll(null)
+            setVotingOption(null)
+            return
+          }
+        }
+      }
+
       const success = await backend.vote(pollId, optionId)
 
       if (success) {
         // Close the vote dialog
         setOpenVoteDialog(null)
 
-        // Refresh poll data
-        await fetchData()
+        // Optimistically update local state
+        setPolls(prevPolls => prevPolls.map(poll => {
+          if (poll.id === pollId) {
+            const updatedOptions = poll.options.map(opt =>
+              opt.id === optionId
+                ? { ...opt, votes: opt.votes + 1n }
+                : opt
+            )
+            const userPrincipalObj = identity?.getPrincipal()
+            return {
+              ...poll,
+              options: updatedOptions,
+              totalVotes: poll.totalVotes + 1n,
+              voterPrincipals: userPrincipalObj
+                ? [...poll.voterPrincipals, userPrincipalObj]
+                : poll.voterPrincipals
+            }
+          }
+          return poll
+        }))
+
+        // Refresh poll data in the background
+        fetchData()
 
         // Show success dialog with options
         setVoteSuccessDialog(pollId)
+
+        analytics.track('poll_voted', {
+          poll_id: pollId.toString(),
+          project_id: currentPoll.scopeId.toString(),
+          option_id: optionId.toString(),
+          has_rewards: Number(currentPoll.rewardFund) > 0,
+        })
       } else {
-        setError('Failed to vote. You may have already voted on this poll.')
+        // If backend returns false, try to provide a specific reason
+        setError('Failed to vote. Please refresh the page and try again.')
+        setOpenVoteDialog(null)
         toast({
           title: "✗ Vote failed",
-          description: "You may have already voted on this poll or the poll has ended.",
+          description: "Unable to submit your vote. Please refresh the page and try again.",
           variant: "destructive",
           className: "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800",
           duration: 5000,
         })
+
+        // Refresh to get latest state
+        await fetchData()
       }
     } catch (err) {
       console.error('Error voting:', err)
-      setError('Failed to submit vote')
+      setError('An unexpected error occurred. Please try again.')
+      setOpenVoteDialog(null)
       toast({
         title: "✗ Error",
-        description: "An unexpected error occurred while submitting your vote.",
+        description: err instanceof Error ? err.message : "An unexpected error occurred while submitting your vote.",
         variant: "destructive",
         className: "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800",
         duration: 5000,
