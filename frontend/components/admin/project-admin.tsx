@@ -311,7 +311,14 @@ export default function ProjectAdmin() {
                 <Button
                   size="sm"
                   className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white"
-                  onClick={() => router.push(`/projects/insights?id=${project.id}`)}
+                  onClick={() => {
+                    console.log('🎯 [ProjectAdmin] Navigating to AI Insights')
+                    console.log('- Project ID:', project.id)
+                    console.log('- Project ID type:', typeof project.id)
+                    console.log('- Project name:', project.name)
+                    console.log('- Full URL:', `/projects/insights?id=${project.id}`)
+                    router.push(`/projects/insights?id=${project.id}`)
+                  }}
                 >
                   <Sparkles className="w-4 h-4 mr-2" />
                   AI Insights

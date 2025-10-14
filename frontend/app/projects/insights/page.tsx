@@ -54,7 +54,13 @@ export default function ProjectInsightsPage() {
   const projectId = searchParams.get('id')
 
   useEffect(() => {
+    console.log('🎬 [AI Insights] useEffect triggered')
+    console.log('- projectId:', projectId)
+    console.log('- isAuthenticated:', isAuthenticated)
+    console.log('- identity exists:', !!identity)
+
     if (!projectId) {
+      console.log('❌ No project ID, redirecting to /projects')
       toast({
         title: 'Project ID missing',
         description: 'Please provide a valid project ID.',
@@ -64,12 +70,25 @@ export default function ProjectInsightsPage() {
       return
     }
 
-    if (isAuthenticated && identity) {
-      fetchData()
-      updateUserStatus()
-    } else {
+    // Wait for both authentication AND identity to be ready
+    if (!isAuthenticated) {
+      console.log('⚠️ Not authenticated, showing login screen')
       setLoading(false)
+      return
     }
+
+    // If authenticated but identity not yet loaded, wait for it
+    if (!identity) {
+      console.log('⏳ Authenticated but identity not loaded yet, waiting...')
+      // Keep loading state as true while waiting for identity
+      setLoading(true)
+      return
+    }
+
+    // Both authentication and identity are ready
+    console.log('✅ Both authenticated and identity ready, calling fetchData()')
+    fetchData()
+    updateUserStatus()
   }, [projectId, identity, isAuthenticated])
 
   const updateUserStatus = () => {
@@ -96,11 +115,20 @@ export default function ProjectInsightsPage() {
       const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
       const backend = await createBackendWithIdentity({ canisterId, host, identity })
 
+      console.log('🔍 [AI Insights Debug] Starting fetch...')
+      console.log('- Project ID (string):', projectId)
+      console.log('- Project ID type:', typeof projectId)
+
       // Fetch project details
       const projects = await backend.list_projects(0n, 100n)
+      console.log('- Total projects found:', projects.length)
+      console.log('- All project IDs:', projects.map(p => ({ id: p.id.toString(), name: p.name })))
+
       const foundProject = projects.find(p => p.id.toString() === projectId)
+      console.log('- Found project match:', foundProject ? foundProject.name : 'NOT FOUND')
 
       if (!foundProject) {
+        console.error('❌ Project not found with ID:', projectId)
         toast({
           title: 'Project not found',
           description: 'The requested project could not be found.',
@@ -111,18 +139,70 @@ export default function ProjectInsightsPage() {
       }
 
       setProject(foundProject)
+      console.log('✅ Project loaded:', { id: foundProject.id.toString(), name: foundProject.name })
 
       // Fetch all polls for this project
-      const pollSummaries = await backend.list_polls_by_project(BigInt(projectId), 0n, 100n)
+      const projectIdBigInt = BigInt(projectId)
+      console.log('- Converting to BigInt:', projectIdBigInt)
+      console.log('- Querying backend.list_polls_by_project with:', { projectId: projectIdBigInt.toString(), offset: 0, limit: 100 })
+
+      const pollSummaries = await backend.list_polls_by_project(projectIdBigInt, 0n, 100n)
+      console.log('- Poll summaries received:', pollSummaries.length)
+
+      if (pollSummaries.length === 0) {
+        console.warn('⚠️ No polls found for this project')
+        console.log('- Checking poll details to understand why...')
+        console.log('- Expected: scopeType = #project, scopeId =', projectIdBigInt.toString())
+
+        // Try to get ALL polls to see their scopeType and scopeId
+        try {
+          const allPolls = await backend.list_polls(0n, 100n)
+          console.log('- Total polls in system:', allPolls.length)
+
+          if (allPolls.length > 0) {
+            console.log('- All polls in system:', allPolls.map(p => ({
+              id: p.id.toString(),
+              title: p.title,
+              scopeType: 'scopeType' in p ? JSON.stringify(p.scopeType) : 'unknown',
+              scopeId: p.scopeId?.toString() || 'none',
+              matchesProject: p.scopeId?.toString() === projectIdBigInt.toString()
+            })))
+
+            // Check if any polls have matching scopeId but different scopeType
+            const matchingScopeId = allPolls.filter(p => p.scopeId?.toString() === projectIdBigInt.toString())
+            if (matchingScopeId.length > 0) {
+              console.log('⚠️ Found polls with matching scopeId but possibly wrong scopeType:', matchingScopeId.map(p => ({
+                id: p.id.toString(),
+                title: p.title,
+                scopeType: JSON.stringify('scopeType' in p ? p.scopeType : 'unknown')
+              })))
+            }
+          } else {
+            console.log('⚠️ No polls exist in the system at all')
+          }
+        } catch (e) {
+          console.log('- Could not fetch polls:', e)
+        }
+      } else {
+        console.log('✅ Poll summaries:', pollSummaries.map(s => ({
+          id: s.id.toString(),
+          title: s.title,
+          scopeType: 'scopeType' in s ? s.scopeType : 'unknown',
+          scopeId: s.scopeId?.toString() || 'none'
+        })))
+      }
+
       const pollDetails: BackendPoll[] = []
 
       for (const summary of pollSummaries) {
         const pollData = await backend.get_poll(summary.id)
         if (pollData && pollData.length > 0 && pollData[0]) {
           pollDetails.push(pollData[0])
+          console.log('- Loaded poll:', pollData[0].title)
         }
       }
 
+      console.log('✅ Total polls loaded:', pollDetails.length)
       setPolls(pollDetails)
     } catch (error) {
       console.error('Error fetching data:', error)
