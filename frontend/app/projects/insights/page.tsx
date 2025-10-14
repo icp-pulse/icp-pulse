@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -35,7 +35,7 @@ interface Insights {
   }[]
 }
 
-export default function ProjectInsightsPage() {
+function ProjectInsightsContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const { toast } = useToast()
@@ -52,6 +52,131 @@ export default function ProjectInsightsPage() {
   const [usageInfo, setUsageInfo] = useState<{ used: number; limit: number }>({ used: 0, limit: 3 })
 
   const projectId = searchParams.get('id')
+
+  const updateUserStatus = useCallback(() => {
+    if (!identity) return
+
+    const userPrincipal = identity.getPrincipal().toString()
+    const status = getUserPremiumStatus(userPrincipal)
+    setUserTier(status.tier)
+
+    const limits = TIER_LIMITS[status.tier]
+    setUsageInfo({
+      used: status.aiInsightsUsed,
+      limit: limits.aiInsightsPerMonth === -1 ? Infinity : limits.aiInsightsPerMonth
+    })
+  }, [identity])
+
+  const fetchData = useCallback(async () => {
+    if (!projectId) return
+
+    try {
+      setLoading(true)
+      const { createBackendWithIdentity } = await import('@/lib/icp')
+      const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
+      const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
+      const backend = await createBackendWithIdentity({ canisterId, host, identity })
+
+      console.log('🔍 [AI Insights Debug] Starting fetch...')
+      console.log('- Project ID (string):', projectId)
+      console.log('- Project ID type:', typeof projectId)
+
+      // Fetch project details
+      const projects = await backend.list_projects(0n, 100n)
+      console.log('- Total projects found:', projects.length)
+      console.log('- All project IDs:', projects.map((p: any) => ({ id: p.id.toString(), name: p.name })))
+
+      const foundProject = projects.find((p: any) => p.id.toString() === projectId)
+      console.log('- Found project match:', foundProject ? foundProject.name : 'NOT FOUND')
+
+      if (!foundProject) {
+        console.error('❌ Project not found with ID:', projectId)
+        toast({
+          title: 'Project not found',
+          description: 'The requested project could not be found.',
+          variant: 'destructive'
+        })
+        router.push('/projects')
+        return
+      }
+
+      setProject(foundProject)
+      console.log('✅ Project loaded:', { id: foundProject.id.toString(), name: foundProject.name })
+
+      // Fetch all polls for this project
+      const projectIdBigInt = BigInt(projectId)
+      console.log('- Converting to BigInt:', projectIdBigInt)
+      console.log('- Querying backend.list_polls_by_project with:', { projectId: projectIdBigInt.toString(), offset: 0, limit: 100 })
+
+      const pollSummaries = await backend.list_polls_by_project(projectIdBigInt, 0n, 100n)
+      console.log('- Poll summaries received:', pollSummaries.length)
+
+      if (pollSummaries.length === 0) {
+        console.warn('⚠️ No polls found for this project')
+        console.log('- Checking poll details to understand why...')
+        console.log('- Expected: scopeType = #project, scopeId =', projectIdBigInt.toString())
+
+        // Try to get ALL polls to see their scopeType and scopeId
+        try {
+          const allPolls = await backend.list_polls(0n, 100n)
+          console.log('- Total polls in system:', allPolls.length)
+
+          if (allPolls.length > 0) {
+            console.log('- All polls in system:', allPolls.map((p: any) => ({
+              id: p.id.toString(),
+              title: p.title,
+              scopeType: 'scopeType' in p ? JSON.stringify(p.scopeType) : 'unknown',
+              scopeId: p.scopeId?.toString() || 'none',
+              matchesProject: p.scopeId?.toString() === projectIdBigInt.toString()
+            })))
+
+            // Check if any polls have matching scopeId but different scopeType
+            const matchingScopeId = allPolls.filter((p: any) => p.scopeId?.toString() === projectIdBigInt.toString())
+            if (matchingScopeId.length > 0) {
+              console.log('⚠️ Found polls with matching scopeId but possibly wrong scopeType:', matchingScopeId.map((p: any) => ({
+                id: p.id.toString(),
+                title: p.title,
+                scopeType: JSON.stringify('scopeType' in p ? p.scopeType : 'unknown')
+              })))
+            }
+          } else {
+            console.log('⚠️ No polls exist in the system at all')
+          }
+        } catch (e) {
+          console.log('- Could not fetch polls:', e)
+        }
+      } else {
+        console.log('✅ Poll summaries:', pollSummaries.map((s: any) => ({
+          id: s.id.toString(),
+          title: s.title,
+          scopeType: 'scopeType' in s ? s.scopeType : 'unknown',
+          scopeId: s.scopeId?.toString() || 'none'
+        })))
+      }
+
+      const pollDetails: BackendPoll[] = []
+
+      for (const summary of pollSummaries) {
+        const pollData = await backend.get_poll(summary.id)
+        if (pollData && pollData.length > 0 && pollData[0]) {
+          pollDetails.push(pollData[0])
+          console.log('- Loaded poll:', pollData[0].title)
+        }
+      }
+
+      console.log('✅ Total polls loaded:', pollDetails.length)
+      setPolls(pollDetails)
+    } catch (error) {
+      console.error('Error fetching data:', error)
+      toast({
+        title: 'Error',
+        description: 'Failed to load project data. Please try again.',
+        variant: 'destructive'
+      })
+    } finally {
+      setLoading(false)
+    }
+  }, [projectId, identity, router, toast])
 
   useEffect(() => {
     console.log('🎬 [AI Insights] useEffect triggered')
@@ -89,132 +214,7 @@ export default function ProjectInsightsPage() {
     console.log('✅ Both authenticated and identity ready, calling fetchData()')
     fetchData()
     updateUserStatus()
-  }, [projectId, identity, isAuthenticated])
-
-  const updateUserStatus = () => {
-    if (!identity) return
-
-    const userPrincipal = identity.getPrincipal().toString()
-    const status = getUserPremiumStatus(userPrincipal)
-    setUserTier(status.tier)
-
-    const limits = TIER_LIMITS[status.tier]
-    setUsageInfo({
-      used: status.aiInsightsUsed,
-      limit: limits.aiInsightsPerMonth === -1 ? Infinity : limits.aiInsightsPerMonth
-    })
-  }
-
-  const fetchData = async () => {
-    if (!projectId) return
-
-    try {
-      setLoading(true)
-      const { createBackendWithIdentity } = await import('@/lib/icp')
-      const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
-      const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
-      const backend = await createBackendWithIdentity({ canisterId, host, identity })
-
-      console.log('🔍 [AI Insights Debug] Starting fetch...')
-      console.log('- Project ID (string):', projectId)
-      console.log('- Project ID type:', typeof projectId)
-
-      // Fetch project details
-      const projects = await backend.list_projects(0n, 100n)
-      console.log('- Total projects found:', projects.length)
-      console.log('- All project IDs:', projects.map(p => ({ id: p.id.toString(), name: p.name })))
-
-      const foundProject = projects.find(p => p.id.toString() === projectId)
-      console.log('- Found project match:', foundProject ? foundProject.name : 'NOT FOUND')
-
-      if (!foundProject) {
-        console.error('❌ Project not found with ID:', projectId)
-        toast({
-          title: 'Project not found',
-          description: 'The requested project could not be found.',
-          variant: 'destructive'
-        })
-        router.push('/projects')
-        return
-      }
-
-      setProject(foundProject)
-      console.log('✅ Project loaded:', { id: foundProject.id.toString(), name: foundProject.name })
-
-      // Fetch all polls for this project
-      const projectIdBigInt = BigInt(projectId)
-      console.log('- Converting to BigInt:', projectIdBigInt)
-      console.log('- Querying backend.list_polls_by_project with:', { projectId: projectIdBigInt.toString(), offset: 0, limit: 100 })
-
-      const pollSummaries = await backend.list_polls_by_project(projectIdBigInt, 0n, 100n)
-      console.log('- Poll summaries received:', pollSummaries.length)
-
-      if (pollSummaries.length === 0) {
-        console.warn('⚠️ No polls found for this project')
-        console.log('- Checking poll details to understand why...')
-        console.log('- Expected: scopeType = #project, scopeId =', projectIdBigInt.toString())
-
-        // Try to get ALL polls to see their scopeType and scopeId
-        try {
-          const allPolls = await backend.list_polls(0n, 100n)
-          console.log('- Total polls in system:', allPolls.length)
-
-          if (allPolls.length > 0) {
-            console.log('- All polls in system:', allPolls.map(p => ({
-              id: p.id.toString(),
-              title: p.title,
-              scopeType: 'scopeType' in p ? JSON.stringify(p.scopeType) : 'unknown',
-              scopeId: p.scopeId?.toString() || 'none',
-              matchesProject: p.scopeId?.toString() === projectIdBigInt.toString()
-            })))
-
-            // Check if any polls have matching scopeId but different scopeType
-            const matchingScopeId = allPolls.filter(p => p.scopeId?.toString() === projectIdBigInt.toString())
-            if (matchingScopeId.length > 0) {
-              console.log('⚠️ Found polls with matching scopeId but possibly wrong scopeType:', matchingScopeId.map(p => ({
-                id: p.id.toString(),
-                title: p.title,
-                scopeType: JSON.stringify('scopeType' in p ? p.scopeType : 'unknown')
-              })))
-            }
-          } else {
-            console.log('⚠️ No polls exist in the system at all')
-          }
-        } catch (e) {
-          console.log('- Could not fetch polls:', e)
-        }
-      } else {
-        console.log('✅ Poll summaries:', pollSummaries.map(s => ({
-          id: s.id.toString(),
-          title: s.title,
-          scopeType: 'scopeType' in s ? s.scopeType : 'unknown',
-          scopeId: s.scopeId?.toString() || 'none'
-        })))
-      }
-
-      const pollDetails: BackendPoll[] = []
-
-      for (const summary of pollSummaries) {
-        const pollData = await backend.get_poll(summary.id)
-        if (pollData && pollData.length > 0 && pollData[0]) {
-          pollDetails.push(pollData[0])
-          console.log('- Loaded poll:', pollData[0].title)
-        }
-      }
-
-      console.log('✅ Total polls loaded:', pollDetails.length)
-      setPolls(pollDetails)
-    } catch (error) {
-      console.error('Error fetching data:', error)
-      toast({
-        title: 'Error',
-        description: 'Failed to load project data. Please try again.',
-        variant: 'destructive'
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
+  }, [projectId, identity, isAuthenticated, fetchData, router, toast, updateUserStatus])
 
   const handleAnalyze = async () => {
     if (!identity) {
@@ -466,7 +466,7 @@ export default function ProjectInsightsPage() {
                     No Analysis Yet
                   </h3>
                   <p className="text-gray-600 dark:text-gray-400 text-center max-w-md mb-6">
-                    Select polls from the left panel and click "Generate AI Insights" to get started.
+                    Select polls from the left panel and click &ldquo;Generate AI Insights&rdquo; to get started.
                   </p>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-6 w-full max-w-2xl">
                     <div className="text-center p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
@@ -501,7 +501,7 @@ export default function ProjectInsightsPage() {
               Upgrade to Premium
             </AlertDialogTitle>
             <AlertDialogDescription className="text-base">
-              You've reached your monthly limit of {usageInfo.limit} AI insights. Upgrade to Premium for more!
+              You&apos;ve reached your monthly limit of {usageInfo.limit} AI insights. Upgrade to Premium for more!
             </AlertDialogDescription>
           </AlertDialogHeader>
 
@@ -554,5 +554,23 @@ export default function ProjectInsightsPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  )
+}
+
+export default function ProjectInsightsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          <div className="animate-pulse space-y-6">
+            <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-1/4"></div>
+            <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded"></div>
+            <div className="h-96 bg-gray-200 dark:bg-gray-700 rounded"></div>
+          </div>
+        </div>
+      </div>
+    }>
+      <ProjectInsightsContent />
+    </Suspense>
   )
 }

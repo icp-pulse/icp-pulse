@@ -7,20 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Clock, Users, CheckCircle2 } from 'lucide-react'
 import { canSelectPolls } from '@/lib/premium'
-
-interface Poll {
-  id: string
-  title: string
-  description: string
-  options: {
-    text: string
-    votes: bigint
-  }[]
-  totalVotes: bigint
-  createdAt: bigint
-  closesAt: bigint
-  status: { active: null } | { paused: null } | { claimsOpen: null } | { claimsEnded: null } | { closed: null }
-}
+import type { Poll } from '@/../../src/declarations/polls_surveys_backend/polls_surveys_backend.did'
 
 interface PollSelectorProps {
   polls: Poll[]
@@ -70,11 +57,11 @@ export function PollSelector({
       const canSelect = canSelectPolls(userPrincipal, polls.length)
 
       if (canSelect.allowed) {
-        onSelectionChange(polls.map(p => p.id))
+        onSelectionChange(polls.map(p => p.id.toString()))
         setLimitWarning(null)
       } else if (canSelect.max) {
         // Select up to max
-        onSelectionChange(polls.slice(0, canSelect.max).map(p => p.id))
+        onSelectionChange(polls.slice(0, canSelect.max).map(p => p.id.toString()))
         setLimitWarning(`Selected maximum of ${canSelect.max} polls. ${canSelect.reason}`)
       }
     }
@@ -166,23 +153,24 @@ export function PollSelector({
         <ScrollArea className="h-[500px] pr-4">
           <div className="space-y-3">
             {polls.map((poll) => {
-              const isSelected = selectedPollIds.includes(poll.id)
+              const pollId = poll.id.toString()
+              const isSelected = selectedPollIds.includes(pollId)
               const totalVotes = Number(poll.totalVotes)
 
               return (
                 <div
-                  key={poll.id}
+                  key={pollId}
                   className={`border rounded-lg p-4 cursor-pointer transition-all ${
                     isSelected
                       ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
                       : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
                   }`}
-                  onClick={() => handleTogglePoll(poll.id)}
+                  onClick={() => handleTogglePoll(pollId)}
                 >
                   <div className="flex items-start gap-3">
                     <Checkbox
                       checked={isSelected}
-                      onCheckedChange={() => handleTogglePoll(poll.id)}
+                      onCheckedChange={() => handleTogglePoll(pollId)}
                       className="mt-1"
                     />
                     <div className="flex-1 min-w-0">
