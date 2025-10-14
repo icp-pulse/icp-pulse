@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { Plus, Search, Filter, MoreHorizontal, Edit, Trash2, Eye } from 'lucide-react'
+import { Plus, Search, Filter, MoreHorizontal, Edit, Trash2, Eye, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
@@ -289,22 +289,39 @@ export default function ProjectAdmin() {
               </div>
 
               {/* Actions */}
-              <div className="flex gap-2 pt-2">
-                <Button variant="outline" size="sm" className="flex-1">
-                  <Eye className="w-4 h-4 mr-1" />
-                  View
-                </Button>
+              <div className="space-y-2 pt-2">
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" className="flex-1">
+                    <Eye className="w-4 h-4 mr-1" />
+                    View
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => router.push(`/projects/edit?id=${project.id}`)}
+                  >
+                    <Edit className="w-4 h-4 mr-1" />
+                    Edit
+                  </Button>
+                  <Button variant="outline" size="sm" className="px-3">
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
                 <Button
-                  variant="outline"
                   size="sm"
-                  className="flex-1"
-                  onClick={() => router.push(`/projects/edit?id=${project.id}`)}
+                  className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white"
+                  onClick={() => {
+                    console.log('🎯 [ProjectAdmin] Navigating to AI Insights')
+                    console.log('- Project ID:', project.id)
+                    console.log('- Project ID type:', typeof project.id)
+                    console.log('- Project name:', project.name)
+                    console.log('- Full URL:', `/projects/insights?id=${project.id}`)
+                    router.push(`/projects/insights?id=${project.id}`)
+                  }}
                 >
-                  <Edit className="w-4 h-4 mr-1" />
-                  Edit
-                </Button>
-                <Button variant="outline" size="sm" className="px-3">
-                  <Trash2 className="w-4 h-4" />
+                  <Sparkles className="w-4 h-4 mr-2" />
+                  AI Insights
                 </Button>
               </div>
             </CardContent>

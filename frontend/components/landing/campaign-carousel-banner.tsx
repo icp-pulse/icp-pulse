@@ -86,7 +86,7 @@ export function CampaignCarouselBanner() {
   const announcements: Announcement[] = [
     {
       id: 'ido-sale',
-      title: '🚀 PULSE Token IDO - Coming Soon!',
+      title: 'PULSE Token IDO - Coming Soon!',
       description: 'Join the decentralized token distribution | Multi-pool vesting | Secure on ICP',
       ctaText: 'Participate Now',
       ctaLink: 'https://ej3ry-6qaaa-aaaai-atlza-cai.icp0.io/',
@@ -95,7 +95,7 @@ export function CampaignCarouselBanner() {
     },
     {
       id: 'quest-launch',
-      title: '🎯 Quest System - Earn PULSE Tokens!',
+      title: 'Quests - Earn PULSE Tokens!',
       description: 'Complete quests and earn points to claim your share of 50,000 PULSE tokens',
       ctaText: 'Start Quests',
       ctaLink: '/quests',
@@ -104,7 +104,7 @@ export function CampaignCarouselBanner() {
     },
     {
       id: 'early-adopter',
-      title: '💎 Early Adopter Rewards',
+      title: 'Early Adopter Rewards',
       description: 'Join True Pulse now and participate in exclusive airdrop campaigns for early supporters',
       ctaText: 'Learn More',
       ctaLink: '/airdrop',
@@ -113,7 +113,7 @@ export function CampaignCarouselBanner() {
     },
     {
       id: 'community',
-      title: '⭐ Join Our Growing Community',
+      title: 'Join Our Growing Community',
       description: 'Connect with thousands of users creating polls, surveys, and making decisions on-chain',
       ctaText: 'Get Started',
       ctaLink: '/polls',
@@ -214,11 +214,11 @@ export function CampaignCarouselBanner() {
 
   const getIconComponent = (iconName: string) => {
     switch (iconName) {
-      case 'rocket': return <Rocket className="w-6 h-6" />
-      case 'sparkles': return <Sparkles className="w-6 h-6" />
-      case 'gift': return <Gift className="w-6 h-6" />
-      case 'star': return <Star className="w-6 h-6" />
-      default: return <Trophy className="w-6 h-6" />
+      case 'rocket': return <Rocket className="w-5 h-5 md:w-6 md:h-6" />
+      case 'sparkles': return <Sparkles className="w-5 h-5 md:w-6 md:h-6" />
+      case 'gift': return <Gift className="w-5 h-5 md:w-6 md:h-6" />
+      case 'star': return <Star className="w-5 h-5 md:w-6 md:h-6" />
+      default: return <Trophy className="w-5 h-5 md:w-6 md:h-6" />
     }
   }
 
@@ -260,8 +260,8 @@ export function CampaignCarouselBanner() {
         ? (currentSlideData.data as Announcement).gradient
         : 'from-purple-600 via-blue-600 to-indigo-600'
     } text-white pt-16 md:pt-20 transition-all duration-500`}>
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-        <div className="flex items-center justify-between gap-4">
+      <div className="max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 py-3 md:py-4">
+        <div className="flex items-center justify-between gap-2 md:gap-4">
           {/* Left Arrow */}
           {slides.length > 1 && (
             <button
@@ -274,13 +274,13 @@ export function CampaignCarouselBanner() {
           )}
 
           {/* Slide Content */}
-          <div className="flex items-center gap-3 flex-1 min-w-0">
+          <div className="flex items-center gap-2 md:gap-3 flex-1 min-w-0">
             <div className="flex-shrink-0">
               {currentSlideData.type === 'announcement'
                 ? getIconComponent((currentSlideData.data as Announcement).icon)
                 : currentSlideData.type === 'airdrop'
-                ? <Gift className="w-6 h-6" />
-                : <Trophy className="w-6 h-6" />
+                ? <Gift className="w-5 h-5 md:w-6 md:h-6" />
+                : <Trophy className="w-5 h-5 md:w-6 md:h-6" />
               }
             </div>
             <div className="flex-1 min-w-0">
@@ -337,7 +337,7 @@ export function CampaignCarouselBanner() {
           </div>
 
           {/* CTA Button */}
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 md:gap-3">
             {currentSlideData.type === 'announcement' && (() => {
               const announcement = currentSlideData.data as Announcement
               const isExternalLink = announcement.ctaLink.startsWith('http')
@@ -348,17 +348,17 @@ export function CampaignCarouselBanner() {
                     href={announcement.ctaLink}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="flex items-center gap-2 px-4 py-2 text-sm bg-white text-purple-600 hover:bg-gray-100 rounded-lg font-medium whitespace-nowrap transition-colors"
+                    className="flex items-center gap-2 px-3 py-2 md:px-4 text-sm bg-white text-purple-600 hover:bg-gray-100 rounded-lg font-medium whitespace-nowrap transition-colors"
                   >
-                    {announcement.ctaText}
+                    <span className="hidden sm:inline">{announcement.ctaText}</span>
                     <ArrowRight className="w-4 h-4" />
                   </a>
                 )
               } else {
                 return (
                   <Link href={announcement.ctaLink}>
-                    <button className="flex items-center gap-2 px-4 py-2 text-sm bg-white text-purple-600 hover:bg-gray-100 rounded-lg font-medium whitespace-nowrap transition-colors">
-                      {announcement.ctaText}
+                    <button className="flex items-center gap-2 px-3 py-2 md:px-4 text-sm bg-white text-purple-600 hover:bg-gray-100 rounded-lg font-medium whitespace-nowrap transition-colors">
+                      <span className="hidden sm:inline">{announcement.ctaText}</span>
                       <ArrowRight className="w-4 h-4" />
                     </button>
                   </Link>
@@ -368,8 +368,8 @@ export function CampaignCarouselBanner() {
 
             {currentSlideData.type === 'airdrop' && (
               <Link href="/airdrop">
-                <button className="flex items-center gap-2 px-4 py-2 text-sm bg-white text-purple-600 hover:bg-gray-100 rounded-lg font-medium whitespace-nowrap transition-colors">
-                  Claim Now
+                <button className="flex items-center gap-2 px-3 py-2 md:px-4 text-sm bg-white text-purple-600 hover:bg-gray-100 rounded-lg font-medium whitespace-nowrap transition-colors">
+                  <span className="hidden sm:inline">Claim Now</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </Link>
@@ -377,8 +377,8 @@ export function CampaignCarouselBanner() {
 
             {currentSlideData.type === 'quest' && (
               <Link href="/quests">
-                <button className="flex items-center gap-2 px-4 py-2 text-sm bg-white text-purple-600 hover:bg-gray-100 rounded-lg font-medium whitespace-nowrap transition-colors">
-                  View Quests
+                <button className="flex items-center gap-2 px-3 py-2 md:px-4 text-sm bg-white text-purple-600 hover:bg-gray-100 rounded-lg font-medium whitespace-nowrap transition-colors">
+                  <span className="hidden sm:inline">View Quests</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </Link>

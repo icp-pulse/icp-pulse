@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Card, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useIcpAuth } from '@/components/IcpAuthProvider'
+import { Sparkles } from 'lucide-react'
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<any[]>([])
@@ -63,22 +64,34 @@ export default function ProjectsPage() {
                   </span>
                 </div>
               </CardHeader>
-              <CardFooter className="flex gap-2">
-                <Button 
-                  variant="outline" 
-                  size="sm" 
+              <CardFooter className="flex flex-col gap-2">
+                <div className="flex gap-2 w-full">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    asChild
+                    className="flex-1"
+                  >
+                    <a href={`/projects/${project.slug}/surveys/new`}>Create Survey</a>
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    asChild
+                    className="flex-1"
+                  >
+                    <a href={`/projects/${project.slug}/polls/new`}>Create Poll</a>
+                  </Button>
+                </div>
+                <Button
+                  size="sm"
                   asChild
-                  className="flex-1"
+                  className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white"
                 >
-                  <a href={`/projects/${project.slug}/surveys/new`}>Create Survey</a>
-                </Button>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  asChild
-                  className="flex-1"
-                >
-                  <a href={`/projects/${project.slug}/polls/new`}>Create Poll</a>
+                  <a href={`/projects/insights?id=${project.id.toString()}`} className="flex items-center justify-center gap-2">
+                    <Sparkles className="w-4 h-4" />
+                    AI Insights
+                  </a>
                 </Button>
               </CardFooter>
             </Card>
