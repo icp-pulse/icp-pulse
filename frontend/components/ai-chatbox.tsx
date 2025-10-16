@@ -91,42 +91,38 @@ export function AIChatbox({ onOptionsGenerated, isOpen: externalIsOpen, onToggle
     setIsLoading(true)
 
     try {
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: currentInput,
-          messages: messages
-        }),
-      })
+      // Call backend canister directly for chat
+      const { createBackendWithIdentity } = await import('@/lib/icp')
+      const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
+      const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
+      const backend = await createBackendWithIdentity({ canisterId, host, identity })
 
-      if (!response.ok) {
-        throw new Error('Failed to get AI response')
-      }
+      // Build conversation history for context (limit to last 5 messages)
+      const conversationHistory: [string, string][] = messages.slice(-5).map(msg => [
+        msg.sender === 'user' ? 'user' : 'assistant',
+        msg.content
+      ])
 
-      const data = await response.json()
-      
-      const aiResponse: Message = {
-        id: (Date.now() + 1).toString(),
-        content: data.message,
-        sender: 'ai',
-        timestamp: new Date(),
-        pollCreated: data.pollCreated,
-        pollId: data.pollId,
-        optionsGenerated: data.optionsGenerated,
-        options: data.options,
-        topic: data.topic,
-        pollPreview: data.pollPreview,
-        preview: data.preview
-      }
+      console.log(`Calling backend canister for chat with message: "${currentInput}"`)
 
-      setMessages(prev => [...prev, aiResponse])
+      // Call the backend canister's chat_message function
+      const result = await backend.chat_message(currentInput, conversationHistory)
 
-      // If options were generated and callback provided, call it
-      if (data.optionsGenerated && data.options && onOptionsGenerated) {
-        onOptionsGenerated(data.options)
+      if ('ok' in result) {
+        const aiMessage = result.ok
+        console.log(`Successfully got chat response from backend canister`)
+
+        const aiResponse: Message = {
+          id: (Date.now() + 1).toString(),
+          content: aiMessage,
+          sender: 'ai',
+          timestamp: new Date()
+        }
+
+        setMessages(prev => [...prev, aiResponse])
+      } else {
+        console.error('Backend canister returned error:', result.err)
+        throw new Error(result.err || 'Failed to get AI response from canister')
       }
     } catch (error) {
       console.error('Error sending message:', error)
@@ -242,9 +238,14 @@ export function AIChatbox({ onOptionsGenerated, isOpen: externalIsOpen, onToggle
             const { Actor, HttpAgent } = await import('@dfinity/agent')
             const { idlFactory: tokenIdl } = await import('@/../../src/declarations/tokenmania')
 
-            const agent = new HttpAgent({ host, identity: identity! })
+            const isLocal = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local'
+            const agent = HttpAgent.createSync({
+              host,
+              identity: identity!,
+              verifyQuerySignatures: !isLocal
+            })
 
-            if (process.env.NEXT_PUBLIC_DFX_NETWORK === 'local') {
+            if (isLocal) {
               await agent.fetchRootKey()
             }
 

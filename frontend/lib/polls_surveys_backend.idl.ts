@@ -1,5 +1,5 @@
-// Auto-generated from deployed IC canister - DO NOT EDIT MANUALLY
-// Last regenerated: 2025-10-15
+// Auto-generated from Motoko canister - DO NOT EDIT MANUALLY
+// Last regenerated: 2025-10-16
 import { IDL } from '@dfinity/candid'
 
 export const idlFactory = ({ IDL: I = IDL }) => {
@@ -320,9 +320,10 @@ export const idlFactory = ({ IDL: I = IDL }) => {
     end_rewards_claiming: I.Func([PollId], [Result], []),
     export_survey_csv: I.Func([SurveyId], [I.Vec(I.Nat8)], ['query']),
     fund_poll: I.Func([PollId, I.Nat64], [Result], []),
-    generate_poll_options: I.Func([I.Text], [Result_1], []),
+    generate_poll_options: I.Func([I.Text, I.Opt(I.Nat)], [Result_1], []),
     get_analytics_overview: I.Func([], [AnalyticsOverview], ['query']),
     get_claimable_rewards: I.Func([I.Principal], [I.Vec(ClaimableReward)], ['query']),
+    get_gateway_url: I.Func([], [I.Text], ['query']),
     get_platform_fee_percentage: I.Func([], [I.Nat], ['query']),
     get_poll: I.Func([PollId], [I.Opt(Poll)], ['query']),
     get_product: I.Func([ProductId], [I.Opt(Product)], ['query']),
@@ -358,10 +359,12 @@ export const idlFactory = ({ IDL: I = IDL }) => {
     list_surveys_by_project: I.Func([ProjectId, I.Nat, I.Nat], [I.Vec(SurveySummary)], ['query']),
     pause_poll: I.Func([PollId], [Result], []),
     resume_poll: I.Func([PollId], [Result], []),
+    set_gateway_url: I.Func([I.Text], [I.Bool], []),
     set_openai_api_key: I.Func([I.Text], [I.Bool], []),
     start_rewards_claiming: I.Func([PollId], [Result], []),
     submit_survey: I.Func([SurveyId, I.Vec(AnswerInput)], [I.Bool], []),
     transform: I.Func([TransformArgs], [HttpResponsePayload], ['query']),
+    transform_gateway: I.Func([TransformArgs], [HttpResponsePayload], ['query']),
     update_product: I.Func([ProductId, I.Text, I.Text, I.Text], [I.Bool], []),
     update_project: I.Func([ProjectId, I.Text, I.Text, I.Text], [I.Bool], []),
     update_survey_funding: I.Func([SurveyId, I.Nat64, I.Nat64], [I.Bool], []),

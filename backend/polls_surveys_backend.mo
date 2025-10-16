@@ -62,6 +62,15 @@ persistent actor class polls_surveys_backend() = this {
     // SNS1 = Principal.fromText("zfcdd-tqaaa-aaaaq-aaaga-cai");
   };
 
+  // Helper function to check if a token is in our known tokens list
+  private func isKnownToken(canister: Principal) : Bool {
+    Principal.equal(canister, KNOWN_TOKENS.PULSE)
+    // When adding more tokens, expand this check:
+    // or Principal.equal(canister, KNOWN_TOKENS.ckBTC)
+    // or Principal.equal(canister, KNOWN_TOKENS.ckETH)
+    // etc.
+  };
+
   // ICRC-1 Types
   type Account = { owner : Principal; subaccount : ?[Nat8] };
   type Tokens = Nat;
@@ -554,11 +563,14 @@ persistent actor class polls_surveys_backend() = this {
     assert(options.size() >= 2);
     assert(closesAt > now());
 
-    // Validate custom token if provided
+    // Validate custom token if provided (skip validation for known tokens)
     switch (tokenCanister) {
       case (?canister) {
-        if (not (await validateTokenCanister(canister))) {
-          return #err("Invalid or unsupported token canister");
+        // Skip validation for known tokens to avoid unnecessary inter-canister calls
+        if (not isKnownToken(canister)) {
+          if (not (await validateTokenCanister(canister))) {
+            return #err("Invalid or unsupported token canister");
+          };
         };
       };
       case null { /* Using ICP */ };
@@ -2033,7 +2045,7 @@ persistent actor class polls_surveys_backend() = this {
 
   // Configuration for the deterministic AI gateway
   // Set this to your deployed Cloudflare Worker URL
-  private stable var gatewayUrl : Text = "https://YOUR-WORKER.workers.dev/generate";
+  private stable var gatewayUrl : Text = "https://icp-pulse-ai-gateway.eastmaels.workers.dev/generate";
   private stable var _gatewaySecret : Text = ""; // Optional: for additional verification (unused)
 
   // Set gateway URL (only callable by canister owner)
@@ -2399,6 +2411,289 @@ persistent actor class polls_surveys_backend() = this {
         }
       };
     }
+  };
+
+  // ======================================================================
+  // AI-POWERED POLL ANALYSIS FUNCTIONS
+  // ======================================================================
+
+  // Type for poll analysis input
+  public type PollDataForAnalysis = {
+    id: Text;
+    title: Text;
+    description: Text;
+    options: [{
+      text: Text;
+      votes: Nat;
+    }];
+    totalVotes: Nat;
+  };
+
+  // Analyze multiple polls and provide insights
+  public func analyze_polls(polls: [PollDataForAnalysis], projectName: Text) : async Result.Result<Text, Text> {
+    if (polls.size() == 0) {
+      return #err("No polls provided for analysis");
+    };
+
+    if (polls.size() > 20) {
+      return #err("Maximum 20 polls can be analyzed at once");
+    };
+
+    let ic : ManagementCanisterActor = actor("aaaaa-aa");
+
+    // Generate seed for determinism
+    let requestSeed = Int.abs(Time.now());
+
+    // Build poll summary for analysis
+    var pollsSummary = "";
+    var pollIndex = 0;
+
+    for (poll in polls.vals()) {
+      pollIndex += 1;
+
+      // Find winning option
+      var winningOption = "";
+      var maxVotes : Nat = 0;
+      for (option in poll.options.vals()) {
+        if (option.votes > maxVotes) {
+          maxVotes := option.votes;
+          winningOption := option.text;
+        };
+      };
+
+      // Build options summary
+      var optionsSummary = "";
+      for (option in poll.options.vals()) {
+        let percentage = if (poll.totalVotes > 0) {
+          (option.votes * 100) / poll.totalVotes
+        } else { 0 };
+        optionsSummary := optionsSummary # "  - " # option.text # ": " # Nat.toText(option.votes) # " votes (" # Nat.toText(percentage) # "%)\n";
+      };
+
+      pollsSummary := pollsSummary # "Poll " # Nat.toText(pollIndex) # ": \"" # poll.title # "\"\n";
+      pollsSummary := pollsSummary # "Description: " # poll.description # "\n";
+      pollsSummary := pollsSummary # "Total Votes: " # Nat.toText(poll.totalVotes) # "\n";
+      pollsSummary := pollsSummary # "Options and Results:\n" # optionsSummary;
+      pollsSummary := pollsSummary # "Leading Option: " # winningOption # " with " # Nat.toText(maxVotes) # " votes\n\n---\n\n";
+    };
+
+    // System prompt for structured JSON analysis
+    let systemPrompt = "You are an expert data analyst specializing in survey and poll analysis. Analyze the provided polls and return ONLY a valid JSON object with this exact structure: {\"overview\":\"2-3 sentence summary\",\"keyFindings\":[\"finding1\",\"finding2\",\"finding3\",\"finding4\",\"finding5\"],\"sentimentAnalysis\":\"overall sentiment\",\"trends\":[\"trend1\",\"trend2\",\"trend3\"],\"recommendations\":[\"rec1\",\"rec2\",\"rec3\",\"rec4\"],\"pollBreakdowns\":[{\"pollTitle\":\"title\",\"winningOption\":\"option\",\"insights\":\"2-3 sentences\"}]}";
+
+    // Construct user prompt
+    let userPrompt = "Analyze the following " # Nat.toText(polls.size()) # " poll(s) from the project \"" # projectName # "\".\n\n" # pollsSummary # "\n\nProvide comprehensive analysis focusing on:\n1. What the voting patterns reveal about user preferences\n2. Any surprising or notable results\n3. Engagement levels and participation\n4. Actionable recommendations based on the data\n5. Trends or patterns across multiple polls\n\nReturn ONLY valid JSON, no additional text.";
+
+    // Construct gateway request body
+    let requestBody = "{\"model\":\"gpt-4o-mini\",\"prompt\":\"" # escapeJsonString(userPrompt) # "\",\"seed\":" # Nat.toText(requestSeed) # ",\"temperature\":0.7,\"max_tokens\":2000,\"system_prompt\":\"" # escapeJsonString(systemPrompt) # "\"}";
+
+    Debug.print("=== SENDING POLL ANALYSIS REQUEST TO AI GATEWAY ===");
+    Debug.print("Project: " # projectName);
+    Debug.print("Number of polls: " # Nat.toText(polls.size()));
+    Debug.print("Seed: " # Nat.toText(requestSeed));
+
+    let requestBodyBlob = Text.encodeUtf8(requestBody);
+
+    let httpHeader : [HttpHeader] = [
+      { name = "Content-Type"; value = "application/json" }
+    ];
+
+    let request : CanisterHttpRequestArgs = {
+      url = gatewayUrl;
+      max_response_bytes = ?20000;
+      headers = httpHeader;
+      body = ?requestBodyBlob;
+      method = #post;
+      transform = ?{function = transform_gateway; context = Blob.fromArray([])};
+    };
+
+    Cycles.add<system>(50_000_000_000);
+
+    try {
+      let response = await ic.http_request(request);
+
+      Debug.print("Gateway Response Status: " # Nat.toText(response.status));
+
+      if (response.status == 200) {
+        let responseText = switch (Text.decodeUtf8(response.body)) {
+          case (?text) { text };
+          case null { return #err("Could not decode response as UTF-8") };
+        };
+
+        Debug.print("Analysis response received");
+
+        // Extract content from gateway response
+        switch (parseGatewayContent(responseText)) {
+          case (#ok(content)) {
+            Debug.print("Successfully parsed analysis");
+            #ok(content)
+          };
+          case (#err(errMsg)) {
+            Debug.print("Parse Error: " # errMsg);
+            #err("PARSE_ERROR: " # errMsg)
+          };
+        };
+      } else {
+        let errorBody = switch (Text.decodeUtf8(response.body)) {
+          case (?text) { text };
+          case null { "(could not decode error body)" };
+        };
+        Debug.print("Gateway HTTP Error: Status " # Nat.toText(response.status));
+        #err("HTTP_ERROR_" # Nat.toText(response.status) # ": " # errorBody)
+      }
+    } catch (error) {
+      Debug.print("Gateway Exception: " # Error.message(error));
+      #err("NETWORK_ERROR: " # Error.message(error))
+    }
+  };
+
+  // Chat with AI assistant (can create polls, answer questions, etc.)
+  public func chat_message(userMessage: Text, conversationHistory: [(Text, Text)]) : async Result.Result<Text, Text> {
+    if (Text.size(userMessage) < 1) {
+      return #err("Message cannot be empty");
+    };
+
+    let ic : ManagementCanisterActor = actor("aaaaa-aa");
+
+    // Generate seed for determinism
+    let requestSeed = Int.abs(Time.now());
+
+    // Build conversation context
+    var conversationContext = "";
+    for ((role, message) in conversationHistory.vals()) {
+      conversationContext := conversationContext # role # ": " # message # "\n";
+    };
+
+    // System prompt for chat assistant
+    let systemPrompt = "You are a helpful assistant for True Pulse, a platform for context-aware polls and surveys on the Internet Computer. You can help with:\n- Creating polls: Explain how to create polls\n- Managing surveys: Help with survey creation\n- Platform guidance: Explain features\n\nBe concise and helpful. When users ask about creating polls, guide them to use the poll creation form.";
+
+    // Construct user prompt with context
+    let fullPrompt = if (conversationContext != "") {
+      "Conversation history:\n" # conversationContext # "\n\nUser: " # userMessage
+    } else {
+      userMessage
+    };
+
+    // Construct gateway request body
+    let requestBody = "{\"model\":\"gpt-4o-mini\",\"prompt\":\"" # escapeJsonString(fullPrompt) # "\",\"seed\":" # Nat.toText(requestSeed) # ",\"temperature\":0.7,\"max_tokens\":500,\"system_prompt\":\"" # escapeJsonString(systemPrompt) # "\"}";
+
+    Debug.print("=== SENDING CHAT MESSAGE TO AI GATEWAY ===");
+    Debug.print("User message: " # userMessage);
+    Debug.print("Seed: " # Nat.toText(requestSeed));
+
+    let requestBodyBlob = Text.encodeUtf8(requestBody);
+
+    let httpHeader : [HttpHeader] = [
+      { name = "Content-Type"; value = "application/json" }
+    ];
+
+    let request : CanisterHttpRequestArgs = {
+      url = gatewayUrl;
+      max_response_bytes = ?10000;
+      headers = httpHeader;
+      body = ?requestBodyBlob;
+      method = #post;
+      transform = ?{function = transform_gateway; context = Blob.fromArray([])};
+    };
+
+    Cycles.add<system>(50_000_000_000);
+
+    try {
+      let response = await ic.http_request(request);
+
+      Debug.print("Gateway Response Status: " # Nat.toText(response.status));
+
+      if (response.status == 200) {
+        let responseText = switch (Text.decodeUtf8(response.body)) {
+          case (?text) { text };
+          case null { return #err("Could not decode response as UTF-8") };
+        };
+
+        Debug.print("Chat response received");
+
+        // Extract content from gateway response
+        switch (parseGatewayContent(responseText)) {
+          case (#ok(content)) {
+            Debug.print("Successfully parsed chat response");
+            #ok(content)
+          };
+          case (#err(errMsg)) {
+            Debug.print("Parse Error: " # errMsg);
+            #err("PARSE_ERROR: " # errMsg)
+          };
+        };
+      } else {
+        let errorBody = switch (Text.decodeUtf8(response.body)) {
+          case (?text) { text };
+          case null { "(could not decode error body)" };
+        };
+        Debug.print("Gateway HTTP Error: Status " # Nat.toText(response.status));
+        #err("HTTP_ERROR_" # Nat.toText(response.status) # ": " # errorBody)
+      }
+    } catch (error) {
+      Debug.print("Gateway Exception: " # Error.message(error));
+      #err("NETWORK_ERROR: " # Error.message(error))
+    }
+  };
+
+  // Helper function to extract content from gateway response
+  // Gateway returns: {"content": "...", "signature": "...", ...}
+  private func parseGatewayContent(response: Text) : Result.Result<Text, Text> {
+    let contentPattern = "\"content\":\"";
+    let contentPos = findPattern(response, contentPattern, 0);
+
+    switch (contentPos) {
+      case null {
+        #err("Could not find content field in gateway response")
+      };
+      case (?pos) {
+        let chars = Iter.toArray(Text.toIter(response));
+        let len = chars.size();
+        let startIdx = pos + Text.size(contentPattern);
+        var endIdx = startIdx;
+        var escapeNext = false;
+
+        // Find the closing quote of the content value
+        while (endIdx < len) {
+          if (escapeNext) {
+            escapeNext := false;
+          } else if (chars[endIdx] == '\\') {
+            escapeNext := true;
+          } else if (chars[endIdx] == '\"') {
+            // Found closing quote
+            let contentLen = if (endIdx > startIdx) { endIdx - startIdx } else { 0 };
+
+            if (contentLen == 0) {
+              return #err("Content field is empty");
+            };
+
+            let content = Text.fromIter(
+              Array.tabulate<Char>(contentLen, func(i) {
+                chars[startIdx + i]
+              }).vals()
+            );
+
+            // Unescape the content
+            let unescapedContent = Text.replace(content, #text("\\\""), "\"");
+            let unescapedContent2 = Text.replace(unescapedContent, #text("\\n"), "\n");
+            let unescapedContent3 = Text.replace(unescapedContent2, #text("\\t"), "\t");
+
+            return #ok(unescapedContent3);
+          };
+          endIdx += 1;
+        };
+
+        #err("Malformed content field - no closing quote")
+      };
+    }
+  };
+
+  // Helper function to escape JSON strings
+  private func escapeJsonString(str: Text) : Text {
+    var escaped = Text.replace(str, #text("\\"), "\\\\");
+    escaped := Text.replace(escaped, #text("\""), "\\\"");
+    escaped := Text.replace(escaped, #text("\n"), "\\n");
+    escaped := Text.replace(escaped, #text("\t"), "\\t");
+    escaped
   };
 
   // Treasury management types and functions

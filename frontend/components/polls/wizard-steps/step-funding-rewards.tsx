@@ -179,12 +179,6 @@ export function StepFundingRewards({
                 <SelectValue placeholder="Select token" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="ICP">
-                  <div className="flex items-center gap-2">
-                    <span className="font-medium">ICP</span>
-                    <span className="text-sm text-gray-500">Internet Computer</span>
-                  </div>
-                </SelectItem>
                 <SelectItem value={process.env.NEXT_PUBLIC_TOKENMANIA_CANISTER_ID || 'PULSE'}>
                   <div className="flex items-center gap-2">
                     <span className="font-medium">PULSE</span>

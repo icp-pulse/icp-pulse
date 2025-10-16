@@ -82,21 +82,39 @@ async function createPollAction(values: PollFormValues, identity: any, isAuthent
 
         const isPlugWallet = typeof window !== 'undefined' && window.ic?.plug
 
+        console.log('Starting token approval process...')
+        console.log('Selected token canister:', selectedToken)
+        console.log('Backend canister:', backendCanisterId)
+        console.log('Approval amount:', approvalAmount.toString())
+
         if (isPlugWallet && window.ic?.plug) {
+          console.log('Using Plug wallet for approval')
           const whitelist = [selectedToken, backendCanisterId]
-          const connected = await (window.ic.plug as any).requestConnect({ whitelist })
+
+          // Force mainnet connection even when frontend is running locally
+          const connected = await (window.ic.plug as any).requestConnect({
+            whitelist,
+            host: 'https://ic0.app'  // Explicitly use mainnet
+          })
 
           if (!connected) {
             throw new Error('Failed to connect to Plug wallet')
           }
 
-          const { idlFactory: tokenIdl } = await import('@/../../src/declarations/tokenmania')
+          console.log('Plug wallet connected to mainnet, creating actor...')
+
+          // Use standard ICRC-2 interface instead of generated declarations
+          const { icrc2IdlFactory } = await import('@/lib/icrc2.idl')
           const tokenActor = await window.ic.plug.createActor({
             canisterId: selectedToken,
-            interfaceFactory: tokenIdl,
+            interfaceFactory: icrc2IdlFactory,
           })
 
-          const approveResult = await tokenActor.icrc2_approve({
+          console.log('Token actor created for mainnet canister:', selectedToken)
+
+          console.log('Token actor created, calling icrc2_approve...')
+
+          const approveParams = {
             from_subaccount: [],
             spender: {
               owner: Principal.fromText(backendCanisterId),
@@ -108,27 +126,56 @@ async function createPollAction(values: PollFormValues, identity: any, isAuthent
             fee: [],
             memo: [],
             created_at_time: [],
-          })
+          }
 
-          if ('Err' in approveResult || approveResult.Err !== undefined) {
-            throw new Error(`Failed to approve token transfer: ${JSON.stringify(approveResult.Err || approveResult)}`)
+          console.log('Approve params:', JSON.stringify({
+            ...approveParams,
+            spender: { owner: approveParams.spender.owner.toText(), subaccount: approveParams.spender.subaccount },
+            amount: approveParams.amount.toString()
+          }))
+
+          try {
+            const approveResult = await tokenActor.icrc2_approve(approveParams)
+
+            console.log('Approve result:', approveResult)
+
+            if ('Err' in approveResult || approveResult.Err !== undefined) {
+              throw new Error(`Failed to approve token transfer: ${JSON.stringify(approveResult.Err || approveResult)}`)
+            }
+
+            console.log('Token approval successful!')
+          } catch (approveError: any) {
+            console.error('Token approval error:', approveError)
+            if (approveError.message?.includes('Invalid read state request')) {
+              throw new Error(`Network error: Could not connect to token canister on mainnet. Please verify the token canister ${selectedToken} exists and is accessible on mainnet.`)
+            }
+            throw approveError
           }
         } else {
+          console.log('Using II/NFID wallet for approval')
           const { Actor, HttpAgent } = await import('@dfinity/agent')
-          const { idlFactory: tokenIdl } = await import('@/../../src/declarations/tokenmania')
+          // Use standard ICRC-2 interface instead of generated declarations
+          const { icrc2IdlFactory } = await import('@/lib/icrc2.idl')
 
-          const agent = new HttpAgent({ host, identity: identity! })
+          const isLocal = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local'
+          const agent = HttpAgent.createSync({
+            host,
+            identity: identity!,
+            verifyQuerySignatures: !isLocal
+          })
 
-          if (process.env.NEXT_PUBLIC_DFX_NETWORK === 'local') {
+          if (isLocal) {
             await agent.fetchRootKey()
           }
 
-          const tokenActor = Actor.createActor(tokenIdl, {
+          const tokenActor = Actor.createActor(icrc2IdlFactory, {
             agent,
             canisterId: selectedToken,
           })
 
-          const approveResult = await (tokenActor as any).icrc2_approve({
+          console.log('Token actor created, calling icrc2_approve...')
+
+          const approveParams = {
             from_subaccount: [],
             spender: {
               owner: Principal.fromText(backendCanisterId),
@@ -140,15 +187,55 @@ async function createPollAction(values: PollFormValues, identity: any, isAuthent
             fee: [],
             memo: [],
             created_at_time: [],
-          })
+          }
 
-          if ('Err' in approveResult || approveResult.Err !== undefined) {
-            throw new Error(`Failed to approve token transfer: ${JSON.stringify(approveResult.Err || approveResult)}`)
+          console.log('Approve params:', JSON.stringify({
+            ...approveParams,
+            spender: { owner: approveParams.spender.owner.toText(), subaccount: approveParams.spender.subaccount },
+            amount: approveParams.amount.toString()
+          }))
+
+          try {
+            const approveResult = await (tokenActor as any).icrc2_approve(approveParams)
+
+            console.log('Approve result:', approveResult)
+
+            if ('Err' in approveResult || approveResult.Err !== undefined) {
+              throw new Error(`Failed to approve token transfer: ${JSON.stringify(approveResult.Err || approveResult)}`)
+            }
+
+            console.log('Token approval successful!')
+          } catch (approveError: any) {
+            console.error('Token approval error:', approveError)
+            if (approveError.message?.includes('Invalid read state request')) {
+              throw new Error(`Network error: Could not connect to token canister on mainnet. Please verify the token canister ${selectedToken} exists and is accessible on mainnet.`)
+            }
+            throw approveError
           }
         }
 
+        console.log('Waiting 2 seconds before creating poll...')
         await new Promise(resolve => setTimeout(resolve, 2000))
       }
+
+      console.log('Creating custom token poll...')
+      console.log('Poll params:', {
+        scopeType: 'project',
+        scopeId: projectId,
+        title,
+        description,
+        optionsCount: backendOptions.length,
+        expiresAtNs: expiresAtNs.toString(),
+        tokenCanister: tokenCanisterPrincipal.toText(),
+        totalFundingE8s: totalFundingE8s.toString(),
+        rewardPerVoteE8s: rewardPerVoteE8s.toString(),
+        fundingSource,
+        maxResponses,
+        allowAnonymous,
+        allowMultiple,
+        visibility,
+        rewardDistributionType
+      })
 
       const result = await backend.create_custom_token_poll(
         'project',
@@ -169,9 +256,13 @@ async function createPollAction(values: PollFormValues, identity: any, isAuthent
         rewardDistributionType ? [rewardDistributionType] : []
       )
 
+      console.log('Create poll result:', result)
+
       if ('ok' in result) {
+        console.log('Poll created successfully with ID:', result.ok)
         return { success: true, pollId: result.ok }
       } else {
+        console.error('Poll creation failed:', result.err)
         throw new Error(result.err)
       }
     } else {
@@ -282,29 +373,36 @@ function NewPollPageContent() {
         remove(0)
       }
 
-      // Call our Next.js API route instead of the backend canister
-      const response = await fetch('/api/generate-poll-options', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ title }),
-      })
+      // Call backend canister directly for poll option generation
+      const { createBackendWithIdentity } = await import('@/lib/icp')
+      const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
+      const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
+      const backend = await createBackendWithIdentity({ canisterId, host, identity })
 
-      const data = await response.json()
+      // Generate a random seed for the request
+      const seed = Math.floor(Math.random() * 1000000000)
 
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to generate options')
-      }
+      console.log(`Calling backend canister to generate options for: "${title}" with seed: ${seed}`)
 
-      // Add generated options
-      if (data.options && Array.isArray(data.options)) {
-        data.options.forEach((optionText: string) => {
-          append({ text: optionText })
-        })
-        setAiError(null)
+      // Call the backend canister's generate_poll_options function
+      const result = await backend.generate_poll_options(title, [BigInt(seed)])
+
+      if ('ok' in result) {
+        const options = result.ok
+        console.log(`Successfully generated ${options.length} options from backend canister`)
+
+        // Add generated options
+        if (options && Array.isArray(options) && options.length > 0) {
+          options.forEach((optionText: string) => {
+            append({ text: optionText })
+          })
+          setAiError(null)
+        } else {
+          throw new Error('Invalid response format - no options returned')
+        }
       } else {
-        throw new Error('Invalid response format')
+        console.error('Backend canister returned error:', result.err)
+        throw new Error(result.err || 'Failed to generate options from canister')
       }
     } catch (err) {
       console.error('Error generating options:', err)
