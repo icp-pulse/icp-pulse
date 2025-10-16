@@ -4,7 +4,21 @@ import { IDL } from '@dfinity/candid'
 
 export const idlFactory = ({ IDL: I = IDL }) => {
   const PollId = I.Nat
-  const Result = I.Variant({ ok: I.Text, err: I.Text })
+  const WithdrawResult = I.Record({
+    escrowAmount: I.Nat64,
+    tokenDecimals: I.Nat8,
+    tokenSymbol: I.Text,
+    withdrawnAmount: I.Nat64
+  })
+  const DonateResult = I.Record({
+    escrowAmount: I.Nat64,
+    tokenDecimals: I.Nat8,
+    donatedAmount: I.Nat64,
+    tokenSymbol: I.Text
+  })
+  const Result = I.Variant({ ok: WithdrawResult, err: I.Text })
+  const Result_1 = I.Variant({ ok: I.Text, err: I.Text })
+  const Result_3 = I.Variant({ ok: DonateResult, err: I.Text })
   const SurveyId = I.Nat
   const Result_2 = I.Variant({ ok: PollId, err: I.Text })
   const ProjectId = I.Nat
@@ -18,7 +32,7 @@ export const idlFactory = ({ IDL: I = IDL }) => {
     required: I.Bool,
     choices: I.Opt(I.Vec(I.Text))
   })
-  const Result_1 = I.Variant({ ok: I.Vec(I.Text), err: I.Text })
+  const Result_4 = I.Variant({ ok: I.Vec(I.Text), err: I.Text })
   const TokenDistribution = I.Record({
     count: I.Nat,
     tokenSymbol: I.Text,
@@ -262,10 +276,10 @@ export const idlFactory = ({ IDL: I = IDL }) => {
   })
 
   return I.Service({
-    claim_poll_reward: I.Func([PollId], [Result], []),
+    claim_poll_reward: I.Func([PollId], [Result_1], []),
     claim_reward: I.Func([I.Text], [I.Bool], []),
-    chat_message: I.Func([I.Text, I.Vec(I.Tuple(I.Text, I.Text))], [Result], []),
-    close_poll: I.Func([PollId], [Result], []),
+    chat_message: I.Func([I.Text, I.Vec(I.Tuple(I.Text, I.Text))], [Result_1], []),
+    close_poll: I.Func([PollId], [Result_1], []),
     close_survey: I.Func([SurveyId], [I.Bool], []),
     create_custom_token_poll: I.Func(
       [
@@ -327,11 +341,11 @@ export const idlFactory = ({ IDL: I = IDL }) => {
       [SurveyId],
       []
     ),
-    donate_unused_funds: I.Func([PollId], [Result], []),
-    end_rewards_claiming: I.Func([PollId], [Result], []),
+    donate_unused_funds: I.Func([PollId], [Result_3], []),
+    end_rewards_claiming: I.Func([PollId], [Result_1], []),
     export_survey_csv: I.Func([SurveyId], [I.Vec(I.Nat8)], ['query']),
-    fund_poll: I.Func([PollId, I.Nat64], [Result], []),
-    generate_poll_options: I.Func([I.Text, I.Opt(I.Nat)], [Result_1], []),
+    fund_poll: I.Func([PollId, I.Nat64], [Result_1], []),
+    generate_poll_options: I.Func([I.Text, I.Opt(I.Nat)], [Result_4], []),
     get_analytics_overview: I.Func([], [AnalyticsOverview], ['query']),
     get_claimable_rewards: I.Func([I.Principal], [I.Vec(ClaimableReward)], ['query']),
     get_gateway_url: I.Func([], [I.Text], ['query']),
@@ -384,17 +398,17 @@ export const idlFactory = ({ IDL: I = IDL }) => {
     list_my_surveys: I.Func([I.Nat, I.Nat], [I.Vec(SurveySummary)], ['query']),
     list_surveys_by_product: I.Func([ProductId, I.Nat, I.Nat], [I.Vec(SurveySummary)], ['query']),
     list_surveys_by_project: I.Func([ProjectId, I.Nat, I.Nat], [I.Vec(SurveySummary)], ['query']),
-    pause_poll: I.Func([PollId], [Result], []),
-    resume_poll: I.Func([PollId], [Result], []),
+    pause_poll: I.Func([PollId], [Result_1], []),
+    resume_poll: I.Func([PollId], [Result_1], []),
     set_gateway_url: I.Func([I.Text], [I.Bool], []),
     set_openai_api_key: I.Func([I.Text], [I.Bool], []),
-    start_rewards_claiming: I.Func([PollId], [Result], []),
+    start_rewards_claiming: I.Func([PollId], [Result_1], []),
     submit_survey: I.Func([SurveyId, I.Vec(AnswerInput)], [I.Bool], []),
     transform: I.Func([TransformArgs], [HttpResponsePayload], ['query']),
     transform_gateway: I.Func([TransformArgs], [HttpResponsePayload], ['query']),
     update_product: I.Func([ProductId, I.Text, I.Text, I.Text], [I.Bool], []),
     update_project: I.Func([ProjectId, I.Text, I.Text, I.Text], [I.Bool], []),
-    update_poll_project: I.Func([PollId, I.Nat], [Result], []),
+    update_poll_project: I.Func([PollId, I.Nat], [Result_1], []),
     update_survey_funding: I.Func([SurveyId, I.Nat64, I.Nat64], [I.Bool], []),
     validate_custom_token: I.Func(
       [I.Principal],

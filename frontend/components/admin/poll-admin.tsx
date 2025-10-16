@@ -50,6 +50,7 @@ export default function PollAdmin() {
   const [withdrawDialogOpen, setWithdrawDialogOpen] = useState(false)
   const [donateDialogOpen, setDonateDialogOpen] = useState(false)
   const [selectedPollId, setSelectedPollId] = useState<any>(null)
+  const [submitting, setSubmitting] = useState(false)
   const { identity, isAuthenticated, authProvider, principalText } = useIcpAuth()
   const router = useRouter()
 
@@ -197,6 +198,7 @@ export default function PollAdmin() {
   const handleStatusTransition = async (pollId: any, action: string) => {
     if (!identity) return
 
+    setSubmitting(true)
     try {
       const { createBackendWithIdentity } = await import('@/lib/icp')
       const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
@@ -243,12 +245,14 @@ export default function PollAdmin() {
         toast({
           title: "Success",
           description: "Poll status updated successfully",
+          className: "bg-green-100 dark:bg-green-900 border-green-200 dark:border-green-800",
         })
       } else if ('err' in result) {
         toast({
           title: "Error",
           description: result.err,
           variant: "destructive",
+          className: "bg-red-100 dark:bg-red-900 border-red-200 dark:border-red-800",
         })
       }
     } catch (error) {
@@ -257,7 +261,10 @@ export default function PollAdmin() {
         title: "Error",
         description: "Failed to update poll status",
         variant: "destructive",
+        className: "bg-red-100 dark:bg-red-900 border-red-200 dark:border-red-800",
       })
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -299,13 +306,14 @@ export default function PollAdmin() {
         toast({
           title: "Success",
           description: `Successfully withdrew ${formattedWithdrawn} ${tokenSymbol} to your account. ${formattedEscrow} ${tokenSymbol} remains in escrow for pending claims.`,
-          className: "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800",
+          className: "bg-green-100 dark:bg-green-900 border-green-200 dark:border-green-800",
         })
       } else if ('err' in result) {
         toast({
           title: "Error",
           description: result.err,
           variant: "destructive",
+          className: "bg-red-100 dark:bg-red-900 border-red-200 dark:border-red-800",
         })
       }
     } catch (error) {
@@ -314,6 +322,7 @@ export default function PollAdmin() {
         title: "Error",
         description: "Failed to withdraw funds",
         variant: "destructive",
+        className: "bg-red-100 dark:bg-red-900 border-red-200 dark:border-red-800",
       })
     } finally {
       setWithdrawDialogOpen(false)
@@ -359,13 +368,14 @@ export default function PollAdmin() {
         toast({
           title: "Success",
           description: `Successfully donated ${formattedDonated} ${tokenSymbol} to the treasury. ${formattedEscrow} ${tokenSymbol} remains in escrow for pending claims.`,
-          className: "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800",
+          className: "bg-green-100 dark:bg-green-900 border-green-200 dark:border-green-800",
         })
       } else if ('err' in result) {
         toast({
           title: "Error",
           description: result.err,
           variant: "destructive",
+          className: "bg-red-100 dark:bg-red-900 border-red-200 dark:border-red-800",
         })
       }
     } catch (error) {
@@ -374,6 +384,7 @@ export default function PollAdmin() {
         title: "Error",
         description: "Failed to donate funds",
         variant: "destructive",
+        className: "bg-red-100 dark:bg-red-900 border-red-200 dark:border-red-800",
       })
     } finally {
       setDonateDialogOpen(false)
@@ -603,11 +614,11 @@ export default function PollAdmin() {
                           <DropdownMenuLabel>Status Management</DropdownMenuLabel>
                           {statusToString(poll.status) === 'Active' && (
                             <>
-                              <DropdownMenuItem onClick={() => handleStatusTransition(poll.id, 'pause')}>
+                              <DropdownMenuItem onClick={() => handleStatusTransition(poll.id, 'pause')} disabled={submitting}>
                                 <Pause className="w-4 h-4 mr-2" />
                                 Pause Poll
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleStatusTransition(poll.id, 'start_claiming')}>
+                              <DropdownMenuItem onClick={() => handleStatusTransition(poll.id, 'start_claiming')} disabled={submitting}>
                                 <Gift className="w-4 h-4 mr-2" />
                                 Start Claiming
                               </DropdownMenuItem>
@@ -615,18 +626,18 @@ export default function PollAdmin() {
                           )}
                           {statusToString(poll.status) === 'Paused' && (
                             <>
-                              <DropdownMenuItem onClick={() => handleStatusTransition(poll.id, 'resume')}>
+                              <DropdownMenuItem onClick={() => handleStatusTransition(poll.id, 'resume')} disabled={submitting}>
                                 <Play className="w-4 h-4 mr-2" />
                                 Resume Poll
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleStatusTransition(poll.id, 'start_claiming')}>
+                              <DropdownMenuItem onClick={() => handleStatusTransition(poll.id, 'start_claiming')} disabled={submitting}>
                                 <Gift className="w-4 h-4 mr-2" />
                                 Start Claiming
                               </DropdownMenuItem>
                             </>
                           )}
                           {statusToString(poll.status) === 'Claims Open' && (
-                            <DropdownMenuItem onClick={() => handleStatusTransition(poll.id, 'end_claiming')}>
+                            <DropdownMenuItem onClick={() => handleStatusTransition(poll.id, 'end_claiming')} disabled={submitting}>
                               <Ban className="w-4 h-4 mr-2" />
                               End Claiming
                             </DropdownMenuItem>
@@ -635,6 +646,7 @@ export default function PollAdmin() {
                             <DropdownMenuItem
                               onClick={() => handleStatusTransition(poll.id, 'close')}
                               className="text-red-600"
+                              disabled={submitting}
                             >
                               <XCircle className="w-4 h-4 mr-2" />
                               Close Poll
@@ -744,6 +756,7 @@ export default function PollAdmin() {
                             size="sm"
                             onClick={() => handleStatusTransition(poll.id, 'pause')}
                             className="text-xs"
+                            disabled={submitting}
                           >
                             <Pause className="w-3 h-3 mr-1" />
                             Pause
@@ -753,6 +766,7 @@ export default function PollAdmin() {
                             size="sm"
                             onClick={() => handleStatusTransition(poll.id, 'start_claiming')}
                             className="text-xs"
+                            disabled={submitting}
                           >
                             <Gift className="w-3 h-3 mr-1" />
                             Start Claiming
@@ -762,6 +776,7 @@ export default function PollAdmin() {
                             size="sm"
                             onClick={() => handleStatusTransition(poll.id, 'close')}
                             className="text-xs text-red-600 hover:bg-red-50"
+                            disabled={submitting}
                           >
                             <XCircle className="w-3 h-3 mr-1" />
                             Close
@@ -775,6 +790,7 @@ export default function PollAdmin() {
                             size="sm"
                             onClick={() => handleStatusTransition(poll.id, 'resume')}
                             className="text-xs"
+                            disabled={submitting}
                           >
                             <Play className="w-3 h-3 mr-1" />
                             Resume
@@ -784,6 +800,7 @@ export default function PollAdmin() {
                             size="sm"
                             onClick={() => handleStatusTransition(poll.id, 'start_claiming')}
                             className="text-xs"
+                            disabled={submitting}
                           >
                             <Gift className="w-3 h-3 mr-1" />
                             Start Claiming
@@ -793,6 +810,7 @@ export default function PollAdmin() {
                             size="sm"
                             onClick={() => handleStatusTransition(poll.id, 'close')}
                             className="text-xs text-red-600 hover:bg-red-50"
+                            disabled={submitting}
                           >
                             <XCircle className="w-3 h-3 mr-1" />
                             Close
@@ -806,6 +824,7 @@ export default function PollAdmin() {
                             size="sm"
                             onClick={() => handleStatusTransition(poll.id, 'end_claiming')}
                             className="text-xs"
+                            disabled={submitting}
                           >
                             <Ban className="w-3 h-3 mr-1" />
                             End Claiming
@@ -815,6 +834,7 @@ export default function PollAdmin() {
                             size="sm"
                             onClick={() => handleStatusTransition(poll.id, 'close')}
                             className="text-xs text-red-600 hover:bg-red-50"
+                            disabled={submitting}
                           >
                             <XCircle className="w-3 h-3 mr-1" />
                             Close
@@ -827,6 +847,7 @@ export default function PollAdmin() {
                           size="sm"
                           onClick={() => handleStatusTransition(poll.id, 'close')}
                           className="text-xs text-red-600 hover:bg-red-50"
+                          disabled={submitting}
                         >
                           <XCircle className="w-3 h-3 mr-1" />
                           Close
@@ -872,6 +893,7 @@ export default function PollAdmin() {
                         size="sm"
                         onClick={() => handleWithdrawFunds(poll.id)}
                         className="text-xs flex-1 bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
+                        disabled={submitting}
                       >
                         <DollarSign className="w-3 h-3 mr-1" />
                         Withdraw Funds
@@ -881,6 +903,7 @@ export default function PollAdmin() {
                         size="sm"
                         onClick={() => handleDonateFunds(poll.id)}
                         className="text-xs flex-1 bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-200"
+                        disabled={submitting}
                       >
                         <Heart className="w-3 h-3 mr-1" />
                         Donate to Treasury

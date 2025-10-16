@@ -565,9 +565,9 @@ export function AIChatbox({ onOptionsGenerated, isOpen: externalIsOpen, onToggle
                         <Button
                           size="sm"
                           className="text-xs w-full"
-                          onClick={() => router.push(`/results?pollId=${message.pollId}`)}
+                          onClick={() => router.push('/polls')}
                         >
-                          View Details
+                          View Polls
                         </Button>
                       </div>
                     )}
