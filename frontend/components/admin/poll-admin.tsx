@@ -252,6 +252,7 @@ export default function PollAdmin() {
           title: "Error",
           description: result.err,
           variant: "destructive",
+          className: "bg-red-100 dark:bg-red-900 border-red-200 dark:border-red-800",
         })
       }
     } catch (error) {
@@ -260,6 +261,7 @@ export default function PollAdmin() {
         title: "Error",
         description: "Failed to update poll status",
         variant: "destructive",
+        className: "bg-red-100 dark:bg-red-900 border-red-200 dark:border-red-800",
       })
     } finally {
       setSubmitting(false)
@@ -311,6 +313,7 @@ export default function PollAdmin() {
           title: "Error",
           description: result.err,
           variant: "destructive",
+          className: "bg-red-100 dark:bg-red-900 border-red-200 dark:border-red-800",
         })
       }
     } catch (error) {
@@ -319,6 +322,7 @@ export default function PollAdmin() {
         title: "Error",
         description: "Failed to withdraw funds",
         variant: "destructive",
+        className: "bg-red-100 dark:bg-red-900 border-red-200 dark:border-red-800",
       })
     } finally {
       setWithdrawDialogOpen(false)
@@ -371,6 +375,7 @@ export default function PollAdmin() {
           title: "Error",
           description: result.err,
           variant: "destructive",
+          className: "bg-red-100 dark:bg-red-900 border-red-200 dark:border-red-800",
         })
       }
     } catch (error) {
@@ -379,6 +384,7 @@ export default function PollAdmin() {
         title: "Error",
         description: "Failed to donate funds",
         variant: "destructive",
+        className: "bg-red-100 dark:bg-red-900 border-red-200 dark:border-red-800",
       })
     } finally {
       setDonateDialogOpen(false)
