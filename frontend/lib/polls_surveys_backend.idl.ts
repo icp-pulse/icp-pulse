@@ -327,6 +327,7 @@ export const idlFactory = ({ IDL: I = IDL }) => {
       [SurveyId],
       []
     ),
+    donate_unused_funds: I.Func([PollId], [Result], []),
     end_rewards_claiming: I.Func([PollId], [Result], []),
     export_survey_csv: I.Func([SurveyId], [I.Vec(I.Nat8)], ['query']),
     fund_poll: I.Func([PollId, I.Nat64], [Result], []),
@@ -400,7 +401,8 @@ export const idlFactory = ({ IDL: I = IDL }) => {
       [I.Opt(I.Record({ decimals: I.Nat8, symbol: I.Text }))],
       []
     ),
-    vote: I.Func([PollId, I.Nat], [I.Bool], [])
+    vote: I.Func([PollId, I.Nat], [I.Bool], []),
+    withdraw_unused_funds: I.Func([PollId], [Result], [])
   })
 }
 
