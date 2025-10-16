@@ -549,7 +549,7 @@ export function AIChatbox({ onOptionsGenerated, isOpen: externalIsOpen, onToggle
                           onClick={() => createPoll(message.preview!)}
                           disabled={isLoading}
                         >
-                          {isLoading ? 'Creating...' : 'Create Poll'}
+                          {isLoading ? 'Creating...' : isAuthenticated ? 'Create Poll' : 'Connect Wallet'}
                         </Button>
                       </div>
                     )}
