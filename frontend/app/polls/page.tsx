@@ -100,27 +100,54 @@ export default function PollsPage() {
 
       // Fetch polls with pagination
       let newPolls: BackendPoll[] = []
+      const pollIdsSet = new Set<string>() // Track unique poll IDs to avoid duplicates
       const currentProjects = pageNum === 0 ? await backend.list_projects(0n, 100n) : projects
 
-      for (const project of currentProjects) {
-        try {
-          const projectPolls = await backend.list_polls_by_project(project.id, offset, BigInt(POLLS_PER_PAGE))
-
-          // Get detailed poll information
-          for (const pollSummary of projectPolls) {
+      // First, fetch user's own polls (including unassociated ones)
+      try {
+        const myPollSummaries = await backend.list_my_polls(offset, BigInt(POLLS_PER_PAGE))
+        for (const pollSummary of myPollSummaries) {
+          const pollIdStr = pollSummary.id.toString()
+          if (!pollIdsSet.has(pollIdStr)) {
             const poll = await backend.get_poll(pollSummary.id)
             if (poll && poll.length > 0 && poll[0]) {
               newPolls.push(poll[0])
+              pollIdsSet.add(pollIdStr)
+            }
+          }
+          if (newPolls.length >= POLLS_PER_PAGE) break
+        }
+      } catch (err) {
+        console.error('Error fetching user polls:', err)
+      }
+
+      // Then, fetch polls from projects (if we still need more)
+      if (newPolls.length < POLLS_PER_PAGE) {
+        for (const project of currentProjects) {
+          try {
+            const projectPolls = await backend.list_polls_by_project(project.id, offset, BigInt(POLLS_PER_PAGE))
+
+            // Get detailed poll information
+            for (const pollSummary of projectPolls) {
+              const pollIdStr = pollSummary.id.toString()
+              // Only add if we haven't seen this poll yet
+              if (!pollIdsSet.has(pollIdStr)) {
+                const poll = await backend.get_poll(pollSummary.id)
+                if (poll && poll.length > 0 && poll[0]) {
+                  newPolls.push(poll[0])
+                  pollIdsSet.add(pollIdStr)
+                }
+              }
+
+              // Stop if we've reached the desired number of polls for this page
+              if (newPolls.length >= POLLS_PER_PAGE) break
             }
 
-            // Stop if we've reached the desired number of polls for this page
+            // Stop fetching from other projects if we have enough polls
             if (newPolls.length >= POLLS_PER_PAGE) break
+          } catch (err) {
+            console.error(`Error fetching polls for project ${project.id}:`, err)
           }
-
-          // Stop fetching from other projects if we have enough polls
-          if (newPolls.length >= POLLS_PER_PAGE) break
-        } catch (err) {
-          console.error(`Error fetching polls for project ${project.id}:`, err)
         }
       }
 

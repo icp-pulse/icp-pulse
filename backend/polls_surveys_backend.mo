@@ -1228,6 +1228,36 @@ persistent actor class polls_surveys_backend() = this {
     }
   };
 
+  // Update poll's project association
+  public shared (msg) func update_poll_project(pollId : PollId, newScopeId : Nat) : async Result.Result<Text, Text> {
+    let pollOpt = findPoll(pollId);
+    switch (pollOpt) {
+      case null { return #err("Poll not found") };
+      case (?poll) {
+        // Check authorization - only poll creator can update
+        if (poll.createdBy != msg.caller) {
+          return #err("Only poll creator can update the poll project");
+        };
+
+        // Verify the project exists (if not 0)
+        if (newScopeId != 0) {
+          let projectOpt = findProject(newScopeId);
+          if (projectOpt == null) {
+            return #err("Project not found");
+          };
+        };
+
+        // Update poll's scopeId
+        polls := Array.tabulate<Poll>(polls.size(), func i {
+          let p = polls[i];
+          if (p.id == pollId) { { p with scopeId = newScopeId } } else { p }
+        });
+
+        #ok("Poll project association updated successfully")
+      };
+    }
+  };
+
   // Distribute custom token rewards for a poll
   private func distributeCustomTokenReward(
     recipient: Principal,
