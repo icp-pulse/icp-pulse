@@ -96,40 +96,12 @@ export function AIChatbox({ onOptionsGenerated, isOpen: externalIsOpen, onToggle
       const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
       const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
 
-      // Detect Plug wallet
-      const isPlugWallet = authProvider === 'plug'
-
-      let backend
-
-      if (isPlugWallet && window.ic?.plug) {
-        // Use Plug wallet
-        console.log('Using Plug wallet for AI chat')
-        const whitelist = [canisterId]
-        const connected = await (window.ic.plug as any).requestConnect({
-          whitelist,
-          host
-        })
-
-        if (!connected) {
-          throw new Error('Failed to connect to Plug wallet')
-        }
-
-        const { idlFactory } = await import('@/../../src/declarations/polls_surveys_backend')
-        backend = await window.ic.plug.createActor({
-          canisterId,
-          interfaceFactory: idlFactory,
-        })
-      } else if (isAuthenticated && identity) {
-        // Use Internet Identity / NFID for authenticated users
-        console.log('Using Internet Identity/NFID for AI chat')
-        const { createBackendWithIdentity } = await import('@/lib/icp')
-        backend = await createBackendWithIdentity({ canisterId, host, identity })
-      } else {
-        // Use anonymous backend for non-authenticated users
-        console.log('Using anonymous backend for AI chat')
-        const { createBackend } = await import('@/lib/icp')
-        backend = await createBackend({ canisterId, host })
-      }
+      // Always use anonymous backend for chat_message to avoid wallet timeouts
+      // The chat function doesn't require authentication - it's just getting AI suggestions
+      // Authentication is only needed when actually creating the poll (in createPoll function)
+      console.log('Using anonymous backend for AI chat (no auth required)')
+      const { createBackend } = await import('@/lib/icp')
+      const backend = await createBackend({ canisterId, host })
 
       // Build conversation history for context (limit to last 5 messages)
       const conversationHistory: [string, string][] = messages.slice(-5).map(msg => [
