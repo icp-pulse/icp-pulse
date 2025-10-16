@@ -227,6 +227,14 @@ export const idlFactory = ({ IDL: I = IDL }) => {
     name: I.Text,
     slug: I.Text
   })
+  const ProjectStats = I.Record({
+    projectId: I.Nat,
+    pollCount: I.Nat,
+    surveyCount: I.Nat,
+    totalVotes: I.Nat,
+    totalSubmissions: I.Nat,
+    totalResponses: I.Nat
+  })
   const SurveySummary = I.Record({
     id: SurveyId,
     status: Status,
@@ -340,6 +348,8 @@ export const idlFactory = ({ IDL: I = IDL }) => {
       ],
       ['query']
     ),
+    get_project_stats: I.Func([I.Nat], [I.Opt(ProjectStats)], ['query']),
+    get_projects_stats: I.Func([I.Vec(I.Nat)], [I.Vec(ProjectStats)], ['query']),
     get_supported_tokens: I.Func(
       [],
       [I.Vec(I.Tuple(I.Principal, I.Text, I.Nat8))],

@@ -150,6 +150,15 @@ persistent actor class polls_surveys_backend() = this {
 
   type ProjectSummary = { id : ProjectId; slug : Text; name : Text; status : Text };
 
+  type ProjectStats = {
+    projectId : Nat;
+    pollCount : Nat;
+    surveyCount : Nat;
+    totalVotes : Nat;
+    totalSubmissions : Nat;
+    totalResponses : Nat;
+  };
+
   type Product = {
     id : ProductId;
     projectId : ProjectId;
@@ -1907,6 +1916,82 @@ persistent actor class polls_surveys_backend() = this {
       surveyCount = surveyCount;
       pollCount = pollCount;
     }
+  };
+
+  // Get statistics for a specific project
+  public query func get_project_stats(projectId : Nat) : async ?ProjectStats {
+    // Verify project exists
+    let projectOpt = findProject(projectId);
+    if (projectOpt == null) {
+      return null;
+    };
+
+    // Count polls for this project
+    let projectPolls = Array.filter<Poll>(polls, func p = (p.scopeType == #project) and (p.scopeId == projectId));
+    let pollCount = projectPolls.size();
+
+    // Count surveys for this project
+    let projectSurveys = Array.filter<Survey>(surveys, func s = (s.scopeType == #project) and (s.scopeId == projectId));
+    let surveyCount = projectSurveys.size();
+
+    // Sum total votes from all polls
+    var totalVotes : Nat = 0;
+    for (poll in projectPolls.vals()) {
+      totalVotes += poll.totalVotes;
+    };
+
+    // Sum total submissions from all surveys
+    var totalSubmissions : Nat = 0;
+    for (survey in projectSurveys.vals()) {
+      totalSubmissions += survey.submissionsCount;
+    };
+
+    ?{
+      projectId = projectId;
+      pollCount = pollCount;
+      surveyCount = surveyCount;
+      totalVotes = totalVotes;
+      totalSubmissions = totalSubmissions;
+      totalResponses = totalVotes + totalSubmissions;
+    }
+  };
+
+  // Get statistics for multiple projects (batch operation)
+  public query func get_projects_stats(projectIds : [Nat]) : async [ProjectStats] {
+    let statsBuffer = Buffer.Buffer<ProjectStats>(projectIds.size());
+
+    for (projectId in projectIds.vals()) {
+      // Count polls for this project
+      let projectPolls = Array.filter<Poll>(polls, func p = (p.scopeType == #project) and (p.scopeId == projectId));
+      let pollCount = projectPolls.size();
+
+      // Count surveys for this project
+      let projectSurveys = Array.filter<Survey>(surveys, func s = (s.scopeType == #project) and (s.scopeId == projectId));
+      let surveyCount = projectSurveys.size();
+
+      // Sum total votes from all polls
+      var totalVotes : Nat = 0;
+      for (poll in projectPolls.vals()) {
+        totalVotes += poll.totalVotes;
+      };
+
+      // Sum total submissions from all surveys
+      var totalSubmissions : Nat = 0;
+      for (survey in projectSurveys.vals()) {
+        totalSubmissions += survey.submissionsCount;
+      };
+
+      statsBuffer.add({
+        projectId = projectId;
+        pollCount = pollCount;
+        surveyCount = surveyCount;
+        totalVotes = totalVotes;
+        totalSubmissions = totalSubmissions;
+        totalResponses = totalVotes + totalSubmissions;
+      });
+    };
+
+    Buffer.toArray(statsBuffer)
   };
 
   // HTTPS Outcall Types for OpenAI Integration
