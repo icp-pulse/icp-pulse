@@ -196,7 +196,7 @@ function ResultsContent() {
           <div className="flex gap-2">
             <Button
               variant="outline"
-              onClick={() => router.push('/admin?tab=polls')}
+              onClick={() => router.push('/creator?tab=polls')}
             >
               <ArrowLeft className="h-4 w-4 mr-2" />
               Back to Polls
@@ -442,7 +442,7 @@ function ResultsContent() {
       <div className="mt-8 md:hidden">
         <Button
           variant="outline"
-          onClick={() => router.push('/admin?tab=polls')}
+          onClick={() => router.push('/creator?tab=polls')}
           className="w-full"
         >
           <ArrowLeft className="h-4 w-4 mr-2" />

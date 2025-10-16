@@ -31,7 +31,7 @@ interface PollCrowdfundingProps {
 export function PollCrowdfunding({ pollId, fundingInfo, onContribute }: PollCrowdfundingProps) {
   const [amount, setAmount] = useState('')
   const [isContributing, setIsContributing] = useState(false)
-  const { identity, isAuthenticated } = useIcpAuth()
+  const { identity, isAuthenticated, authProvider } = useIcpAuth()
 
   // Check if poll is crowdfunded
   const isCrowdfunded = 'Crowdfunded' in fundingInfo.fundingType
@@ -99,7 +99,7 @@ export function PollCrowdfunding({ pollId, fundingInfo, onContribute }: PollCrow
       console.log('Full funding info:', fundingInfo)
 
       // Check if using Plug wallet
-      const isPlugWallet = typeof window !== 'undefined' && window.ic?.plug
+      const isPlugWallet = authProvider === 'plug'
       const { Principal } = await import('@dfinity/principal')
 
       if (isPlugWallet && window.ic?.plug) {

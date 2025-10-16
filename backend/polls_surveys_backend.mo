@@ -2,6 +2,7 @@ import Array "mo:base/Array";
 import Iter "mo:base/Iter";
 import Blob "mo:base/Blob";
 import Bool "mo:base/Bool";
+import Buffer "mo:base/Buffer";
 import Nat "mo:base/Nat";
 import Nat8 "mo:base/Nat8";
 import Nat64 "mo:base/Nat64";
@@ -371,6 +372,18 @@ persistent actor class polls_surveys_backend() = this {
 
   public query func list_projects(offset : Nat, limit : Nat) : async [ProjectSummary] {
     sliceProjectSummaries(projects, offset, limit)
+  };
+
+  // List projects created by the caller
+  public shared query(msg) func list_my_projects(offset : Nat, limit : Nat) : async [ProjectSummary] {
+    let myProjects = Buffer.Buffer<Project>(0);
+    for (project in projects.vals()) {
+      if (project.createdBy == msg.caller) {
+        myProjects.add(project);
+      };
+    };
+    let myProjectsArray = Buffer.toArray(myProjects);
+    sliceProjectSummaries(myProjectsArray, offset, limit)
   };
 
   public query func get_project(id : ProjectId) : async ?Project { findProject(id) };
@@ -1000,6 +1013,19 @@ persistent actor class polls_surveys_backend() = this {
     })
   };
 
+  // List polls created by the caller
+  public shared query(msg) func list_my_polls(offset : Nat, limit : Nat) : async [PollSummary] {
+    let filtered = Array.filter<Poll>(polls, func p = p.createdBy == msg.caller);
+    let size = filtered.size();
+    let start = if (offset > size) size else offset;
+    let endVal = start + limit;
+    let end_ = if (endVal > size) size else endVal;
+    Array.tabulate<PollSummary>(end_ - start, func i {
+      let p = filtered[start + i];
+      { id = p.id; scopeType = p.scopeType; scopeId = p.scopeId; title = p.title; status = p.status; totalVotes = p.totalVotes }
+    })
+  };
+
   public query func get_poll(id : PollId) : async ?Poll { findPoll(id) };
 
   public shared (msg) func vote(pollId : PollId, optionId : Nat) : async Bool {
@@ -1318,6 +1344,19 @@ persistent actor class polls_surveys_backend() = this {
 
   public query func list_surveys_by_product(productId : ProductId, offset : Nat, limit : Nat) : async [SurveySummary] {
     let filtered = Array.filter<Survey>(surveys, func s = (s.scopeType == #product) and (s.scopeId == productId));
+    let size = filtered.size();
+    let start = if (offset > size) size else offset;
+    let endVal = start + limit;
+    let end_ = if (endVal > size) size else endVal;
+    Array.tabulate<SurveySummary>(end_ - start, func i {
+      let s = filtered[start + i];
+      { id = s.id; scopeType = s.scopeType; scopeId = s.scopeId; title = s.title; status = s.status; submissionsCount = s.submissionsCount }
+    })
+  };
+
+  // List surveys created by the caller
+  public shared query(msg) func list_my_surveys(offset : Nat, limit : Nat) : async [SurveySummary] {
+    let filtered = Array.filter<Survey>(surveys, func s = s.createdBy == msg.caller);
     let size = filtered.size();
     let start = if (offset > size) size else offset;
     let endVal = start + limit;

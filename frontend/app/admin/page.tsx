@@ -10,6 +10,7 @@ import PollAdmin from '@/components/admin/poll-admin'
 import AirdropAdmin from '@/components/admin/airdrop-admin'
 import QuestAdmin from '@/components/admin/quest-admin'
 import TokenHoldersAdmin from '@/components/admin/token-holders-admin'
+import { AdminGuard } from '@/components/AdminGuard'
 
 export type TabType = "projects" | "surveys" | "polls" | "airdrops" | "quests" | "holders";
 
@@ -27,37 +28,39 @@ function AdminDashboardContent() {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false)
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
-      <TopHeader
-        isSidebarCollapsed={isSidebarCollapsed}
-        onSidebarToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
-      />
-      <div className="flex pt-16">
-        <Sidebar activeTab={activeTab} onTabChange={setActiveTab} isCollapsed={isSidebarCollapsed} />
-        <main className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
-          <div className="flex-1 overflow-auto px-6 py-4">
-            {activeTab === 'projects' && (
-              <ProjectAdmin />
-            )}
-            {activeTab === 'surveys' && (
-              <SurveyAdmin />
-            )}
-            {activeTab === 'polls' && (
-              <PollAdmin />
-            )}
-            {activeTab === 'airdrops' && (
-              <AirdropAdmin />
-            )}
-            {activeTab === 'quests' && (
-              <QuestAdmin />
-            )}
-            {activeTab === 'holders' && (
-              <TokenHoldersAdmin />
-            )}
-          </div>
-        </main>
+    <AdminGuard>
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+        <TopHeader
+          isSidebarCollapsed={isSidebarCollapsed}
+          onSidebarToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
+        />
+        <div className="flex pt-16">
+          <Sidebar activeTab={activeTab} onTabChange={setActiveTab} isCollapsed={isSidebarCollapsed} />
+          <main className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
+            <div className="flex-1 overflow-auto px-6 py-4">
+              {activeTab === 'projects' && (
+                <ProjectAdmin />
+              )}
+              {activeTab === 'surveys' && (
+                <SurveyAdmin />
+              )}
+              {activeTab === 'polls' && (
+                <PollAdmin />
+              )}
+              {activeTab === 'airdrops' && (
+                <AirdropAdmin />
+              )}
+              {activeTab === 'quests' && (
+                <QuestAdmin />
+              )}
+              {activeTab === 'holders' && (
+                <TokenHoldersAdmin />
+              )}
+            </div>
+          </main>
+        </div>
       </div>
-    </div>
+    </AdminGuard>
   )
 }
 

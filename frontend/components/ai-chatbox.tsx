@@ -40,7 +40,7 @@ interface AIChatboxProps {
 }
 
 export function AIChatbox({ onOptionsGenerated, isOpen: externalIsOpen, onToggle }: AIChatboxProps = {}) {
-  const { isAuthenticated, identity } = useIcpAuth()
+  const { isAuthenticated, identity, authProvider } = useIcpAuth()
   const router = useRouter()
   const [internalIsOpen, setInternalIsOpen] = useState(false)
 
@@ -92,10 +92,38 @@ export function AIChatbox({ onOptionsGenerated, isOpen: externalIsOpen, onToggle
 
     try {
       // Call backend canister directly for chat
-      const { createBackendWithIdentity } = await import('@/lib/icp')
       const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
       const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
-      const backend = await createBackendWithIdentity({ canisterId, host, identity })
+
+      // Detect Plug wallet
+      const isPlugWallet = authProvider === 'plug'
+
+      let backend
+
+      if (isPlugWallet && window.ic?.plug) {
+        // Use Plug wallet
+        console.log('Using Plug wallet for AI chat')
+        const whitelist = [canisterId]
+        const connected = await (window.ic.plug as any).requestConnect({
+          whitelist,
+          host
+        })
+
+        if (!connected) {
+          throw new Error('Failed to connect to Plug wallet')
+        }
+
+        const { idlFactory } = await import('@/../../src/declarations/polls_surveys_backend')
+        backend = await window.ic.plug.createActor({
+          canisterId,
+          interfaceFactory: idlFactory,
+        })
+      } else {
+        // Use Internet Identity / NFID
+        console.log('Using Internet Identity/NFID for AI chat')
+        const { createBackendWithIdentity } = await import('@/lib/icp')
+        backend = await createBackendWithIdentity({ canisterId, host, identity })
+      }
 
       // Build conversation history for context (limit to last 5 messages)
       const conversationHistory: [string, string][] = messages.slice(-5).map(msg => [
@@ -199,7 +227,7 @@ export function AIChatbox({ onOptionsGenerated, isOpen: externalIsOpen, onToggle
           const approvalAmount = totalFundE8s + feeBuffer
 
           // Check if using Plug wallet
-          const isPlugWallet = typeof window !== 'undefined' && window.ic?.plug
+          const isPlugWallet = authProvider === 'plug'
 
           if (isPlugWallet && window.ic?.plug) {
             // Use Plug wallet for approval
