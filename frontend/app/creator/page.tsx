@@ -11,7 +11,7 @@ import { useIcpAuth } from '@/components/IcpAuthProvider'
 import { useRouter } from 'next/navigation'
 import { LoginButton } from '@/components/LoginButton'
 
-export type TabType = "projects" | "surveys" | "polls";
+export type TabType = "projects" | "surveys" | "polls" | "airdrops" | "quests" | "holders";
 
 function CreatorDashboardContent() {
   const searchParams = useSearchParams()
