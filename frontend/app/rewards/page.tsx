@@ -121,31 +121,31 @@ export default function RewardsPage() {
       const result = await backend.claim_poll_reward(BigInt(pollId))
 
       if ('ok' in result) {
-        const claimedReward = rewards.find(r => r.pollId === pollId)
+        const claimResult = result.ok
+        const formattedAmount = formatTokenAmount(claimResult.claimedAmount, claimResult.tokenDecimals)
 
         // Track successful reward claim
-        if (claimedReward) {
-          analytics.track('reward_claimed', {
-            reward_id: pollId,
-            poll_id: claimedReward.pollId,
-            amount: formatTokenAmount(claimedReward.amount, claimedReward.tokenDecimals),
-            token_symbol: claimedReward.tokenSymbol
-          })
-        }
+        analytics.track('reward_claimed', {
+          reward_id: pollId,
+          poll_id: pollId,
+          amount: formattedAmount,
+          token_symbol: claimResult.tokenSymbol
+        })
 
         // Remove claimed reward from list since it's no longer claimable
         setRewards(prev => prev.filter(reward => reward.pollId !== pollId))
 
         toast({
           title: "Success",
-          description: result.ok,
-          className: "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800",
+          description: `Successfully claimed ${formattedAmount} ${claimResult.tokenSymbol}`,
+          className: "bg-green-100 dark:bg-green-900 border-green-200 dark:border-green-800",
         })
       } else {
         toast({
           title: "Error",
           description: 'Failed to claim reward: ' + result.err,
           variant: "destructive",
+          className: "bg-red-100 dark:bg-red-900 border-red-200 dark:border-red-800",
         })
       }
     } catch (error) {
@@ -154,6 +154,7 @@ export default function RewardsPage() {
         title: "Error",
         description: 'Failed to claim reward. Please try again.',
         variant: "destructive",
+        className: "bg-red-100 dark:bg-red-900 border-red-200 dark:border-red-800",
       })
     } finally {
       setClaiming(prev => ({ ...prev, [pollId]: false }))

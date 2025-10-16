@@ -16,9 +16,16 @@ export const idlFactory = ({ IDL: I = IDL }) => {
     donatedAmount: I.Nat64,
     tokenSymbol: I.Text
   })
+  const ClaimResult = I.Record({
+    claimedAmount: I.Nat64,
+    tokenSymbol: I.Text,
+    tokenDecimals: I.Nat8,
+    tokenCanister: I.Opt(I.Principal)
+  })
   const Result = I.Variant({ ok: WithdrawResult, err: I.Text })
   const Result_1 = I.Variant({ ok: I.Text, err: I.Text })
   const Result_3 = I.Variant({ ok: DonateResult, err: I.Text })
+  const Result_5 = I.Variant({ ok: ClaimResult, err: I.Text })
   const SurveyId = I.Nat
   const Result_2 = I.Variant({ ok: PollId, err: I.Text })
   const ProjectId = I.Nat
@@ -276,7 +283,7 @@ export const idlFactory = ({ IDL: I = IDL }) => {
   })
 
   return I.Service({
-    claim_poll_reward: I.Func([PollId], [Result_1], []),
+    claim_poll_reward: I.Func([PollId], [Result_5], []),
     claim_reward: I.Func([I.Text], [I.Bool], []),
     chat_message: I.Func([I.Text, I.Vec(I.Tuple(I.Text, I.Text))], [Result_1], []),
     close_poll: I.Func([PollId], [Result_1], []),

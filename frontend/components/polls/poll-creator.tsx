@@ -37,7 +37,10 @@ export default function PollCreator() {
     mutationFn: (data: InsertPoll) => apiRequest("POST", "/api/polls", data),
     onSuccess: (result, variables) => {
       queryClient.invalidateQueries({ queryKey: ["/api/polls"] });
-      toast({ title: "Poll created successfully" });
+      toast({
+        title: "Poll created successfully",
+        className: "bg-green-100 dark:bg-green-900 border-green-200 dark:border-green-800",
+      });
 
       // Track poll creation
       analytics.track('poll_created', {
@@ -57,7 +60,8 @@ export default function PollCreator() {
       toast({
         title: "Error",
         description: "Failed to create poll",
-        variant: "destructive"
+        variant: "destructive",
+        className: "bg-red-100 dark:bg-red-900 border-red-200 dark:border-red-800",
       });
 
       // Track error
@@ -87,10 +91,11 @@ export default function PollCreator() {
   const onSubmit = (data: InsertPoll) => {
     const filteredOptions = options.filter(opt => opt.text.trim() !== "");
     if (filteredOptions.length < 2) {
-      toast({ 
-        title: "Error", 
+      toast({
+        title: "Error",
         description: "Poll must have at least 2 options",
-        variant: "destructive"
+        variant: "destructive",
+        className: "bg-red-100 dark:bg-red-900 border-red-200 dark:border-red-800",
       });
       return;
     }
