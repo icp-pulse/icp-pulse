@@ -151,6 +151,13 @@ persistent actor class polls_surveys_backend() = this {
     tokenDecimals: Nat8;
   };
 
+  type ClaimResult = {
+    claimedAmount: Nat64;
+    tokenSymbol: Text;
+    tokenDecimals: Nat8;
+    tokenCanister: ?Principal;
+  };
+
   type ScopeType = { #project; #product };
 
   type Project = {
@@ -882,7 +889,7 @@ persistent actor class polls_surveys_backend() = this {
   };
 
   // Claim escrowed rewards for a poll
-  public shared (msg) func claim_poll_reward(pollId : PollId) : async Result.Result<Text, Text> {
+  public shared (msg) func claim_poll_reward(pollId : PollId) : async Result.Result<ClaimResult, Text> {
     let pollOpt = findPoll(pollId);
     switch (pollOpt) {
       case null { return #err("Poll not found") };
@@ -955,7 +962,12 @@ persistent actor class polls_surveys_backend() = this {
                     ignore await airdrop.update_quest_progress(msg.caller, 0, null, null, null, null, ?1);
                   };
 
-                  #ok("Successfully claimed " # Nat64.toText(userReward) # " " # info.tokenSymbol)
+                  #ok({
+                    claimedAmount = userReward;
+                    tokenSymbol = info.tokenSymbol;
+                    tokenDecimals = info.tokenDecimals;
+                    tokenCanister = info.tokenCanister;
+                  })
                 };
                 case (#Err(error)) {
                   let errorMsg = switch (error) {
