@@ -329,6 +329,47 @@ persistent actor class polls_surveys_backend() = this {
     };
   };
 
+  // Format token amount with decimals for human-readable display
+  private func formatTokenAmount(amount: Nat64, decimals: Nat8) : Text {
+    let divisor = 10 ** Nat8.toNat(decimals);
+    let amountNat = Nat64.toNat(amount);
+    let quotient = amountNat / divisor;
+    let remainder = amountNat % divisor;
+
+    if (remainder == 0) {
+      return Nat.toText(quotient);
+    };
+
+    // Convert remainder to text and pad with leading zeros
+    var remainderText = Nat.toText(remainder);
+    let paddingNeeded = Nat8.toNat(decimals) - remainderText.size();
+
+    // Add leading zeros
+    var i = 0;
+    while (i < paddingNeeded) {
+      remainderText := "0" # remainderText;
+      i += 1;
+    };
+
+    // Remove trailing zeros
+    var endIndex = remainderText.size();
+    label trimLoop while (endIndex > 0) {
+      let charIndex = endIndex - 1;
+      let char = Text.toArray(remainderText)[charIndex];
+      if (char != '0') {
+        break trimLoop;
+      };
+      endIndex -= 1;
+    };
+
+    if (endIndex == 0) {
+      return Nat.toText(quotient);
+    };
+
+    let trimmedRemainder = Text.fromIter(Array.slice(Text.toArray(remainderText), 0, endIndex).vals());
+    Nat.toText(quotient) # "." # trimmedRemainder
+  };
+
   private func toScopeType(txt : Text) : ScopeType { if (txt == "project") { #project } else { #product } };
   private func toQuestionType(txt : Text) : QuestionType {
     if (txt == "single") return #single;
@@ -2939,6 +2980,175 @@ persistent actor class polls_surveys_backend() = this {
         }
       };
       case null { null }
+    }
+  };
+
+  // Withdraw unused funds from a closed poll back to the creator
+  public shared (msg) func withdraw_unused_funds(pollId : PollId) : async Result.Result<Text, Text> {
+    let pollOpt = findPoll(pollId);
+    switch (pollOpt) {
+      case null { return #err("Poll not found") };
+      case (?poll) {
+        // Check if caller is the poll creator
+        if (poll.createdBy != msg.caller) {
+          return #err("Only the poll creator can withdraw unused funds");
+        };
+
+        // Check if poll is closed or claims ended
+        if (poll.status != #closed and poll.status != #claimsEnded) {
+          return #err("Can only withdraw funds from closed polls or polls with ended claims");
+        };
+
+        switch (poll.fundingInfo) {
+          case null { return #err("Poll has no funding information") };
+          case (?info) {
+            // Check if there are remaining funds
+            if (info.remainingFund == 0) {
+              return #err("No remaining funds to withdraw");
+            };
+
+            // Calculate total pending claims
+            var totalPendingClaims : Nat64 = 0;
+            for ((principal, amount) in info.pendingClaims.vals()) {
+              totalPendingClaims += amount;
+            };
+
+            // Calculate withdrawable amount (remaining funds minus pending claims)
+            if (info.remainingFund <= totalPendingClaims) {
+              return #err("No withdrawable funds. All remaining funds are reserved for pending claims.");
+            };
+
+            let withdrawAmount = info.remainingFund - totalPendingClaims;
+
+            // Transfer tokens based on token type
+            switch (info.tokenType) {
+              case (#ICP) {
+                // For ICP, transfer back to creator
+                // Note: ICP transfer implementation would go here
+                return #err("ICP withdrawal not yet implemented");
+              };
+              case (#ICRC1(canister)) {
+                try {
+                  let tokenActor = actor (Principal.toText(canister)) : actor {
+                    icrc1_transfer : (TransferArgs) -> async TransferResult;
+                  };
+
+                  let transferArgs : TransferArgs = {
+                    from_subaccount = null;
+                    to = { owner = msg.caller; subaccount = null };
+                    amount = Nat64.toNat(withdrawAmount);
+                    fee = null;
+                    memo = null;
+                    created_at_time = ?Nat64.fromNat(Int.abs(Time.now()));
+                  };
+
+                  switch (await tokenActor.icrc1_transfer(transferArgs)) {
+                    case (#Ok(_)) {
+                      // Update poll to set remaining fund to only pending claims (keeping them in escrow)
+                      polls := Array.tabulate<Poll>(polls.size(), func i {
+                        let p = polls[i];
+                        if (p.id == pollId) {
+                          switch (p.fundingInfo) {
+                            case (?fi) {
+                              { p with fundingInfo = ?{ fi with remainingFund = totalPendingClaims } }
+                            };
+                            case null { p }
+                          }
+                        } else { p }
+                      });
+
+                      let message = "Successfully withdrew " # formatTokenAmount(withdrawAmount, info.tokenDecimals) # " " # info.tokenSymbol # " to your account. " #
+                                   formatTokenAmount(totalPendingClaims, info.tokenDecimals) # " " # info.tokenSymbol # " remains in escrow for pending claims.";
+                      #ok(message)
+                    };
+                    case (#Err(error)) {
+                      #err("Transfer failed: " # debug_show(error))
+                    }
+                  }
+                } catch (e) {
+                  #err("Transfer error: " # Error.message(e))
+                }
+              };
+            }
+          }
+        }
+      }
+    }
+  };
+
+  // Donate unused funds from a closed poll to the treasury
+  public shared (msg) func donate_unused_funds(pollId : PollId) : async Result.Result<Text, Text> {
+    let pollOpt = findPoll(pollId);
+    switch (pollOpt) {
+      case null { return #err("Poll not found") };
+      case (?poll) {
+        // Check if caller is the poll creator
+        if (poll.createdBy != msg.caller) {
+          return #err("Only the poll creator can donate unused funds");
+        };
+
+        // Check if poll is closed or claims ended
+        if (poll.status != #closed and poll.status != #claimsEnded) {
+          return #err("Can only donate funds from closed polls or polls with ended claims");
+        };
+
+        switch (poll.fundingInfo) {
+          case null { return #err("Poll has no funding information") };
+          case (?info) {
+            // Check if there are remaining funds
+            if (info.remainingFund == 0) {
+              return #err("No remaining funds to donate");
+            };
+
+            // Calculate total pending claims
+            var totalPendingClaims : Nat64 = 0;
+            for ((principal, amount) in info.pendingClaims.vals()) {
+              totalPendingClaims += amount;
+            };
+
+            // Calculate donatable amount (remaining funds minus pending claims)
+            if (info.remainingFund <= totalPendingClaims) {
+              return #err("No donatable funds. All remaining funds are reserved for pending claims.");
+            };
+
+            let donationAmount = info.remainingFund - totalPendingClaims;
+
+            // Add to treasury fees
+            switch (info.tokenType) {
+              case (#ICP) {
+                treasuryFeesICP := treasuryFeesICP + donationAmount;
+              };
+              case (#ICRC1(canister)) {
+                switch (Map.get(treasuryFees, phash, canister)) {
+                  case (?existingFees) {
+                    Map.set(treasuryFees, phash, canister, existingFees + donationAmount);
+                  };
+                  case null {
+                    Map.set(treasuryFees, phash, canister, donationAmount);
+                  };
+                };
+              };
+            };
+
+            // Update poll to set remaining fund to only pending claims (keeping them in escrow)
+            polls := Array.tabulate<Poll>(polls.size(), func i {
+              let p = polls[i];
+              if (p.id == pollId) {
+                switch (p.fundingInfo) {
+                  case (?fi) {
+                    { p with fundingInfo = ?{ fi with remainingFund = totalPendingClaims } }
+                  };
+                  case null { p }
+                }
+              } else { p }
+            });
+
+            let message = "Successfully donated " # formatTokenAmount(donationAmount, info.tokenDecimals) # " " # info.tokenSymbol # " to the treasury. " #
+                         formatTokenAmount(totalPendingClaims, info.tokenDecimals) # " " # info.tokenSymbol # " remains in escrow for pending claims.";
+            #ok(message)
+          }
+        }
+      }
     }
   };
 }
