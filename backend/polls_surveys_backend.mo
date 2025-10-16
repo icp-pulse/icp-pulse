@@ -133,7 +133,8 @@ persistent actor class polls_surveys_backend() = this {
     tokenSymbol: Text;
     tokenDecimals: Nat8;
     tokenCanister: ?Principal;
-    pollClosed: Bool;
+    claimsAreOpen: Bool; // True when poll status is #claimsOpen, false otherwise
+    pollClosed: Bool;    // DEPRECATED: Same as claimsAreOpen. Kept for backward compatibility with existing clients.
   };
 
   type ScopeType = { #project; #product };
@@ -968,7 +969,7 @@ persistent actor class polls_surveys_backend() = this {
       switch (poll.fundingInfo) {
         case (?info) {
           // Check if poll is claimable - must be in claimsOpen status
-          let pollClosed = (poll.status == #claimsOpen);
+          let claimsAreOpen = (poll.status == #claimsOpen);
 
           // Find user's pending claims in this poll
           var userAmount : Nat64 = 0;
@@ -986,7 +987,8 @@ persistent actor class polls_surveys_backend() = this {
               tokenSymbol = info.tokenSymbol;
               tokenDecimals = info.tokenDecimals;
               tokenCanister = info.tokenCanister;
-              pollClosed = pollClosed;
+              claimsAreOpen = claimsAreOpen;
+              pollClosed = claimsAreOpen; // Set to same value for backward compatibility
             };
             claimableRewards := Array.append(claimableRewards, [reward]);
           };
