@@ -96,40 +96,12 @@ export function AIChatbox({ onOptionsGenerated, isOpen: externalIsOpen, onToggle
       const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
       const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
 
-      // Detect Plug wallet
-      const isPlugWallet = authProvider === 'plug'
-
-      let backend
-
-      if (isPlugWallet && window.ic?.plug) {
-        // Use Plug wallet
-        console.log('Using Plug wallet for AI chat')
-        const whitelist = [canisterId]
-        const connected = await (window.ic.plug as any).requestConnect({
-          whitelist,
-          host
-        })
-
-        if (!connected) {
-          throw new Error('Failed to connect to Plug wallet')
-        }
-
-        const { idlFactory } = await import('@/../../src/declarations/polls_surveys_backend')
-        backend = await window.ic.plug.createActor({
-          canisterId,
-          interfaceFactory: idlFactory,
-        })
-      } else if (isAuthenticated && identity) {
-        // Use Internet Identity / NFID for authenticated users
-        console.log('Using Internet Identity/NFID for AI chat')
-        const { createBackendWithIdentity } = await import('@/lib/icp')
-        backend = await createBackendWithIdentity({ canisterId, host, identity })
-      } else {
-        // Use anonymous backend for non-authenticated users
-        console.log('Using anonymous backend for AI chat')
-        const { createBackend } = await import('@/lib/icp')
-        backend = await createBackend({ canisterId, host })
-      }
+      // Always use anonymous backend for chat_message to avoid wallet timeouts
+      // The chat function doesn't require authentication - it's just getting AI suggestions
+      // Authentication is only needed when actually creating the poll (in createPoll function)
+      console.log('Using anonymous backend for AI chat (no auth required)')
+      const { createBackend } = await import('@/lib/icp')
+      const backend = await createBackend({ canisterId, host })
 
       // Build conversation history for context (limit to last 5 messages)
       const conversationHistory: [string, string][] = messages.slice(-5).map(msg => [
@@ -137,20 +109,46 @@ export function AIChatbox({ onOptionsGenerated, isOpen: externalIsOpen, onToggle
         msg.content
       ])
 
-      console.log(`Calling backend canister for chat with message: "${currentInput}"`)
+      console.log('=== FRONTEND: CALLING BACKEND ===')
+      console.log('Backend object:', backend)
+      console.log('Message:', currentInput)
+      console.log('Conversation history:', conversationHistory)
+      console.log('About to call backend.chat_message()...')
 
       // Call the backend canister's chat_message function
-      const result = await backend.chat_message(currentInput, conversationHistory)
+      let result
+      try {
+        result = await backend.chat_message(currentInput, conversationHistory)
+        console.log('=== FRONTEND: BACKEND CALL COMPLETED ===')
+        console.log('Raw result object:', result)
+        console.log('Result type:', typeof result)
+        console.log('Result keys:', Object.keys(result))
+      } catch (callError) {
+        console.error('=== FRONTEND: BACKEND CALL FAILED ===')
+        console.error('Call error:', callError)
+        console.error('Error type:', typeof callError)
+        console.error('Error message:', callError instanceof Error ? callError.message : String(callError))
+        console.error('Error stack:', callError instanceof Error ? callError.stack : 'N/A')
+        throw callError
+      }
 
+      console.log('=== FRONTEND: CHECKING RESULT ===')
       if ('ok' in result) {
         const aiMessage = result.ok
-        console.log(`Successfully got chat response from backend canister`)
-        console.log('AI Response:', aiMessage)
+        console.log('Result has "ok" property')
+        console.log('AI Message type:', typeof aiMessage)
+        console.log('AI Message length:', aiMessage.length)
+        console.log('AI Message:', aiMessage)
 
         // Try to parse as JSON for poll creation
+        console.log('=== FRONTEND: PARSING JSON ===')
+        console.log('Attempting to parse AI message as JSON...')
         try {
           const pollData = JSON.parse(aiMessage)
+          console.log('✓ JSON parsing successful')
           console.log('Parsed poll data:', pollData)
+          console.log('Poll data type:', typeof pollData)
+          console.log('Poll data keys:', Object.keys(pollData))
 
           if (pollData.action === 'create_poll') {
             console.log('Poll creation request detected:', pollData)
@@ -202,6 +200,9 @@ export function AIChatbox({ onOptionsGenerated, isOpen: externalIsOpen, onToggle
           }
         } catch (parseError) {
           // Not JSON - display as normal text message
+          console.log('=== FRONTEND: JSON PARSING FAILED ===')
+          console.log('Parse error:', parseError)
+          console.log('Will display as plain text message')
           const aiResponse: Message = {
             id: (Date.now() + 1).toString(),
             content: aiMessage,
@@ -211,11 +212,16 @@ export function AIChatbox({ onOptionsGenerated, isOpen: externalIsOpen, onToggle
           setMessages(prev => [...prev, aiResponse])
         }
       } else {
+        console.error('=== FRONTEND: RESULT HAS ERROR ===')
         console.error('Backend canister returned error:', result.err)
         throw new Error(result.err || 'Failed to get AI response from canister')
       }
     } catch (error) {
+      console.error('=== FRONTEND: TOP LEVEL ERROR ===')
       console.error('Error sending message:', error)
+      console.error('Error name:', error instanceof Error ? error.name : 'N/A')
+      console.error('Error message:', error instanceof Error ? error.message : String(error))
+      console.error('Error stack:', error instanceof Error ? error.stack : 'N/A')
       const errorResponse: Message = {
         id: (Date.now() + 1).toString(),
         content: 'Sorry, I encountered an error. Please try again later.',
@@ -549,7 +555,7 @@ export function AIChatbox({ onOptionsGenerated, isOpen: externalIsOpen, onToggle
                           onClick={() => createPoll(message.preview!)}
                           disabled={isLoading}
                         >
-                          {isLoading ? 'Creating...' : 'Create Poll'}
+                          {isLoading ? 'Creating...' : isAuthenticated ? 'Create Poll' : 'Connect Wallet'}
                         </Button>
                       </div>
                     )}
