@@ -26,6 +26,7 @@ export function WalletBalance({ compact = false, showRefresh = true }: WalletBal
   const { identity, isAuthenticated, principalText } = useIcpAuth()
   const [balances, setBalances] = useState<TokenBalance[]>([])
   const [loading, setLoading] = useState(false)
+  const [silentRefreshing, setSilentRefreshing] = useState(false)
   const [showBalances, setShowBalances] = useState(true)
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -65,14 +66,18 @@ export function WalletBalance({ compact = false, showRefresh = true }: WalletBal
     return usdValues[symbol]
   }, [pulseUsdValue])
 
-  const fetchBalances = useCallback(async (isRetry: boolean = false) => {
+  const fetchBalances = useCallback(async (isRetry: boolean = false, isSilent: boolean = false) => {
     if (!isAuthenticated || !principalText) return
 
     // Check if using Plug wallet
     const isPlugWallet = !identity && typeof window !== 'undefined' && window.ic?.plug?.isConnected
 
     try {
-      setLoading(true)
+      if (isSilent) {
+        setSilentRefreshing(true)
+      } else {
+        setLoading(true)
+      }
       setError(null)
 
       if (!isRetry) {
@@ -375,7 +380,11 @@ export function WalletBalance({ compact = false, showRefresh = true }: WalletBal
         setBalances(fallbackTokens)
       }
     } finally {
-      setLoading(false)
+      if (isSilent) {
+        setSilentRefreshing(false)
+      } else {
+        setLoading(false)
+      }
     }
   }, [isAuthenticated, identity, principalText, balances.length, getTokenUSDValue])
 
@@ -390,6 +399,17 @@ export function WalletBalance({ compact = false, showRefresh = true }: WalletBal
     if (isAuthenticated && principalText) {
       fetchBalances()
     }
+  }, [isAuthenticated, principalText, fetchBalances])
+
+  // Auto-refresh balances every 5 seconds (silent refresh)
+  useEffect(() => {
+    if (!isAuthenticated || !principalText) return
+
+    const intervalId = setInterval(() => {
+      fetchBalances(false, true) // isRetry=false, isSilent=true
+    }, 5000) // 5 seconds
+
+    return () => clearInterval(intervalId)
   }, [isAuthenticated, principalText, fetchBalances])
 
   const calculateTotalUSD = () => {
@@ -457,7 +477,7 @@ export function WalletBalance({ compact = false, showRefresh = true }: WalletBal
                 disabled={loading}
                 className="h-8 w-8 p-0"
               >
-                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`h-4 w-4 ${loading && !silentRefreshing ? 'animate-spin' : ''}`} />
               </Button>
             )}
           </div>
@@ -489,7 +509,7 @@ export function WalletBalance({ compact = false, showRefresh = true }: WalletBal
             </div>
           </div>
         )}
-        {loading ? (
+        {loading && !silentRefreshing ? (
           <div className="space-y-3">
             {[1, 2, 3].map((i) => (
               <div key={i} className="flex items-center justify-between">
