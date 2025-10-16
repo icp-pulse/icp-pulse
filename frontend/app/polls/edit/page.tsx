@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ArrowLeft, BarChart3, CheckCircle2, Settings, Coins } from 'lucide-react'
 import { PollBreadcrumb } from '@/components/polls/poll-breadcrumb'
 
@@ -25,6 +26,9 @@ function EditPollContent() {
   const [loading, setLoading] = useState(true)
   const [err, setErr] = useState<string | null>(null)
   const [poll, setPoll] = useState<any>(null)
+  const [projects, setProjects] = useState<any[]>([])
+  const [selectedProjectId, setSelectedProjectId] = useState<string>('')
+  const [updating, setUpdating] = useState(false)
   const { identity, isAuthenticated } = useIcpAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -50,13 +54,19 @@ function EditPollContent() {
         const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
         const backend = await createBackendWithIdentity({ canisterId, host, identity })
 
+        // Fetch poll data
         const pollData = await backend.get_poll(BigInt(pollId))
 
         if (pollData && pollData.length > 0) {
           setPoll(pollData[0])
+          setSelectedProjectId(pollData[0].scopeId.toString())
         } else {
           setErr('Poll not found')
         }
+
+        // Fetch user's projects
+        const userProjects = await backend.list_my_projects(0n, 100n)
+        setProjects(userProjects)
       } catch (error) {
         console.error('Error fetching poll:', error)
         setErr('Failed to load poll')
@@ -93,6 +103,37 @@ function EditPollContent() {
     const trimmedRemainder = remainderStr.replace(/0+$/, '')
 
     return trimmedRemainder ? `${quotient}.${trimmedRemainder}` : quotient.toString()
+  }
+
+  const handleUpdateProject = async () => {
+    if (!pollId || !isAuthenticated) return
+
+    setUpdating(true)
+    setErr(null)
+
+    try {
+      const { createBackendWithIdentity } = await import('@/lib/icp')
+      const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
+      const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
+      const backend = await createBackendWithIdentity({ canisterId, host, identity })
+
+      const result = await backend.update_poll_project(BigInt(pollId), BigInt(selectedProjectId))
+
+      if ('ok' in result) {
+        // Update local poll state
+        setPoll((prev: any) => ({ ...prev, scopeId: BigInt(selectedProjectId) }))
+        alert('Poll project updated successfully!')
+      } else {
+        setErr(result.err)
+        alert(`Error: ${result.err}`)
+      }
+    } catch (error) {
+      console.error('Error updating poll project:', error)
+      setErr('Failed to update poll project')
+      alert('Failed to update poll project')
+    } finally {
+      setUpdating(false)
+    }
   }
 
   const handleViewResults = () => {
@@ -177,12 +218,51 @@ function EditPollContent() {
         </Badge>
       </div>
 
-      {/* Info Banner */}
-      <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-        <p className="text-sm text-blue-800 dark:text-blue-200">
-          <strong>Note:</strong> Polls cannot be edited after creation. You can view all details below and check the results.
-        </p>
-      </div>
+      {/* Project Association */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Settings className="h-5 w-5" />
+            Project Association
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2 block">
+                Associate this poll with a project
+              </label>
+              <Select value={selectedProjectId} onValueChange={setSelectedProjectId}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="Select a project" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="0">No Project (Unassociated)</SelectItem>
+                  {projects.map((project) => (
+                    <SelectItem key={project.id.toString()} value={project.id.toString()}>
+                      {project.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              onClick={handleUpdateProject}
+              disabled={updating || selectedProjectId === poll?.scopeId.toString()}
+              className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              {updating ? 'Updating...' : 'Update Project Association'}
+            </Button>
+            {poll?.scopeId.toString() === '0' && (
+              <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-3">
+                <p className="text-sm text-yellow-800 dark:text-yellow-200">
+                  <strong>Note:</strong> This poll is currently unassociated. Associating it with a project will make it easier to find and organize.
+                </p>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Poll Metadata */}
       <Card>

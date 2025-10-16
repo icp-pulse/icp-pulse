@@ -371,6 +371,7 @@ export const idlFactory = ({ IDL: I = IDL }) => {
     transform_gateway: I.Func([TransformArgs], [HttpResponsePayload], ['query']),
     update_product: I.Func([ProductId, I.Text, I.Text, I.Text], [I.Bool], []),
     update_project: I.Func([ProjectId, I.Text, I.Text, I.Text], [I.Bool], []),
+    update_poll_project: I.Func([PollId, I.Nat], [Result], []),
     update_survey_funding: I.Func([SurveyId, I.Nat64, I.Nat64], [I.Bool], []),
     validate_custom_token: I.Func(
       [I.Principal],
