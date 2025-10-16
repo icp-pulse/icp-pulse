@@ -5,6 +5,7 @@
     "prebuild": "npm run prebuild --workspaces --if-present",
     "dev": "npm run dev --workspaces --if-present",
     "sync:env": "node scripts/sync-env.mjs",
+    "dfx:backend:logs": "dfx canister --network ic logs polls_surveys_backend",
     "deploy:backend:ic": "dfx deploy --network ic polls_surveys_backend",
     "deploy:frontend:ic": "cd frontend && npm run build && cd .. && dfx deploy polls_surveys_frontend --network ic"
   },

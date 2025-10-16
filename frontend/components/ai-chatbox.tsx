@@ -15,6 +15,7 @@ interface PollPreviewData {
   options: string[]
   durationDays: number
   fundingAmount?: number
+  tokenType?: string  // "ICP" or PULSE canister ID
   closesAt: number
   scopeId: number
 }
@@ -144,15 +145,71 @@ export function AIChatbox({ onOptionsGenerated, isOpen: externalIsOpen, onToggle
       if ('ok' in result) {
         const aiMessage = result.ok
         console.log(`Successfully got chat response from backend canister`)
+        console.log('AI Response:', aiMessage)
 
-        const aiResponse: Message = {
-          id: (Date.now() + 1).toString(),
-          content: aiMessage,
-          sender: 'ai',
-          timestamp: new Date()
+        // Try to parse as JSON for poll creation
+        try {
+          const pollData = JSON.parse(aiMessage)
+          console.log('Parsed poll data:', pollData)
+
+          if (pollData.action === 'create_poll') {
+            console.log('Poll creation request detected:', pollData)
+
+            // Options are already included in the AI response
+            const options = pollData.options
+
+            if (options && Array.isArray(options) && options.length > 0) {
+              console.log('Using options from AI response:', options)
+
+              // Calculate closesAt timestamp in nanoseconds
+              const durationDays = pollData.durationDays || 7
+              const closesAt = Date.now() + (durationDays * 24 * 60 * 60 * 1000)
+              const closesAtNs = closesAt * 1_000_000
+
+              // Create poll preview message
+              const previewMessage: Message = {
+                id: (Date.now() + 1).toString(),
+                content: `I've prepared your poll! Here's a preview:`,
+                sender: 'ai',
+                timestamp: new Date(),
+                pollPreview: true,
+                preview: {
+                  title: pollData.title,
+                  description: pollData.description,
+                  options: options,
+                  durationDays: durationDays,
+                  fundingAmount: pollData.fundingAmount,
+                  tokenType: pollData.tokenType === 'ICP' ? 'ICP' : (process.env.NEXT_PUBLIC_TOKENMANIA_CANISTER_ID || 'PULSE'),
+                  closesAt: closesAtNs,
+                  scopeId: 0  // Default project ID
+                }
+              }
+
+              console.log('Created poll preview with', options.length, 'options')
+              setMessages(prev => [...prev, previewMessage])
+            } else {
+              throw new Error('AI response missing poll options')
+            }
+          } else {
+            // JSON but not a poll creation - display as text
+            const aiResponse: Message = {
+              id: (Date.now() + 1).toString(),
+              content: aiMessage,
+              sender: 'ai',
+              timestamp: new Date()
+            }
+            setMessages(prev => [...prev, aiResponse])
+          }
+        } catch (parseError) {
+          // Not JSON - display as normal text message
+          const aiResponse: Message = {
+            id: (Date.now() + 1).toString(),
+            content: aiMessage,
+            sender: 'ai',
+            timestamp: new Date()
+          }
+          setMessages(prev => [...prev, aiResponse])
         }
-
-        setMessages(prev => [...prev, aiResponse])
       } else {
         console.error('Backend canister returned error:', result.err)
         throw new Error(result.err || 'Failed to get AI response from canister')
@@ -212,9 +269,10 @@ export function AIChatbox({ onOptionsGenerated, isOpen: externalIsOpen, onToggle
         rewardPerVoteE8s = totalFundE8s / BigInt(estimatedResponses)
       }
 
-      // Get token canister ID if funding is enabled
-      const tokenCanisterId = fundingEnabled && preview.fundingAmount
-        ? process.env.NEXT_PUBLIC_TOKENMANIA_CANISTER_ID || ''
+      // Determine token type - use tokenType from preview, default to PULSE
+      const isICPPoll = preview.tokenType === 'ICP'
+      const tokenCanisterId = !isICPPoll && fundingEnabled && preview.fundingAmount
+        ? (preview.tokenType || process.env.NEXT_PUBLIC_TOKENMANIA_CANISTER_ID || '')
         : ''
 
       // Import Principal for custom token polls
@@ -222,7 +280,7 @@ export function AIChatbox({ onOptionsGenerated, isOpen: externalIsOpen, onToggle
 
       // Create poll using appropriate backend function
       let pollId
-      if (fundingEnabled && tokenCanisterId) {
+      if (fundingEnabled && tokenCanisterId && !isICPPoll) {
         // For self-funded polls, approve tokens first
         if (totalFundE8s > 0n) {
           const backendCanisterId = canisterId
@@ -482,7 +540,7 @@ export function AIChatbox({ onOptionsGenerated, isOpen: externalIsOpen, onToggle
                         <div className="flex items-center justify-between text-xs">
                           <span>⏱️ Duration: {message.preview.durationDays} day{message.preview.durationDays !== 1 ? 's' : ''}</span>
                           {message.preview.fundingAmount && (
-                            <span>💰 Fund: {message.preview.fundingAmount} PULSE</span>
+                            <span>💰 Fund: {message.preview.fundingAmount} {message.preview.tokenType === 'ICP' ? 'ICP' : 'PULSE'}</span>
                           )}
                         </div>
                         <Button
