@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from 'react'
-import { Plus, Search, Filter, MoreHorizontal, Edit, Vote, Users, TrendingUp, Clock, Pause, Play, Gift, Ban, XCircle, Copy, FileDown, DollarSign, Heart } from 'lucide-react'
+import { Plus, Search, Filter, MoreHorizontal, Edit, Vote, Users, TrendingUp, Clock, Pause, Play, Gift, Ban, XCircle, Copy, FileDown, DollarSign, Heart, ArrowUpDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card'
@@ -44,9 +44,11 @@ function statusToString(status: any): string {
 export default function CreatorPollList() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [sortBy, setSortBy] = useState('recent')
   const [polls, setPolls] = useState<any[]>([])
   const [projects, setProjects] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [withdrawDialogOpen, setWithdrawDialogOpen] = useState(false)
   const [donateDialogOpen, setDonateDialogOpen] = useState(false)
@@ -105,13 +107,28 @@ export default function CreatorPollList() {
     fetchMyPolls()
   }, [identity, isAuthenticated])
 
-  const filteredPolls = polls.filter(poll => {
-    const matchesSearch = (poll.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
-                         (poll.description || '').toLowerCase().includes(searchQuery.toLowerCase())
-    const pollStatusString = statusToString(poll.status)
-    const matchesStatus = statusFilter === 'all' || pollStatusString === statusFilter
-    return matchesSearch && matchesStatus
-  })
+  const filteredPolls = polls
+    .filter(poll => {
+      const matchesSearch = (poll.title || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+                           (poll.description || '').toLowerCase().includes(searchQuery.toLowerCase())
+      const pollStatusString = statusToString(poll.status)
+      const matchesStatus = statusFilter === 'all' || pollStatusString === statusFilter
+      return matchesSearch && matchesStatus
+    })
+    .sort((a, b) => {
+      switch (sortBy) {
+        case 'recent':
+          return Number(b.createdAt) - Number(a.createdAt)
+        case 'oldest':
+          return Number(a.createdAt) - Number(b.createdAt)
+        case 'votes':
+          return Number(b.totalVotes) - Number(a.totalVotes)
+        case 'ending':
+          return Number(a.closesAt) - Number(b.closesAt)
+        default:
+          return 0
+      }
+    })
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
@@ -209,6 +226,7 @@ export default function CreatorPollList() {
   const handleStatusTransition = async (pollId: any, action: string) => {
     if (!identity) return
 
+    setSubmitting(true);
     try {
       const { createBackendWithIdentity } = await import('@/lib/icp')
       const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
@@ -255,6 +273,7 @@ export default function CreatorPollList() {
         toast({
           title: "Success",
           description: "Poll status updated successfully",
+          className: "bg-green-100 dark:bg-green-900 border-green-200 dark:border-green-800",
         })
       } else if ('err' in result) {
         toast({
@@ -270,6 +289,8 @@ export default function CreatorPollList() {
         description: "Failed to update poll status",
         variant: "destructive",
       })
+    } finally {
+      setSubmitting(false);
     }
   }
 
@@ -505,6 +526,18 @@ export default function CreatorPollList() {
             <SelectItem value="Closed">Closed</SelectItem>
           </SelectContent>
         </Select>
+        <Select value={sortBy} onValueChange={setSortBy}>
+          <SelectTrigger className="w-48">
+            <ArrowUpDown className="w-4 h-4 mr-2" />
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="recent">Most Recent</SelectItem>
+            <SelectItem value="oldest">Oldest First</SelectItem>
+            <SelectItem value="votes">Most Votes</SelectItem>
+            <SelectItem value="ending">Ending Soon</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Loading State */}
@@ -700,6 +733,7 @@ export default function CreatorPollList() {
                             size="sm"
                             onClick={() => handleStatusTransition(poll.id, 'pause')}
                             className="text-xs"
+                            disabled={submitting}
                           >
                             <Pause className="w-3 h-3 mr-1" />
                             Pause
@@ -709,6 +743,7 @@ export default function CreatorPollList() {
                             size="sm"
                             onClick={() => handleStatusTransition(poll.id, 'start_claiming')}
                             className="text-xs"
+                            disabled={submitting}
                           >
                             <Gift className="w-3 h-3 mr-1" />
                             Start Claiming
@@ -718,6 +753,7 @@ export default function CreatorPollList() {
                             size="sm"
                             onClick={() => handleStatusTransition(poll.id, 'close')}
                             className="text-xs text-red-600 hover:bg-red-50"
+                            disabled={submitting}
                           >
                             <XCircle className="w-3 h-3 mr-1" />
                             Close
@@ -731,6 +767,7 @@ export default function CreatorPollList() {
                             size="sm"
                             onClick={() => handleStatusTransition(poll.id, 'resume')}
                             className="text-xs"
+                            disabled={submitting}
                           >
                             <Play className="w-3 h-3 mr-1" />
                             Resume
@@ -740,6 +777,7 @@ export default function CreatorPollList() {
                             size="sm"
                             onClick={() => handleStatusTransition(poll.id, 'start_claiming')}
                             className="text-xs"
+                            disabled={submitting}
                           >
                             <Gift className="w-3 h-3 mr-1" />
                             Start Claiming
@@ -749,6 +787,7 @@ export default function CreatorPollList() {
                             size="sm"
                             onClick={() => handleStatusTransition(poll.id, 'close')}
                             className="text-xs text-red-600 hover:bg-red-50"
+                            disabled={submitting}
                           >
                             <XCircle className="w-3 h-3 mr-1" />
                             Close
@@ -762,6 +801,7 @@ export default function CreatorPollList() {
                             size="sm"
                             onClick={() => handleStatusTransition(poll.id, 'end_claiming')}
                             className="text-xs"
+                            disabled={submitting}
                           >
                             <Ban className="w-3 h-3 mr-1" />
                             End Claiming
@@ -771,6 +811,7 @@ export default function CreatorPollList() {
                             size="sm"
                             onClick={() => handleStatusTransition(poll.id, 'close')}
                             className="text-xs text-red-600 hover:bg-red-50"
+                            disabled={submitting}
                           >
                             <XCircle className="w-3 h-3 mr-1" />
                             Close
@@ -783,6 +824,7 @@ export default function CreatorPollList() {
                           size="sm"
                           onClick={() => handleStatusTransition(poll.id, 'close')}
                           className="text-xs text-red-600 hover:bg-red-50"
+                          disabled={submitting}
                         >
                           <XCircle className="w-3 h-3 mr-1" />
                           Close
@@ -828,6 +870,7 @@ export default function CreatorPollList() {
                         size="sm"
                         onClick={() => handleWithdrawFunds(poll.id)}
                         className="text-xs flex-1 bg-green-50 hover:bg-green-100 text-green-700 border-green-200"
+                        disabled={submitting}
                       >
                         <DollarSign className="w-3 h-3 mr-1" />
                         Withdraw Funds
@@ -837,6 +880,7 @@ export default function CreatorPollList() {
                         size="sm"
                         onClick={() => handleDonateFunds(poll.id)}
                         className="text-xs flex-1 bg-purple-50 hover:bg-purple-100 text-purple-700 border-purple-200"
+                        disabled={submitting}
                       >
                         <Heart className="w-3 h-3 mr-1" />
                         Donate to Treasury
