@@ -38,6 +38,7 @@ export default function PollsPage() {
   const [votingOption, setVotingOption] = useState<bigint | null>(null)
   const [openVoteDialog, setOpenVoteDialog] = useState<bigint | null>(null)
   const [voteSuccessDialog, setVoteSuccessDialog] = useState<bigint | null>(null)
+  const [voteSuccess, setVoteSuccess] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [projectFilter, setProjectFilter] = useState('all')
@@ -368,11 +369,8 @@ export default function PollsPage() {
         // Refresh poll data in the background
         refreshSinglePoll(pollId)
 
-        // Close the vote dialog
-        setOpenVoteDialog(null)
-
-        // Show success dialog with options
-        setVoteSuccessDialog(pollId)
+        // Show success state in the current dialog
+        setVoteSuccess(true)
 
         analytics.track('poll_voted', {
           poll_id: pollId.toString(),
@@ -843,7 +841,15 @@ export default function PollsPage() {
                             </TableCell>
                             <TableCell>
                               {isActive && !userVoted ? (
-                                <AlertDialog open={openVoteDialog === poll.id} onOpenChange={(open) => setOpenVoteDialog(open ? poll.id : null)}>
+                                <AlertDialog open={openVoteDialog === poll.id} onOpenChange={(open) => {
+                                  if (!open) {
+                                    setOpenVoteDialog(null)
+                                    setVotingOption(null)
+                                    setVoteSuccess(false)
+                                  } else {
+                                    setOpenVoteDialog(poll.id)
+                                  }
+                                }}>
                                   <AlertDialogTrigger asChild>
                                     <Button
                                       size="sm"
@@ -854,34 +860,84 @@ export default function PollsPage() {
                                     </Button>
                                   </AlertDialogTrigger>
                                   <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>Vote on: {poll.title}</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        Choose your option:
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <div className="space-y-2">
-                                      {poll.options.map((option) => {
-                                        const isVotingThis = votingOption === option.id
-                                        return (
-                                          <Button
-                                            key={option.id}
-                                            variant="outline"
-                                            onClick={() => handleVote(poll.id, option.id)}
-                                            disabled={!!votingPoll}
-                                            className="w-full justify-start"
+                                    {!voteSuccess ? (
+                                      <>
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle>Vote on: {poll.title}</AlertDialogTitle>
+                                          <AlertDialogDescription>
+                                            Choose your option:
+                                          </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <div className="space-y-2">
+                                          {poll.options.map((option) => {
+                                            const isVotingThis = votingOption === option.id
+                                            return (
+                                              <Button
+                                                key={option.id}
+                                                variant="outline"
+                                                onClick={() => handleVote(poll.id, option.id)}
+                                                disabled={!!votingPoll}
+                                                className="w-full justify-start"
+                                              >
+                                                {isVotingThis && (
+                                                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
+                                                )}
+                                                {option.text}
+                                              </Button>
+                                            )
+                                          })}
+                                        </div>
+                                        <AlertDialogFooter>
+                                          <AlertDialogCancel
+                                            disabled={votingPoll === poll.id}
+                                            onClick={() => {
+                                              setOpenVoteDialog(null)
+                                              setVotingOption(null)
+                                              setVoteSuccess(false)
+                                            }}
                                           >
-                                            {isVotingThis && (
-                                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary mr-2"></div>
-                                            )}
-                                            {option.text}
-                                          </Button>
-                                        )
-                                      })}
-                                    </div>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel disabled={votingPoll === poll.id}>Cancel</AlertDialogCancel>
-                                    </AlertDialogFooter>
+                                            Cancel
+                                          </AlertDialogCancel>
+                                        </AlertDialogFooter>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <AlertDialogHeader>
+                                          <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-green-100 dark:bg-green-900/30 rounded-full">
+                                            <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
+                                          </div>
+                                          <AlertDialogTitle className="text-center text-xl">Vote Submitted Successfully!</AlertDialogTitle>
+                                          <AlertDialogDescription className="text-center">
+                                            Your vote has been recorded on the blockchain. What would you like to do next?
+                                          </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter className="flex flex-col sm:flex-row gap-2">
+                                          <AlertDialogAction
+                                            onClick={() => {
+                                              router.push(`/results?pollId=${poll.id}`)
+                                              setOpenVoteDialog(null)
+                                              setVotingOption(null)
+                                              setVoteSuccess(false)
+                                            }}
+                                            className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto"
+                                          >
+                                            <BarChart3 className="w-4 h-4 mr-2" />
+                                            View Results
+                                          </AlertDialogAction>
+                                          <AlertDialogCancel
+                                            onClick={() => {
+                                              setOpenVoteDialog(null)
+                                              setVotingOption(null)
+                                              setVoteSuccess(false)
+                                            }}
+                                            className="w-full sm:w-auto mt-0"
+                                          >
+                                            <Vote className="w-4 w-4 mr-2" />
+                                            Vote on Another Poll
+                                          </AlertDialogCancel>
+                                        </AlertDialogFooter>
+                                      </>
+                                    )}
                                   </AlertDialogContent>
                                 </AlertDialog>
                               ) : (
@@ -1041,44 +1097,87 @@ export default function PollsPage() {
                                   if (!open) {
                                     setOpenVoteDialog(null)
                                     setVotingOption(null)
+                                    setVoteSuccess(false)
                                   }
                                 }}>
                                   <AlertDialogContent>
-                                    <AlertDialogHeader>
-                                      <AlertDialogTitle>Confirm your vote</AlertDialogTitle>
-                                      <AlertDialogDescription>
-                                        Are you sure you want to vote for this option? This action cannot be undone.
-                                      </AlertDialogDescription>
-                                    </AlertDialogHeader>
-                                    <AlertDialogFooter>
-                                      <AlertDialogCancel
-                                        disabled={votingPoll === poll.id}
-                                        onClick={() => {
-                                          setOpenVoteDialog(null)
-                                          setVotingOption(null)
-                                        }}
-                                      >
-                                        Cancel
-                                      </AlertDialogCancel>
-                                      <AlertDialogAction
-                                        onClick={() => {
-                                          if (votingOption !== null) {
-                                            handleVote(poll.id, votingOption)
-                                          }
-                                        }}
-                                        disabled={votingPoll === poll.id}
-                                        className="bg-blue-600 hover:bg-blue-700"
-                                      >
-                                        {votingPoll === poll.id ? (
-                                          <>
-                                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                                            Submitting...
-                                          </>
-                                        ) : (
-                                          'Confirm Vote'
-                                        )}
-                                      </AlertDialogAction>
-                                    </AlertDialogFooter>
+                                    {!voteSuccess ? (
+                                      <>
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle>Confirm your vote</AlertDialogTitle>
+                                          <AlertDialogDescription>
+                                            Are you sure you want to vote for this option? This action cannot be undone.
+                                          </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                          <AlertDialogCancel
+                                            disabled={votingPoll === poll.id}
+                                            onClick={() => {
+                                              setOpenVoteDialog(null)
+                                              setVotingOption(null)
+                                              setVoteSuccess(false)
+                                            }}
+                                          >
+                                            Cancel
+                                          </AlertDialogCancel>
+                                          <AlertDialogAction
+                                            onClick={() => {
+                                              if (votingOption !== null) {
+                                                handleVote(poll.id, votingOption)
+                                              }
+                                            }}
+                                            disabled={votingPoll === poll.id}
+                                            className="bg-blue-600 hover:bg-blue-700"
+                                          >
+                                            {votingPoll === poll.id ? (
+                                              <>
+                                                <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                                                Submitting...
+                                              </>
+                                            ) : (
+                                              'Confirm Vote'
+                                            )}
+                                          </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <AlertDialogHeader>
+                                          <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-green-100 dark:bg-green-900/30 rounded-full">
+                                            <CheckCircle className="w-6 h-6 text-green-600 dark:text-green-400" />
+                                          </div>
+                                          <AlertDialogTitle className="text-center text-xl">Vote Submitted Successfully!</AlertDialogTitle>
+                                          <AlertDialogDescription className="text-center">
+                                            Your vote has been recorded on the blockchain. What would you like to do next?
+                                          </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter className="flex flex-col sm:flex-row gap-2">
+                                          <AlertDialogAction
+                                            onClick={() => {
+                                              router.push(`/results?pollId=${poll.id}`)
+                                              setOpenVoteDialog(null)
+                                              setVotingOption(null)
+                                              setVoteSuccess(false)
+                                            }}
+                                            className="bg-blue-600 hover:bg-blue-700 w-full sm:w-auto"
+                                          >
+                                            <BarChart3 className="w-4 h-4 mr-2" />
+                                            View Results
+                                          </AlertDialogAction>
+                                          <AlertDialogCancel
+                                            onClick={() => {
+                                              setOpenVoteDialog(null)
+                                              setVotingOption(null)
+                                              setVoteSuccess(false)
+                                            }}
+                                            className="w-full sm:w-auto mt-0"
+                                          >
+                                            <Vote className="w-4 w-4 mr-2" />
+                                            Vote on Another Poll
+                                          </AlertDialogCancel>
+                                        </AlertDialogFooter>
+                                      </>
+                                    )}
                                   </AlertDialogContent>
                                 </AlertDialog>
                               ) : userVoted ? (

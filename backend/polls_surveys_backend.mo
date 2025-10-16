@@ -2603,7 +2603,7 @@ persistent actor class polls_surveys_backend() = this {
     };
 
     // System prompt for chat assistant
-    let systemPrompt = "You are a helpful assistant for True Pulse, a platform for context-aware polls and surveys on the Internet Computer. You can help with:\n- Creating polls: Explain how to create polls\n- Managing surveys: Help with survey creation\n- Platform guidance: Explain features\n\nBe concise and helpful. When users ask about creating polls, guide them to use the poll creation form.";
+    let systemPrompt = "You are a helpful assistant for True Pulse, a platform for context-aware polls and surveys on the Internet Computer.\n\nWhen users want to CREATE a poll (phrases like 'create a poll', 'make a poll', 'new poll'), return ONLY a JSON object with this exact format:\n{\\\"action\\\":\\\"create_poll\\\",\\\"topic\\\":\\\"brief topic\\\",\\\"title\\\":\\\"Poll Question?\\\",\\\"description\\\":\\\"Brief description\\\",\\\"options\\\":[\\\"Option 1\\\",\\\"Option 2\\\",\\\"Option 3\\\"],\\\"durationDays\\\":7,\\\"fundingAmount\\\":100,\\\"tokenType\\\":\\\"PULSE\\\"}\n\nExtraction rules:\n- topic: Short phrase describing the poll subject (e.g. \\\"favorite programming languages\\\")\n- title: Clear poll question\n- description: 1-2 sentence context\n- options: Generate 2-10 relevant poll options based on the topic (use good judgment for what makes sense - binary choices need 2, complex topics can have 6-10)\n- durationDays: Extract from user input, default to 7\n- fundingAmount: Only include if user mentions funding (e.g. \\\"fund with 100\\\"), otherwise omit\n- tokenType: \\\"PULSE\\\" (default) or \\\"ICP\\\" if user specifies ICP\n\nFor general questions about the platform or how things work, respond with helpful text (NOT JSON).\n\nBe concise and friendly.";
 
     // Construct user prompt with context
     let fullPrompt = if (conversationContext != "") {
@@ -2613,7 +2613,8 @@ persistent actor class polls_surveys_backend() = this {
     };
 
     // Construct gateway request body
-    let requestBody = "{\"model\":\"gpt-4o-mini\",\"prompt\":\"" # escapeJsonString(fullPrompt) # "\",\"seed\":" # Nat.toText(requestSeed) # ",\"temperature\":0.7,\"max_tokens\":500,\"system_prompt\":\"" # escapeJsonString(systemPrompt) # "\"}";
+    // Note: temperature must be 0 when using seed for deterministic results
+    let requestBody = "{\"model\":\"gpt-4o-mini\",\"prompt\":\"" # escapeJsonString(fullPrompt) # "\",\"seed\":" # Nat.toText(requestSeed) # ",\"temperature\":0,\"max_tokens\":500,\"system_prompt\":\"" # escapeJsonString(systemPrompt) # "\"}";
 
     Debug.print("=== SENDING CHAT MESSAGE TO AI GATEWAY ===");
     Debug.print("User message: " # userMessage);
@@ -2648,11 +2649,13 @@ persistent actor class polls_surveys_backend() = this {
         };
 
         Debug.print("Chat response received");
+        Debug.print("Raw gateway response: " # responseText);
 
         // Extract content from gateway response
         switch (parseGatewayContent(responseText)) {
           case (#ok(content)) {
             Debug.print("Successfully parsed chat response");
+            Debug.print("Extracted content: " # content);
             #ok(content)
           };
           case (#err(errMsg)) {
