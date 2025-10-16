@@ -137,20 +137,46 @@ export function AIChatbox({ onOptionsGenerated, isOpen: externalIsOpen, onToggle
         msg.content
       ])
 
-      console.log(`Calling backend canister for chat with message: "${currentInput}"`)
+      console.log('=== FRONTEND: CALLING BACKEND ===')
+      console.log('Backend object:', backend)
+      console.log('Message:', currentInput)
+      console.log('Conversation history:', conversationHistory)
+      console.log('About to call backend.chat_message()...')
 
       // Call the backend canister's chat_message function
-      const result = await backend.chat_message(currentInput, conversationHistory)
+      let result
+      try {
+        result = await backend.chat_message(currentInput, conversationHistory)
+        console.log('=== FRONTEND: BACKEND CALL COMPLETED ===')
+        console.log('Raw result object:', result)
+        console.log('Result type:', typeof result)
+        console.log('Result keys:', Object.keys(result))
+      } catch (callError) {
+        console.error('=== FRONTEND: BACKEND CALL FAILED ===')
+        console.error('Call error:', callError)
+        console.error('Error type:', typeof callError)
+        console.error('Error message:', callError instanceof Error ? callError.message : String(callError))
+        console.error('Error stack:', callError instanceof Error ? callError.stack : 'N/A')
+        throw callError
+      }
 
+      console.log('=== FRONTEND: CHECKING RESULT ===')
       if ('ok' in result) {
         const aiMessage = result.ok
-        console.log(`Successfully got chat response from backend canister`)
-        console.log('AI Response:', aiMessage)
+        console.log('Result has "ok" property')
+        console.log('AI Message type:', typeof aiMessage)
+        console.log('AI Message length:', aiMessage.length)
+        console.log('AI Message:', aiMessage)
 
         // Try to parse as JSON for poll creation
+        console.log('=== FRONTEND: PARSING JSON ===')
+        console.log('Attempting to parse AI message as JSON...')
         try {
           const pollData = JSON.parse(aiMessage)
+          console.log('✓ JSON parsing successful')
           console.log('Parsed poll data:', pollData)
+          console.log('Poll data type:', typeof pollData)
+          console.log('Poll data keys:', Object.keys(pollData))
 
           if (pollData.action === 'create_poll') {
             console.log('Poll creation request detected:', pollData)
@@ -202,6 +228,9 @@ export function AIChatbox({ onOptionsGenerated, isOpen: externalIsOpen, onToggle
           }
         } catch (parseError) {
           // Not JSON - display as normal text message
+          console.log('=== FRONTEND: JSON PARSING FAILED ===')
+          console.log('Parse error:', parseError)
+          console.log('Will display as plain text message')
           const aiResponse: Message = {
             id: (Date.now() + 1).toString(),
             content: aiMessage,
@@ -211,11 +240,16 @@ export function AIChatbox({ onOptionsGenerated, isOpen: externalIsOpen, onToggle
           setMessages(prev => [...prev, aiResponse])
         }
       } else {
+        console.error('=== FRONTEND: RESULT HAS ERROR ===')
         console.error('Backend canister returned error:', result.err)
         throw new Error(result.err || 'Failed to get AI response from canister')
       }
     } catch (error) {
+      console.error('=== FRONTEND: TOP LEVEL ERROR ===')
       console.error('Error sending message:', error)
+      console.error('Error name:', error instanceof Error ? error.name : 'N/A')
+      console.error('Error message:', error instanceof Error ? error.message : String(error))
+      console.error('Error stack:', error instanceof Error ? error.stack : 'N/A')
       const errorResponse: Message = {
         id: (Date.now() + 1).toString(),
         content: 'Sorry, I encountered an error. Please try again later.',
