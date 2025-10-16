@@ -213,14 +213,38 @@ export default function PollAdmin() {
       }
 
       if ('ok' in result) {
-        // Success - reload polls
-        window.location.reload()
+        // Fetch the updated poll to get new status
+        const updatedPollData = await backend.get_poll(pollId)
+
+        if (updatedPollData && updatedPollData.length > 0 && updatedPollData[0]) {
+          // Update the poll in local state
+          setPolls(prevPolls =>
+            prevPolls.map(p =>
+              p.id.toString() === pollId.toString()
+                ? updatedPollData[0]
+                : p
+            )
+          )
+        }
+
+        toast({
+          title: "Success",
+          description: "Poll status updated successfully",
+        })
       } else if ('err' in result) {
-        alert(`Error: ${result.err}`)
+        toast({
+          title: "Error",
+          description: result.err,
+          variant: "destructive",
+        })
       }
     } catch (error) {
       console.error('Error updating poll status:', error)
-      alert('Failed to update poll status')
+      toast({
+        title: "Error",
+        description: "Failed to update poll status",
+        variant: "destructive",
+      })
     }
   }
 
