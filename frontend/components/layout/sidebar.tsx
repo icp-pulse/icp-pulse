@@ -4,31 +4,46 @@ import { cn } from "@lib/utils";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useIsAdmin } from "@/components/AdminGuard";
+import { useIcpAuth } from "@/components/IcpAuthProvider";
 
 interface SidebarProps {
   activeTab: "projects" | "surveys" | "polls" | "airdrops" | "quests" | "holders";
   onTabChange: (tab: "projects" | "surveys" | "polls" | "airdrops" | "quests" | "holders") => void;
   isCollapsed: boolean;
+  mode?: "creator" | "admin"; // Mode determines which stats to show
 }
 
-export default function Sidebar({ activeTab, onTabChange, isCollapsed }: SidebarProps) {
+export default function Sidebar({ activeTab, onTabChange, isCollapsed, mode = "creator" }: SidebarProps) {
   const isAdmin = useIsAdmin();
+  const { identity, isAuthenticated } = useIcpAuth();
   const router = useRouter();
 
-  // Fetch stats from ICP backend (single query for all counts)
+  // Fetch stats from ICP backend
+  // - Creator mode: use authenticated backend and get_my_stats (user's own content)
+  // - Admin mode: use anonymous backend and get_stats (global statistics)
   const { data: stats } = useQuery({
-    queryKey: ["stats"],
+    queryKey: ["stats", mode, isAuthenticated],
     queryFn: async () => {
-      const { createBackend } = await import('@/lib/icp')
       const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
       const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
-      const backend = await createBackend({ canisterId, host })
-      return await backend.get_stats()
+
+      if (mode === "creator" && isAuthenticated) {
+        // Creator mode: fetch user-specific stats with authentication
+        const { createBackendWithIdentity } = await import('@/lib/icp')
+        const backend = await createBackendWithIdentity({ canisterId, host, identity })
+        return await backend.get_my_stats()
+      } else {
+        // Admin mode or not authenticated: fetch global stats
+        const { createBackend } = await import('@/lib/icp')
+        const backend = await createBackend({ canisterId, host })
+        return await backend.get_stats()
+      }
     },
     staleTime: 30000, // Cache for 30 seconds
     retry: 1,
     refetchOnMount: true,
     refetchOnWindowFocus: false,
+    enabled: mode === "admin" || isAuthenticated, // Only run if authenticated in creator mode
   });
 
   // Fetch token holder count

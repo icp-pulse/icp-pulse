@@ -348,6 +348,17 @@ export const idlFactory = ({ IDL: I = IDL }) => {
       ],
       ['query']
     ),
+    get_my_stats: I.Func(
+      [],
+      [
+        I.Record({
+          pollCount: I.Nat,
+          surveyCount: I.Nat,
+          projectCount: I.Nat
+        })
+      ],
+      ['query']
+    ),
     get_project_stats: I.Func([I.Nat], [I.Opt(ProjectStats)], ['query']),
     get_projects_stats: I.Func([I.Vec(I.Nat)], [I.Vec(ProjectStats)], ['query']),
     get_supported_tokens: I.Func(

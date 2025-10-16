@@ -1894,7 +1894,7 @@ persistent actor class polls_surveys_backend() = this {
     }
   };
 
-  // Get counts for sidebar stats
+  // Get counts for sidebar stats (global - admin view)
   public query func get_stats() : async { projectCount: Nat; surveyCount: Nat; pollCount: Nat } {
     var surveyCount = 0;
     var pollCount = 0;
@@ -1913,6 +1913,27 @@ persistent actor class polls_surveys_backend() = this {
 
     {
       projectCount = projects.size();
+      surveyCount = surveyCount;
+      pollCount = pollCount;
+    }
+  };
+
+  // Get counts for current user (creator view)
+  public shared query(msg) func get_my_stats() : async { projectCount: Nat; surveyCount: Nat; pollCount: Nat } {
+    // Count user's projects
+    let myProjects = Array.filter<Project>(projects, func p = p.createdBy == msg.caller);
+    let projectCount = myProjects.size();
+
+    // Count user's surveys
+    let mySurveys = Array.filter<Survey>(surveys, func s = s.createdBy == msg.caller);
+    let surveyCount = mySurveys.size();
+
+    // Count user's polls
+    let myPolls = Array.filter<Poll>(polls, func p = p.createdBy == msg.caller);
+    let pollCount = myPolls.size();
+
+    {
+      projectCount = projectCount;
       surveyCount = surveyCount;
       pollCount = pollCount;
     }

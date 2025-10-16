@@ -35,7 +35,7 @@ function AdminDashboardContent() {
           onSidebarToggle={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         />
         <div className="flex pt-16">
-          <Sidebar activeTab={activeTab} onTabChange={setActiveTab} isCollapsed={isSidebarCollapsed} />
+          <Sidebar activeTab={activeTab} onTabChange={setActiveTab} isCollapsed={isSidebarCollapsed} mode="admin" />
           <main className={`flex-1 flex flex-col overflow-hidden transition-all duration-300 ${isSidebarCollapsed ? 'ml-16' : 'ml-64'}`}>
             <div className="flex-1 overflow-auto px-6 py-4">
               {activeTab === 'projects' && (
