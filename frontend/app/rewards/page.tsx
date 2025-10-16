@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Coins, Gift, CheckCircle, Clock, AlertCircle } from 'lucide-react'
 import { analytics } from '@/lib/analytics'
+import { useToast } from '@/hooks/use-toast'
 
 import type { PendingReward, RewardStatus } from '@/lib/types'
 
@@ -27,6 +28,7 @@ interface DisplayReward {
 
 export default function RewardsPage() {
   const { identity, isAuthenticated } = useIcpAuth()
+  const { toast } = useToast()
   const [rewards, setRewards] = useState<DisplayReward[]>([])
   const [loading, setLoading] = useState(true)
   const [claiming, setClaiming] = useState<Record<string, boolean>>({})
@@ -47,6 +49,7 @@ export default function RewardsPage() {
 
           const userPrincipal = identity.getPrincipal()
           const backendRewards = await backend.get_claimable_rewards(userPrincipal)
+          console.log('backendrewards', backendRewards)
 
           // Transform backend rewards to display format
           const displayRewards: DisplayReward[] = backendRewards.map((reward: any) => ({
@@ -57,7 +60,7 @@ export default function RewardsPage() {
             tokenSymbol: reward.tokenSymbol,
             tokenDecimals: reward.tokenDecimals,
             tokenCanister: reward.tokenCanister && reward.tokenCanister.length > 0 ? reward.tokenCanister[0]?.toString() : undefined,
-            status: reward.pollClosed ? 'pending' : 'processing', // pending = claimable, processing = poll still active
+            status: reward.claimsAreOpen ? 'pending' : 'processing', // pending = claimable, processing = poll still active
             claimedAt: undefined,
             votedAt: Date.now() // Not tracked in new system, use current time
           }))
@@ -133,17 +136,30 @@ export default function RewardsPage() {
         // Remove claimed reward from list since it's no longer claimable
         setRewards(prev => prev.filter(reward => reward.pollId !== pollId))
 
-        alert(result.ok)
+        toast({
+          title: "Success",
+          description: result.ok,
+          className: "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800",
+        })
       } else {
-        alert('Failed to claim reward: ' + result.err)
+        toast({
+          title: "Error",
+          description: 'Failed to claim reward: ' + result.err,
+          variant: "destructive",
+        })
       }
     } catch (error) {
       console.error('Failed to claim reward:', error)
-      alert('Failed to claim reward. Please try again.')
+      toast({
+        title: "Error",
+        description: 'Failed to claim reward. Please try again.',
+        variant: "destructive",
+      })
     } finally {
       setClaiming(prev => ({ ...prev, [pollId]: false }))
     }
   }
+  console.log('rewards', rewards)
 
   const claimableRewards = rewards.filter(r => r.status === 'pending') // Poll closed, can claim
   const activeRewards = rewards.filter(r => r.status === 'processing') // Poll still active

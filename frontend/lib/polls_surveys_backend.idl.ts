@@ -47,6 +47,7 @@ export const idlFactory = ({ IDL: I = IDL }) => {
   })
   const ClaimableReward = I.Record({
     tokenDecimals: I.Nat8,
+    claimsAreOpen: I.Bool,
     pollTitle: I.Text,
     tokenSymbol: I.Text,
     pollClosed: I.Bool,
