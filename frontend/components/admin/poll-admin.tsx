@@ -291,9 +291,14 @@ export default function PollAdmin() {
           )
         }
 
+        // Format the amounts for display
+        const { withdrawnAmount, escrowAmount, tokenSymbol, tokenDecimals } = result.ok
+        const formattedWithdrawn = formatFundAmount(withdrawnAmount, tokenDecimals)
+        const formattedEscrow = formatFundAmount(escrowAmount, tokenDecimals)
+
         toast({
           title: "Success",
-          description: result.ok,
+          description: `Successfully withdrew ${formattedWithdrawn} ${tokenSymbol} to your account. ${formattedEscrow} ${tokenSymbol} remains in escrow for pending claims.`,
           className: "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800",
         })
       } else if ('err' in result) {
@@ -346,9 +351,14 @@ export default function PollAdmin() {
           )
         }
 
+        // Format the amounts for display
+        const { donatedAmount, escrowAmount, tokenSymbol, tokenDecimals } = result.ok
+        const formattedDonated = formatFundAmount(donatedAmount, tokenDecimals)
+        const formattedEscrow = formatFundAmount(escrowAmount, tokenDecimals)
+
         toast({
           title: "Success",
-          description: result.ok,
+          description: `Successfully donated ${formattedDonated} ${tokenSymbol} to the treasury. ${formattedEscrow} ${tokenSymbol} remains in escrow for pending claims.`,
           className: "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800",
         })
       } else if ('err' in result) {

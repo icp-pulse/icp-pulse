@@ -137,6 +137,20 @@ persistent actor class polls_surveys_backend() = this {
     pollClosed: Bool;    // DEPRECATED: Same as claimsAreOpen. Kept for backward compatibility with existing clients.
   };
 
+  type WithdrawResult = {
+    withdrawnAmount: Nat64;
+    escrowAmount: Nat64;
+    tokenSymbol: Text;
+    tokenDecimals: Nat8;
+  };
+
+  type DonateResult = {
+    donatedAmount: Nat64;
+    escrowAmount: Nat64;
+    tokenSymbol: Text;
+    tokenDecimals: Nat8;
+  };
+
   type ScopeType = { #project; #product };
 
   type Project = {
@@ -327,47 +341,6 @@ persistent actor class polls_surveys_backend() = this {
         };
       };
     };
-  };
-
-  // Format token amount with decimals for human-readable display
-  private func formatTokenAmount(amount: Nat64, decimals: Nat8) : Text {
-    let divisor = 10 ** Nat8.toNat(decimals);
-    let amountNat = Nat64.toNat(amount);
-    let quotient = amountNat / divisor;
-    let remainder = amountNat % divisor;
-
-    if (remainder == 0) {
-      return Nat.toText(quotient);
-    };
-
-    // Convert remainder to text and pad with leading zeros
-    var remainderText = Nat.toText(remainder);
-    let paddingNeeded = Nat8.toNat(decimals) - remainderText.size();
-
-    // Add leading zeros
-    var i = 0;
-    while (i < paddingNeeded) {
-      remainderText := "0" # remainderText;
-      i += 1;
-    };
-
-    // Remove trailing zeros
-    var endIndex = remainderText.size();
-    label trimLoop while (endIndex > 0) {
-      let charIndex = endIndex - 1;
-      let char = Text.toArray(remainderText)[charIndex];
-      if (char != '0') {
-        break trimLoop;
-      };
-      endIndex -= 1;
-    };
-
-    if (endIndex == 0) {
-      return Nat.toText(quotient);
-    };
-
-    let trimmedRemainder = Text.fromIter(Array.slice(Text.toArray(remainderText), 0, endIndex).vals());
-    Nat.toText(quotient) # "." # trimmedRemainder
   };
 
   private func toScopeType(txt : Text) : ScopeType { if (txt == "project") { #project } else { #product } };
@@ -2984,7 +2957,7 @@ persistent actor class polls_surveys_backend() = this {
   };
 
   // Withdraw unused funds from a closed poll back to the creator
-  public shared (msg) func withdraw_unused_funds(pollId : PollId) : async Result.Result<Text, Text> {
+  public shared (msg) func withdraw_unused_funds(pollId : PollId) : async Result.Result<WithdrawResult, Text> {
     let pollOpt = findPoll(pollId);
     switch (pollOpt) {
       case null { return #err("Poll not found") };
@@ -3057,9 +3030,12 @@ persistent actor class polls_surveys_backend() = this {
                         } else { p }
                       });
 
-                      let message = "Successfully withdrew " # formatTokenAmount(withdrawAmount, info.tokenDecimals) # " " # info.tokenSymbol # " to your account. " #
-                                   formatTokenAmount(totalPendingClaims, info.tokenDecimals) # " " # info.tokenSymbol # " remains in escrow for pending claims.";
-                      #ok(message)
+                      #ok({
+                        withdrawnAmount = withdrawAmount;
+                        escrowAmount = totalPendingClaims;
+                        tokenSymbol = info.tokenSymbol;
+                        tokenDecimals = info.tokenDecimals;
+                      })
                     };
                     case (#Err(error)) {
                       #err("Transfer failed: " # debug_show(error))
@@ -3077,7 +3053,7 @@ persistent actor class polls_surveys_backend() = this {
   };
 
   // Donate unused funds from a closed poll to the treasury
-  public shared (msg) func donate_unused_funds(pollId : PollId) : async Result.Result<Text, Text> {
+  public shared (msg) func donate_unused_funds(pollId : PollId) : async Result.Result<DonateResult, Text> {
     let pollOpt = findPoll(pollId);
     switch (pollOpt) {
       case null { return #err("Poll not found") };
@@ -3143,9 +3119,12 @@ persistent actor class polls_surveys_backend() = this {
               } else { p }
             });
 
-            let message = "Successfully donated " # formatTokenAmount(donationAmount, info.tokenDecimals) # " " # info.tokenSymbol # " to the treasury. " #
-                         formatTokenAmount(totalPendingClaims, info.tokenDecimals) # " " # info.tokenSymbol # " remains in escrow for pending claims.";
-            #ok(message)
+            #ok({
+              donatedAmount = donationAmount;
+              escrowAmount = totalPendingClaims;
+              tokenSymbol = info.tokenSymbol;
+              tokenDecimals = info.tokenDecimals;
+            })
           }
         }
       }
