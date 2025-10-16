@@ -299,7 +299,7 @@ export default function PollAdmin() {
         toast({
           title: "Success",
           description: `Successfully withdrew ${formattedWithdrawn} ${tokenSymbol} to your account. ${formattedEscrow} ${tokenSymbol} remains in escrow for pending claims.`,
-          className: "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800",
+          className: "bg-green-100 dark:bg-green-900 border-green-200 dark:border-green-800",
         })
       } else if ('err' in result) {
         toast({
@@ -359,7 +359,7 @@ export default function PollAdmin() {
         toast({
           title: "Success",
           description: `Successfully donated ${formattedDonated} ${tokenSymbol} to the treasury. ${formattedEscrow} ${tokenSymbol} remains in escrow for pending claims.`,
-          className: "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800",
+          className: "bg-green-100 dark:bg-green-900 border-green-200 dark:border-green-800",
         })
       } else if ('err' in result) {
         toast({

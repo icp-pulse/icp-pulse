@@ -40,7 +40,7 @@ export default function PollsPage() {
   const [voteSuccessDialog, setVoteSuccessDialog] = useState<bigint | null>(null)
   const [voteSuccess, setVoteSuccess] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
-  const [statusFilter, setStatusFilter] = useState('all')
+  const [statusFilter, setStatusFilter] = useState('active')
   const [projectFilter, setProjectFilter] = useState('all')
   const [sortBy, setSortBy] = useState('recent')
   const [viewMode, setViewMode] = useState<'table' | 'grid'>('grid')
