@@ -1558,7 +1558,8 @@ persistent actor class polls_surveys_backend() = this {
   private var rewardsArray : [PendingReward] = [];
   private var rewards = Map.new<Text, PendingReward>();
 
-  // Storage for OpenAI API key
+  // DEPRECATED: OpenAI API key - kept for stable variable compatibility
+  // No longer used - gateway handles authentication
   private var openaiApiKey : Text = "";
 
   // Platform fee configuration (10% fee)
@@ -2000,7 +2001,7 @@ persistent actor class polls_surveys_backend() = this {
     }
   };
 
-  // Transform function to normalize HTTP response for consensus
+  // Transform function to normalize HTTP response for consensus (legacy OpenAI)
   public query func transform(args: TransformArgs) : async HttpResponsePayload {
     {
       status = args.response.status;
@@ -2009,51 +2010,81 @@ persistent actor class polls_surveys_backend() = this {
     }
   };
 
-  // Set OpenAI API key (only callable by canister owner)
-  public shared(msg) func set_openai_api_key(key: Text) : async Bool {
-    // TODO: Add proper access control to restrict this to canister controller
+  // New transform function for gateway responses
+  // Gateway already returns deterministic format, so we just strip headers
+  public query func transform_gateway(args: TransformArgs) : async HttpResponsePayload {
+    {
+      status = args.response.status;
+      headers = []; // Strip all headers for consensus
+      body = args.response.body; // Keep full gateway response (already deterministic)
+    }
+  };
+
+  // DEPRECATED: Legacy OpenAI API key functions - kept for backward compatibility
+  // These are no longer used but maintained for stable interface compatibility
+  public shared(_msg) func set_openai_api_key(key: Text) : async Bool {
     openaiApiKey := key;
     true
   };
 
-  // Get current API key status (doesn't return the actual key)
   public query func has_openai_api_key() : async Bool {
     Text.size(openaiApiKey) > 0
   };
 
-  // Generate poll options using OpenAI
-  public func generate_poll_options(topic: Text) : async Result.Result<[Text], Text> {
-    if (Text.size(openaiApiKey) == 0) {
-      Debug.print("AI Generation Error: No OpenAI API key configured");
-      return #err("NO_API_KEY");
-    };
+  // Configuration for the deterministic AI gateway
+  // Set this to your deployed Cloudflare Worker URL
+  private stable var gatewayUrl : Text = "https://YOUR-WORKER.workers.dev/generate";
+  private stable var _gatewaySecret : Text = ""; // Optional: for additional verification (unused)
 
-    let apiKey = openaiApiKey;
+  // Set gateway URL (only callable by canister owner)
+  public shared(_msg) func set_gateway_url(url: Text) : async Bool {
+    // TODO: Add proper access control to restrict this to canister controller
+    gatewayUrl := url;
+    true
+  };
+
+  // Get current gateway URL
+  public query func get_gateway_url() : async Text {
+    gatewayUrl
+  };
+
+  // Generate poll options using deterministic AI gateway
+  // seed parameter: Optional seed for caching. If null, uses timestamp for fresh results
+  public func generate_poll_options(topic: Text, seed: ?Nat) : async Result.Result<[Text], Text> {
     let ic : ManagementCanisterActor = actor("aaaaa-aa");
 
-    // Construct the OpenAI API request with deterministic temperature for consensus
-    // NOTE: temperature MUST be 0 for IC consensus - each replica makes independent requests
-    let requestBody = "{\"model\":\"gpt-4o-mini\",\"messages\":[{\"role\":\"system\",\"content\":\"You are a helpful assistant. Return ONLY a JSON array of 4 poll option strings, nothing else. Format: [\\\"option1\\\",\\\"option2\\\",\\\"option3\\\",\\\"option4\\\"]\"},{\"role\":\"user\",\"content\":\"Generate 4 poll options for: " # topic # "\"}],\"temperature\":0,\"max_tokens\":150}";
+    // Generate seed: use provided seed or timestamp for fresh results
+    let requestSeed = switch (seed) {
+      case (?s) { s };
+      case null { Int.abs(Time.now()) }; // Fresh results every time
+    };
 
-    // DEBUG: Log the request we're sending to OpenAI
-    Debug.print("=== SENDING REQUEST TO OPENAI ===");
+    // System prompt for generating poll options
+    let systemPrompt = "You are a helpful assistant. Return ONLY a JSON array of 4 poll option strings, nothing else. Format: [\\\"option1\\\",\\\"option2\\\",\\\"option3\\\",\\\"option4\\\"]";
+
+    // Construct gateway request body
+    let requestBody = "{\"model\":\"gpt-4o-mini\",\"prompt\":\"Generate 4 poll options for: " # topic # "\",\"seed\":" # Nat.toText(requestSeed) # ",\"temperature\":0,\"max_tokens\":150,\"system_prompt\":\"" # systemPrompt # "\"}";
+
+    // DEBUG: Log the request we're sending to gateway
+    Debug.print("=== SENDING REQUEST TO AI GATEWAY ===");
     Debug.print("Poll topic: " # topic);
+    Debug.print("Seed: " # Nat.toText(requestSeed));
+    Debug.print("Gateway URL: " # gatewayUrl);
     Debug.print("Request body: " # requestBody);
 
     let requestBodyBlob = Text.encodeUtf8(requestBody);
 
     let httpHeader : [HttpHeader] = [
-      { name = "Content-Type"; value = "application/json" },
-      { name = "Authorization"; value = "Bearer " # apiKey }
+      { name = "Content-Type"; value = "application/json" }
     ];
 
     let request : CanisterHttpRequestArgs = {
-      url = "https://api.openai.com/v1/chat/completions";
+      url = gatewayUrl;
       max_response_bytes = ?10000;
       headers = httpHeader;
       body = ?requestBodyBlob;
       method = #post;
-      transform = ?{function = transform; context = Blob.fromArray([])};
+      transform = ?{function = transform_gateway; context = Blob.fromArray([])};
     };
 
     // Add cycles for the HTTPS outcall (50B cycles for HTTPS request)
@@ -2062,13 +2093,13 @@ persistent actor class polls_surveys_backend() = this {
     try {
       let response = await ic.http_request(request);
 
-      Debug.print("OpenAI Response Status: " # Nat.toText(response.status));
+      Debug.print("Gateway Response Status: " # Nat.toText(response.status));
       Debug.print("Response body size: " # Nat.toText(response.body.size()));
 
       // DEBUG: Log the actual response.body (this is AFTER transform)
       switch (Text.decodeUtf8(response.body)) {
         case (?bodyText) {
-          Debug.print("Response body (after transform, first 1000 chars): " # textPrefix(bodyText, 1000));
+          Debug.print("Response body (after transform): " # textPrefix(bodyText, 1000));
         };
         case null {
           Debug.print("Could not decode response.body as UTF-8");
@@ -2084,17 +2115,18 @@ persistent actor class polls_surveys_backend() = this {
           };
         };
 
-        Debug.print("OpenAI Response (already transformed): " # responseText);
+        Debug.print("Gateway Response: " # responseText);
         Debug.print("Response length: " # Nat.toText(Text.size(responseText)));
 
-        // Parse the OpenAI response to extract the poll options
-        switch (parseOpenAIResponse(responseText)) {
+        // Parse the gateway response to extract the poll options
+        // Gateway returns: {"content": "[\"opt1\",\"opt2\",...]", "signature": "...", ...}
+        switch (parseGatewayResponse(responseText)) {
           case (#ok(options)) {
-            Debug.print("Successfully parsed " # Nat.toText(options.size()) # " options from AI response");
+            Debug.print("Successfully parsed " # Nat.toText(options.size()) # " options from gateway");
             #ok(options)
           };
           case (#err(errMsg)) {
-            Debug.print("AI Generation Parse Error: " # errMsg);
+            Debug.print("Gateway Parse Error: " # errMsg);
             #err("PARSE_ERROR: " # errMsg)
           };
         };
@@ -2104,11 +2136,11 @@ persistent actor class polls_surveys_backend() = this {
           case (?text) { text };
           case null { "(could not decode error body)" };
         };
-        Debug.print("AI Generation HTTP Error: Status " # Nat.toText(response.status) # ", Body: " # errorBody);
+        Debug.print("Gateway HTTP Error: Status " # Nat.toText(response.status) # ", Body: " # errorBody);
         #err("HTTP_ERROR_" # Nat.toText(response.status) # ": " # errorBody)
       }
     } catch (error) {
-      Debug.print("AI Generation Exception: " # Error.message(error));
+      Debug.print("Gateway Exception: " # Error.message(error));
       #err("NETWORK_ERROR: " # Error.message(error))
     }
   };
@@ -2234,6 +2266,133 @@ persistent actor class polls_surveys_backend() = this {
         };
 
         if (options.size() >= 2) {
+          #ok(options)
+        } else {
+          #err("Parsed array has fewer than 2 options. Found: " # Nat.toText(options.size()))
+        }
+      };
+    }
+  };
+
+  // Helper function to parse gateway response
+  // Gateway returns: {"content": "[\"opt1\",\"opt2\",...]", "signature": "...", "model": "...", ...}
+  private func parseGatewayResponse(response: Text) : Result.Result<[Text], Text> {
+    Debug.print("Parsing gateway response: " # response);
+
+    // Find the "content" field in the gateway response
+    let contentPattern = "\"content\":\"";
+    let contentPos = findPattern(response, contentPattern, 0);
+
+    switch (contentPos) {
+      case null {
+        Debug.print("Could not find content field in gateway response");
+        #err("Could not find content field in gateway response")
+      };
+      case (?pos) {
+        // Extract the content value (which is a JSON array string)
+        let chars = Iter.toArray(Text.toIter(response));
+        let len = chars.size();
+        let startIdx = pos + Text.size(contentPattern);
+        var endIdx = startIdx;
+        var escapeNext = false;
+
+        // Find the closing quote of the content value
+        while (endIdx < len) {
+          if (escapeNext) {
+            escapeNext := false;
+          } else if (chars[endIdx] == '\\') {
+            escapeNext := true;
+          } else if (chars[endIdx] == '\"') {
+            // Found closing quote
+            let contentLen = if (endIdx > startIdx) { endIdx - startIdx } else { 0 };
+
+            if (contentLen == 0) {
+              Debug.print("Content field is empty");
+              return #err("Content field is empty");
+            };
+
+            let content = Text.fromIter(
+              Array.tabulate<Char>(contentLen, func(i) {
+                chars[startIdx + i]
+              }).vals()
+            );
+
+            Debug.print("Extracted content: " # content);
+
+            // Unescape the content: replace \" with "
+            // The gateway returns escaped quotes like: [\"opt1\",\"opt2\"]
+            // We need to convert to: ["opt1","opt2"]
+            let unescapedContent = Text.replace(content, #text("\\\""), "\"");
+            Debug.print("Unescaped content: " # unescapedContent);
+
+            // Now parse the content as a JSON array: ["opt1","opt2",...]
+            return parseJsonArray(unescapedContent);
+          };
+          endIdx += 1;
+        };
+
+        #err("Could not find closing quote for content field")
+      };
+    }
+  };
+
+  // Helper to parse a JSON array string: ["opt1","opt2","opt3","opt4"]
+  private func parseJsonArray(arrayStr: Text) : Result.Result<[Text], Text> {
+    let chars = Iter.toArray(Text.toIter(arrayStr));
+    let len = chars.size();
+
+    // Find opening bracket
+    var arrayStart : ?Nat = null;
+    var i = 0;
+    while (i < len and arrayStart == null) {
+      if (chars[i] == '[') {
+        arrayStart := ?i;
+      };
+      i += 1;
+    };
+
+    switch (arrayStart) {
+      case null { #err("No opening bracket found in JSON array") };
+      case (?start) {
+        // Parse array elements
+        var options : [Text] = [];
+        var currentOption : Text = "";
+        var inString = false;
+        var escapeNext = false;
+        var idx = start + 1;
+
+        while (idx < len) {
+          let char = chars[idx];
+
+          if (escapeNext) {
+            currentOption := currentOption # Text.fromChar(char);
+            escapeNext := false;
+          } else if (char == '\\') {
+            escapeNext := true;
+          } else if (char == '\"') {
+            if (inString) {
+              // End of string
+              if (Text.size(currentOption) > 0) {
+                options := Array.append(options, [currentOption]);
+              };
+              currentOption := "";
+              inString := false;
+            } else {
+              // Start of string
+              inString := true;
+            };
+          } else if (inString) {
+            currentOption := currentOption # Text.fromChar(char);
+          } else if (char == ']') {
+            // End of array
+            idx := len; // break
+          };
+
+          idx += 1;
+        };
+
+        if (options.size() >= 2) {
+          Debug.print("Parsed " # Nat.toText(options.size()) # " options from gateway content");
           #ok(options)
         } else {
           #err("Parsed array has fewer than 2 options. Found: " # Nat.toText(options.size()))

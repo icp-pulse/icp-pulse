@@ -10,10 +10,11 @@ export async function createBackend({ canisterId, host }: CanisterConfig) {
   const isLocal = !!host && (host.includes('127.0.0.1') || host.includes('localhost'))
 
   // Create agent with proper local development settings
-  const agent = new HttpAgent({
-    host,
-    verifyQuerySignatures: !isLocal
-  }) as HttpAgent
+  const agent = HttpAgent.createSync({
+    host
+    // Note: verifyQuerySignatures is removed as it can cause issues with update calls
+    // Update calls use ingress messages, not query signatures
+  })
 
   // For local development, fetch the root key to avoid certificate issues
   if (isLocal) {
@@ -52,11 +53,12 @@ export async function createBackendWithIdentity({ canisterId, host, identity }: 
 
   const isLocal = !!host && (host.includes('127.0.0.1') || host.includes('localhost'))
 
-  const agent = new HttpAgent({
+  const agent = HttpAgent.createSync({
     host,
-    identity,
-    verifyQuerySignatures: !isLocal
-  }) as HttpAgent
+    identity
+    // Note: verifyQuerySignatures is removed as it can cause issues with update calls
+    // Update calls use ingress messages, not query signatures
+  })
 
   // For local development, fetch the root key to avoid certificate issues
   if (isLocal) {
@@ -74,10 +76,11 @@ export async function createBackendWithIdentity({ canisterId, host, identity }: 
 export async function createActor({ canisterId, host, idlFactory }: CanisterConfigWithIDL) {
   const isLocal = !!host && (host.includes('127.0.0.1') || host.includes('localhost'))
 
-  const agent = new HttpAgent({
-    host,
-    verifyQuerySignatures: !isLocal
-  }) as HttpAgent
+  const agent = HttpAgent.createSync({
+    host
+    // Note: verifyQuerySignatures is removed as it can cause issues with update calls
+    // Update calls use ingress messages, not query signatures
+  })
 
   if (isLocal) {
     try {

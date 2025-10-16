@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createBackend } from '@/lib/icp'
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,76 +12,46 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const apiKey = process.env.OPENAI_API_KEY
-    if (!apiKey) {
+    // Get canister configuration
+    const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID
+    const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local'
+      ? 'http://127.0.0.1:4943'
+      : 'https://ic0.app'
+
+    if (!canisterId) {
       return NextResponse.json(
-        { error: 'OpenAI API key not configured' },
+        { error: 'Backend canister not configured' },
         { status: 500 }
       )
     }
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a helpful assistant. Return ONLY a JSON array of 4 poll option strings, nothing else. Format: ["option1","option2","option3","option4"]'
-          },
-          {
-            role: 'user',
-            content: `Generate 4 poll options for: ${title}`
-          }
-        ],
-        temperature: 0.7, // Can use creative temperature since no consensus needed
-        max_tokens: 150
-      })
-    })
+    // Generate a random seed on the server side
+    // This ensures all ICP replicas will use the same seed
+    const seed = Math.floor(Math.random() * 1000000000)
 
-    if (!response.ok) {
-      const errorData = await response.json()
-      return NextResponse.json(
-        { error: errorData.error?.message || 'OpenAI API error' },
-        { status: response.status }
-      )
-    }
+    console.log(`Calling ICP canister to generate options for: "${title}" with seed: ${seed}`)
 
-    const data = await response.json()
-    const content = data.choices[0]?.message?.content
+    const backend = await createBackend({ canisterId, host })
 
-    if (!content) {
-      return NextResponse.json(
-        { error: 'No content in OpenAI response' },
-        { status: 500 }
-      )
-    }
+    // Call the ICP canister's generate_poll_options function
+    // The canister will make the HTTP outcall to the deterministic gateway
+    const result = await backend.generate_poll_options(title, [BigInt(seed)])
 
-    // Parse the JSON array from the content
-    try {
-      const options = JSON.parse(content)
-      if (!Array.isArray(options) || options.length < 2) {
-        return NextResponse.json(
-          { error: 'Invalid options format from AI' },
-          { status: 500 }
-        )
-      }
-
+    if ('ok' in result) {
+      const options = result.ok
+      console.log(`Successfully generated ${options.length} options from ICP canister`)
       return NextResponse.json({ options })
-    } catch (parseError) {
+    } else {
+      console.error('ICP canister returned error:', result.err)
       return NextResponse.json(
-        { error: 'Could not parse AI response as JSON' },
+        { error: result.err || 'Failed to generate options from canister' },
         { status: 500 }
       )
     }
   } catch (error) {
     console.error('Error generating poll options:', error)
     return NextResponse.json(
-      { error: 'Failed to generate options' },
+      { error: error instanceof Error ? error.message : 'Failed to generate options' },
       { status: 500 }
     )
   }
