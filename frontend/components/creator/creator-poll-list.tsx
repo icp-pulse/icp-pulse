@@ -38,7 +38,7 @@ export default function CreatorPollList() {
   const [projects, setProjects] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const { identity, isAuthenticated } = useIcpAuth()
+  const { identity, isAuthenticated, authProvider, principalText } = useIcpAuth()
   const router = useRouter()
 
   // Fetch user's polls from ICP backend
@@ -155,6 +155,30 @@ export default function CreatorPollList() {
     return decimal ? `${quotient}.${decimal}` : quotient.toString()
   }
 
+  // Check if current user is the creator of a poll
+  const isCreator = (poll: any) => {
+    let userPrincipal: string | null = null
+
+    // Handle Plug wallet authentication
+    if (authProvider === 'plug') {
+      userPrincipal = principalText
+    }
+    // Handle Internet Identity / NFID authentication
+    else if (identity) {
+      userPrincipal = identity.getPrincipal().toText()
+    } else {
+      return false
+    }
+
+    if (!userPrincipal) {
+      return false
+    }
+
+    const pollCreator = poll.createdBy?.toText?.() || poll.createdBy?.toString()
+    const match = userPrincipal === pollCreator
+    return match
+  }
+
   const getProjectName = (scopeId: any): string => {
     if (!scopeId || scopeId.toString() === '0') return 'No Project'
     const project = projects.find(p => p.id.toString() === scopeId.toString())
@@ -201,12 +225,24 @@ export default function CreatorPollList() {
       }
 
       if ('ok' in result) {
+        // Fetch the updated poll to get new status
+        const updatedPollData = await backend.get_poll(pollId)
+
+        if (updatedPollData && updatedPollData.length > 0 && updatedPollData[0]) {
+          // Update the poll in local state
+          setPolls(prevPolls =>
+            prevPolls.map(p =>
+              p.id.toString() === pollId.toString()
+                ? updatedPollData[0]
+                : p
+            )
+          )
+        }
+
         toast({
           title: "Success",
           description: "Poll status updated successfully",
         })
-        // Reload polls
-        window.location.reload()
       } else if ('err' in result) {
         toast({
           title: "Error",
@@ -502,6 +538,113 @@ export default function CreatorPollList() {
                     </div>
                   )}
                 </div>
+
+                {/* Status Management (only for creators) */}
+                {isCreator(poll) && (
+                  <div className="pt-3 border-t">
+                    <p className="text-xs font-medium text-gray-500 mb-2">Poll Status Management</p>
+                    <div className="flex flex-wrap gap-2">
+                      {statusToString(poll.status) === 'Active' && (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleStatusTransition(poll.id, 'pause')}
+                            className="text-xs"
+                          >
+                            <Pause className="w-3 h-3 mr-1" />
+                            Pause
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleStatusTransition(poll.id, 'start_claiming')}
+                            className="text-xs"
+                          >
+                            <Gift className="w-3 h-3 mr-1" />
+                            Start Claiming
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleStatusTransition(poll.id, 'close')}
+                            className="text-xs text-red-600 hover:bg-red-50"
+                          >
+                            <XCircle className="w-3 h-3 mr-1" />
+                            Close
+                          </Button>
+                        </>
+                      )}
+                      {statusToString(poll.status) === 'Paused' && (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleStatusTransition(poll.id, 'resume')}
+                            className="text-xs"
+                          >
+                            <Play className="w-3 h-3 mr-1" />
+                            Resume
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleStatusTransition(poll.id, 'start_claiming')}
+                            className="text-xs"
+                          >
+                            <Gift className="w-3 h-3 mr-1" />
+                            Start Claiming
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleStatusTransition(poll.id, 'close')}
+                            className="text-xs text-red-600 hover:bg-red-50"
+                          >
+                            <XCircle className="w-3 h-3 mr-1" />
+                            Close
+                          </Button>
+                        </>
+                      )}
+                      {statusToString(poll.status) === 'Claims Open' && (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleStatusTransition(poll.id, 'end_claiming')}
+                            className="text-xs"
+                          >
+                            <Ban className="w-3 h-3 mr-1" />
+                            End Claiming
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => handleStatusTransition(poll.id, 'close')}
+                            className="text-xs text-red-600 hover:bg-red-50"
+                          >
+                            <XCircle className="w-3 h-3 mr-1" />
+                            Close
+                          </Button>
+                        </>
+                      )}
+                      {statusToString(poll.status) === 'Claims Ended' && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleStatusTransition(poll.id, 'close')}
+                          className="text-xs text-red-600 hover:bg-red-50"
+                        >
+                          <XCircle className="w-3 h-3 mr-1" />
+                          Close
+                        </Button>
+                      )}
+                      {statusToString(poll.status) === 'Closed' && (
+                        <p className="text-xs text-gray-500 italic">Poll is permanently closed</p>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* Actions */}
                 <div className="flex gap-2 pt-2">
