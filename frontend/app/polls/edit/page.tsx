@@ -100,7 +100,7 @@ function EditPollContent() {
   }
 
   const handleViewPolls = () => {
-    router.push('/admin?tab=polls')
+    router.push('/creator?tab=polls')
   }
 
   if (loading) {
@@ -131,7 +131,7 @@ function EditPollContent() {
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">Unable to Load Poll</h1>
           <p className="text-gray-600 dark:text-gray-400 mb-4">{err || 'No poll ID provided'}</p>
-          <Button onClick={() => router.push('/admin?tab=polls')}>
+          <Button onClick={() => router.push('/creator?tab=polls')}>
             Back to Polls
           </Button>
         </div>
@@ -145,7 +145,7 @@ function EditPollContent() {
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-4">Poll Not Found</h1>
           <p className="text-gray-600 dark:text-gray-400 mb-4">The requested poll could not be found.</p>
-          <Button onClick={() => router.push('/admin?tab=polls')}>
+          <Button onClick={() => router.push('/creator?tab=polls')}>
             Back to Polls
           </Button>
         </div>

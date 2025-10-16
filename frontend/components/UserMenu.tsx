@@ -10,8 +10,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { User, Settings, Shield, LogOut, Copy, TrendingUp } from 'lucide-react'
+import { User, Settings, Shield, LogOut, Copy, TrendingUp, LayoutDashboard } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { isAdmin } from '@/lib/admin-config'
 
 function truncatePrincipal(p: string) {
   return p.slice(0, 6) + '…' + p.slice(-4)
@@ -63,10 +64,16 @@ export function UserMenu() {
           <TrendingUp className="h-4 w-4 mr-2" />
           Token Stats
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => router.push('/admin')} className="cursor-pointer">
-          <Shield className="h-4 w-4 mr-2" />
-          Admin Panel
+        <DropdownMenuItem onClick={() => router.push('/creator')} className="cursor-pointer">
+          <LayoutDashboard className="h-4 w-4 mr-2" />
+          Creator Dashboard
         </DropdownMenuItem>
+        {isAdmin(principalText) && (
+          <DropdownMenuItem onClick={() => router.push('/admin')} className="cursor-pointer">
+            <Shield className="h-4 w-4 mr-2" />
+            Admin Panel
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem onClick={() => router.push('/settings')} className="cursor-pointer">
           <Settings className="h-4 w-4 mr-2" />
           Settings

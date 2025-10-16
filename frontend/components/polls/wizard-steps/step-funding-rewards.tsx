@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect } from 'react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -48,6 +49,14 @@ export function StepFundingRewards({
   }
 
   const tokenInfo = getSelectedTokenInfo()
+
+  // Ensure PULSE is set as default when funding is enabled
+  useEffect(() => {
+    if (fundingEnabled && !selectedToken) {
+      const pulseCanisterId = process.env.NEXT_PUBLIC_TOKENMANIA_CANISTER_ID || 'PULSE'
+      setValue('selectedToken', pulseCanisterId)
+    }
+  }, [fundingEnabled, selectedToken, setValue])
 
   // Calculate rewards based on distribution type
   // Note: Platform fee (10%) is deducted for self-funded and crowdfunded polls
@@ -174,9 +183,13 @@ export function StepFundingRewards({
               <Coins className="h-5 w-5 text-orange-600" />
               Reward Token
             </Label>
-            <Select onValueChange={(value) => setValue('selectedToken', value)} value={selectedToken}>
+            <Select
+              onValueChange={(value) => setValue('selectedToken', value)}
+              value={selectedToken}
+              defaultValue={process.env.NEXT_PUBLIC_TOKENMANIA_CANISTER_ID || 'PULSE'}
+            >
               <SelectTrigger id="selectedToken">
-                <SelectValue placeholder="Select token" />
+                <SelectValue placeholder="PULSE (Default)" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={process.env.NEXT_PUBLIC_TOKENMANIA_CANISTER_ID || 'PULSE'}>
@@ -185,7 +198,7 @@ export function StepFundingRewards({
                     <span className="text-sm text-gray-500">True Pulse Token</span>
                   </div>
                 </SelectItem>
-                {!tokensLoading && supportedTokens.map(([principal, symbol, decimals]) => {
+                {!tokensLoading && supportedTokens.map(([principal, symbol, _decimals]) => {
                   if (principal === process.env.NEXT_PUBLIC_TOKENMANIA_CANISTER_ID) return null
                   return (
                     <SelectItem key={principal} value={principal}>

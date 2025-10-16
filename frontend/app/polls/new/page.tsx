@@ -37,7 +37,7 @@ const wizardSteps: WizardStep[] = [
   }
 ]
 
-async function createPollAction(values: PollFormValues, identity: any, isAuthenticated: boolean) {
+async function createPollAction(values: PollFormValues, identity: any, isAuthenticated: boolean, authProvider: 'ii' | 'nfid' | 'plug' | null) {
   const { createBackendWithIdentity } = await import('@/lib/icp')
   const { Principal } = await import('@dfinity/principal')
 
@@ -80,9 +80,11 @@ async function createPollAction(values: PollFormValues, identity: any, isAuthent
         const feeBuffer = 20001n
         const approvalAmount = totalFundingE8s + feeBuffer
 
-        const isPlugWallet = typeof window !== 'undefined' && window.ic?.plug
+        // Use authProvider to determine which wallet is actually being used
+        const isPlugWallet = authProvider === 'plug'
 
         console.log('Starting token approval process...')
+        console.log('Auth provider:', authProvider)
         console.log('Selected token canister:', selectedToken)
         console.log('Backend canister:', backendCanisterId)
         console.log('Approval amount:', approvalAmount.toString())
@@ -303,7 +305,7 @@ function NewPollPageContent() {
   const [projects, setProjects] = useState<Project[]>([])
   const [aiGenerating, setAiGenerating] = useState(false)
   const [aiError, setAiError] = useState<string | null>(null)
-  const { identity, isAuthenticated } = useIcpAuth()
+  const { identity, isAuthenticated, authProvider } = useIcpAuth()
   const router = useRouter()
   const searchParams = useSearchParams()
 
@@ -374,10 +376,38 @@ function NewPollPageContent() {
       }
 
       // Call backend canister directly for poll option generation
-      const { createBackendWithIdentity } = await import('@/lib/icp')
       const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
       const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
-      const backend = await createBackendWithIdentity({ canisterId, host, identity })
+
+      // Use authProvider to determine which wallet is actually being used
+      const isPlugWallet = authProvider === 'plug'
+
+      let backend
+
+      if (isPlugWallet && window.ic?.plug) {
+        // Use Plug wallet
+        console.log('Using Plug wallet for AI option generation (auth provider:', authProvider, ')')
+        const whitelist = [canisterId]
+        const connected = await (window.ic.plug as any).requestConnect({
+          whitelist,
+          host
+        })
+
+        if (!connected) {
+          throw new Error('Failed to connect to Plug wallet')
+        }
+
+        const { idlFactory } = await import('@/../../src/declarations/polls_surveys_backend')
+        backend = await window.ic.plug.createActor({
+          canisterId,
+          interfaceFactory: idlFactory,
+        })
+      } else {
+        // Use Internet Identity / NFID
+        console.log('Using Internet Identity/NFID for AI option generation')
+        const { createBackendWithIdentity } = await import('@/lib/icp')
+        backend = await createBackendWithIdentity({ canisterId, host, identity })
+      }
 
       // Generate a random seed for the request
       const seed = Math.floor(Math.random() * 1000000000)
@@ -422,12 +452,12 @@ function NewPollPageContent() {
   const onSubmit = async (data: PollFormValues) => {
     setIsSubmitting(true)
     try {
-      await createPollAction(data, identity, isAuthenticated)
+      await createPollAction(data, identity, isAuthenticated, authProvider)
       toast({
         title: "Poll created successfully!",
         description: "Your poll is now live and ready for votes.",
       })
-      router.push('/admin?tab=polls')
+      router.push('/creator?tab=polls')
     } catch (e: any) {
       toast({
         title: "Error",

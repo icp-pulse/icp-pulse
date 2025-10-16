@@ -28,9 +28,9 @@ export function PollBreadcrumb({ pollTitle, pollId, currentPage }: PollBreadcrum
       <BreadcrumbList>
         <BreadcrumbItem>
           <BreadcrumbLink asChild>
-            <Link href="/admin?tab=polls" className="flex items-center gap-1">
+            <Link href="/creator?tab=polls" className="flex items-center gap-1">
               <Home className="h-3.5 w-3.5" />
-              <span>Admin</span>
+              <span>Dashboard</span>
             </Link>
           </BreadcrumbLink>
         </BreadcrumbItem>
@@ -39,7 +39,7 @@ export function PollBreadcrumb({ pollTitle, pollId, currentPage }: PollBreadcrum
 
         <BreadcrumbItem>
           <BreadcrumbLink asChild>
-            <Link href="/admin?tab=polls">Polls</Link>
+            <Link href="/creator?tab=polls">Polls</Link>
           </BreadcrumbLink>
         </BreadcrumbItem>
 

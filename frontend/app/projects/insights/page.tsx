@@ -39,7 +39,7 @@ function ProjectInsightsContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const { toast } = useToast()
-  const { identity, isAuthenticated } = useIcpAuth()
+  const { identity, isAuthenticated, authProvider } = useIcpAuth()
 
   const [project, setProject] = useState<Project | null>(null)
   const [polls, setPolls] = useState<BackendPoll[]>([])
@@ -261,10 +261,38 @@ function ProjectInsightsContent() {
       }))
 
       // Call backend canister directly for poll analysis
-      const { createBackendWithIdentity } = await import('@/lib/icp')
       const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
       const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
-      const backend = await createBackendWithIdentity({ canisterId, host, identity })
+
+      // Detect Plug wallet
+      const isPlugWallet = authProvider === 'plug'
+
+      let backend
+
+      if (isPlugWallet && window.ic?.plug) {
+        // Use Plug wallet
+        console.log('Using Plug wallet for poll analysis')
+        const whitelist = [canisterId]
+        const connected = await (window.ic.plug as any).requestConnect({
+          whitelist,
+          host
+        })
+
+        if (!connected) {
+          throw new Error('Failed to connect to Plug wallet')
+        }
+
+        const { idlFactory } = await import('@/../../src/declarations/polls_surveys_backend')
+        backend = await window.ic.plug.createActor({
+          canisterId,
+          interfaceFactory: idlFactory,
+        })
+      } else {
+        // Use Internet Identity / NFID
+        console.log('Using Internet Identity/NFID for poll analysis')
+        const { createBackendWithIdentity } = await import('@/lib/icp')
+        backend = await createBackendWithIdentity({ canisterId, host, identity })
+      }
 
       console.log(`Calling backend canister to analyze ${pollsData.length} polls for project: ${project?.name}`)
 
