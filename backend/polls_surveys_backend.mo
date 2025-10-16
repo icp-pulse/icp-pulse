@@ -2613,7 +2613,8 @@ persistent actor class polls_surveys_backend() = this {
     };
 
     // Construct gateway request body
-    let requestBody = "{\"model\":\"gpt-4o-mini\",\"prompt\":\"" # escapeJsonString(fullPrompt) # "\",\"seed\":" # Nat.toText(requestSeed) # ",\"temperature\":0.7,\"max_tokens\":500,\"system_prompt\":\"" # escapeJsonString(systemPrompt) # "\"}";
+    // Note: temperature must be 0 when using seed for deterministic results
+    let requestBody = "{\"model\":\"gpt-4o-mini\",\"prompt\":\"" # escapeJsonString(fullPrompt) # "\",\"seed\":" # Nat.toText(requestSeed) # ",\"temperature\":0,\"max_tokens\":500,\"system_prompt\":\"" # escapeJsonString(systemPrompt) # "\"}";
 
     Debug.print("=== SENDING CHAT MESSAGE TO AI GATEWAY ===");
     Debug.print("User message: " # userMessage);

@@ -255,6 +255,7 @@ export const idlFactory = ({ IDL: I = IDL }) => {
   return I.Service({
     claim_poll_reward: I.Func([PollId], [Result], []),
     claim_reward: I.Func([I.Text], [I.Bool], []),
+    chat_message: I.Func([I.Text, I.Vec(I.Tuple(I.Text, I.Text))], [Result], []),
     close_poll: I.Func([PollId], [Result], []),
     close_survey: I.Func([SurveyId], [I.Bool], []),
     create_custom_token_poll: I.Func(

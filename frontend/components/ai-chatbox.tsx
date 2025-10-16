@@ -118,11 +118,16 @@ export function AIChatbox({ onOptionsGenerated, isOpen: externalIsOpen, onToggle
           canisterId,
           interfaceFactory: idlFactory,
         })
-      } else {
-        // Use Internet Identity / NFID
+      } else if (isAuthenticated && identity) {
+        // Use Internet Identity / NFID for authenticated users
         console.log('Using Internet Identity/NFID for AI chat')
         const { createBackendWithIdentity } = await import('@/lib/icp')
         backend = await createBackendWithIdentity({ canisterId, host, identity })
+      } else {
+        // Use anonymous backend for non-authenticated users
+        console.log('Using anonymous backend for AI chat')
+        const { createBackend } = await import('@/lib/icp')
+        backend = await createBackend({ canisterId, host })
       }
 
       // Build conversation history for context (limit to last 5 messages)
