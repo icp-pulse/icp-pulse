@@ -247,7 +247,7 @@ function ProjectInsightsContent() {
     try {
       setAnalyzing(true)
 
-      // Prepare poll data
+      // Prepare poll data for backend canister
       const selectedPolls = polls.filter(p => selectedPollIds.includes(p.id.toString()))
       const pollsData = selectedPolls.map(poll => ({
         id: poll.id.toString(),
@@ -257,39 +257,43 @@ function ProjectInsightsContent() {
           text: opt.text,
           votes: Number(opt.votes)
         })),
-        totalVotes: Number(poll.totalVotes),
-        createdAt: poll.createdAt.toString(),
-        closesAt: poll.closesAt.toString()
+        totalVotes: Number(poll.totalVotes)
       }))
 
-      // Call AI analysis API (same approach as ai-chatbox)
-      const response = await fetch('/api/analyze-polls', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          polls: pollsData,
-          projectName: project?.name,
-          analysisType: userTier === PremiumTier.FREE ? 'standard' : 'advanced',
-          userPrincipal
-        })
-      })
+      // Call backend canister directly for poll analysis
+      const { createBackendWithIdentity } = await import('@/lib/icp')
+      const canisterId = process.env.NEXT_PUBLIC_POLLS_SURVEYS_BACKEND_CANISTER_ID!
+      const host = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local' ? 'http://127.0.0.1:4943' : 'https://ic0.app'
+      const backend = await createBackendWithIdentity({ canisterId, host, identity })
 
-      const result = await response.json()
+      console.log(`Calling backend canister to analyze ${pollsData.length} polls for project: ${project?.name}`)
 
-      if (!result.success) {
-        throw new Error(result.error || 'Analysis failed')
+      // Call the backend canister's analyze_polls function
+      const result = await backend.analyze_polls(pollsData, project?.name || 'Unknown Project')
+
+      if ('ok' in result) {
+        const analysisJson = result.ok
+        console.log(`Successfully got analysis from backend canister`)
+
+        // Parse the JSON response from the AI
+        try {
+          const parsedInsights = JSON.parse(analysisJson)
+          setInsights(parsedInsights)
+          incrementAIInsightUsage(userPrincipal)
+          updateUserStatus()
+
+          toast({
+            title: 'Analysis complete!',
+            description: `Generated insights for ${selectedPollIds.length} poll${selectedPollIds.length > 1 ? 's' : ''}.`,
+          })
+        } catch (parseError) {
+          console.error('Failed to parse analysis JSON:', parseError)
+          throw new Error('Failed to parse analysis results. Please try again.')
+        }
+      } else {
+        console.error('Backend canister returned error:', result.err)
+        throw new Error(result.err || 'Failed to analyze polls')
       }
-
-      setInsights(result.insights)
-      incrementAIInsightUsage(userPrincipal)
-      updateUserStatus()
-
-      toast({
-        title: 'Analysis complete!',
-        description: `Generated insights for ${selectedPollIds.length} poll${selectedPollIds.length > 1 ? 's' : ''}.`,
-      })
     } catch (error) {
       console.error('Error analyzing polls:', error)
       toast({

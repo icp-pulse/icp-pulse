@@ -404,11 +404,11 @@ export async function createStakingActor(
     throw new Error('No identity provided and Plug wallet not connected')
   }
 
-  const agent = new HttpAgent({
+  const agent = HttpAgent.createSync({
     host,
     identity,
     verifyQuerySignatures: !isLocal
-  }) as HttpAgent
+  })
 
   if (isLocal) {
     try {
@@ -449,11 +449,11 @@ export async function createAirdropActor(
     throw new Error('No identity provided and Plug wallet not connected')
   }
 
-  const agent = new HttpAgent({
+  const agent = HttpAgent.createSync({
     host,
     identity,
     verifyQuerySignatures: !isLocal
-  }) as HttpAgent
+  })
 
   if (isLocal) {
     try {
@@ -494,11 +494,11 @@ export async function createPulsegActor(
     throw new Error('No identity provided and Plug wallet not connected')
   }
 
-  const agent = new HttpAgent({
+  const agent = HttpAgent.createSync({
     host,
     identity,
     verifyQuerySignatures: !isLocal
-  }) as HttpAgent
+  })
 
   if (isLocal) {
     try {

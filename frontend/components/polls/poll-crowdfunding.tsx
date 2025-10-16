@@ -152,12 +152,14 @@ export function PollCrowdfunding({ pollId, fundingInfo, onContribute }: PollCrow
         const { Actor, HttpAgent } = await import('@dfinity/agent')
         const { idlFactory: tokenIdl } = await import('@/../../src/declarations/tokenmania')
 
-        const agent = new HttpAgent({
+        const isLocal = process.env.NEXT_PUBLIC_DFX_NETWORK === 'local'
+        const agent = HttpAgent.createSync({
           host,
-          identity: identity!
+          identity: identity!,
+          verifyQuerySignatures: !isLocal
         })
 
-        if (process.env.NEXT_PUBLIC_DFX_NETWORK === 'local') {
+        if (isLocal) {
           await agent.fetchRootKey()
         }
 
