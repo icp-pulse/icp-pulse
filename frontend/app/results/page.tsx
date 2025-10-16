@@ -206,7 +206,7 @@ function ResultsContent() {
               onClick={() => router.push(`/polls/edit?id=${pollId}`)}
             >
               <FileText className="h-4 w-4 mr-2" />
-              View Details
+              Edit
             </Button>
           </div>
         </div>

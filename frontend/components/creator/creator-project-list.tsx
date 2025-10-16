@@ -51,19 +51,32 @@ export default function CreatorProjectList() {
 
         const apiProjects = await backend.list_my_projects(0n, 100n)
 
-        // Transform API data to match our interface
-        const transformedProjects = apiProjects.map((project: any) => ({
-          id: Number(project.id),
-          slug: project.slug || project.name.toLowerCase().replace(/\s+/g, '-'),
-          name: project.name,
-          description: project.description,
-          createdBy: project.owner || project.createdBy || 'Unknown',
-          createdAt: project.createdAt ? new Date(project.createdAt).getTime() * 1000000 : Date.now() * 1000000,
-          status: project.status,
-          surveys: 0,
-          polls: 0,
-          responses: 0
-        }))
+        // Fetch stats for all projects
+        const projectIds = apiProjects.map((p: any) => p.id)
+        const projectsStats = await backend.get_projects_stats(projectIds)
+
+        // Create a map for quick lookup
+        const statsMap = new Map()
+        projectsStats.forEach((stats: any) => {
+          statsMap.set(stats.projectId.toString(), stats)
+        })
+
+        // Transform API data to match our interface with real stats
+        const transformedProjects = apiProjects.map((project: any) => {
+          const stats = statsMap.get(project.id.toString())
+          return {
+            id: Number(project.id),
+            slug: project.slug || project.name.toLowerCase().replace(/\s+/g, '-'),
+            name: project.name,
+            description: project.description,
+            createdBy: project.owner || project.createdBy || 'Unknown',
+            createdAt: project.createdAt ? new Date(project.createdAt).getTime() * 1000000 : Date.now() * 1000000,
+            status: project.status,
+            surveys: stats ? Number(stats.surveyCount) : 0,
+            polls: stats ? Number(stats.pollCount) : 0,
+            responses: stats ? Number(stats.totalResponses) : 0
+          }
+        })
 
         setProjects(transformedProjects)
 

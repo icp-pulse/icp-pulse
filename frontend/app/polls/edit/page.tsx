@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ArrowLeft, BarChart3, CheckCircle2, Settings, Coins } from 'lucide-react'
 import { PollBreadcrumb } from '@/components/polls/poll-breadcrumb'
+import { toast } from '@/hooks/use-toast'
 
 // Helper to get status string
 function statusToString(status: any): string {
@@ -122,15 +123,27 @@ function EditPollContent() {
       if ('ok' in result) {
         // Update local poll state
         setPoll((prev: any) => ({ ...prev, scopeId: BigInt(selectedProjectId) }))
-        alert('Poll project updated successfully!')
+        toast({
+          title: "Success",
+          description: "Poll project updated successfully!",
+          className: "bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800",
+        })
       } else {
         setErr(result.err)
-        alert(`Error: ${result.err}`)
+        toast({
+          title: "Error",
+          description: result.err,
+          variant: "destructive",
+        })
       }
     } catch (error) {
       console.error('Error updating poll project:', error)
       setErr('Failed to update poll project')
-      alert('Failed to update poll project')
+      toast({
+        title: "Error",
+        description: "Failed to update poll project. Please try again.",
+        variant: "destructive",
+      })
     } finally {
       setUpdating(false)
     }

@@ -35,6 +35,7 @@ export default function CreatorPollList() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [polls, setPolls] = useState<any[]>([])
+  const [projects, setProjects] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const { identity, isAuthenticated } = useIcpAuth()
@@ -75,6 +76,10 @@ export default function CreatorPollList() {
         }
 
         setPolls(allPolls)
+
+        // Fetch user's projects for project association display
+        const userProjects = await backend.list_my_projects(0n, 100n)
+        setProjects(userProjects)
 
       } catch (err) {
         console.error('Error fetching polls:', err)
@@ -148,6 +153,19 @@ export default function CreatorPollList() {
     if (remainder === 0n) return quotient.toString()
     const decimal = remainder.toString().padStart(decimals, '0').replace(/0+$/, '')
     return decimal ? `${quotient}.${decimal}` : quotient.toString()
+  }
+
+  const getProjectName = (scopeId: any): string => {
+    if (!scopeId || scopeId.toString() === '0') return 'No Project'
+    const project = projects.find(p => p.id.toString() === scopeId.toString())
+    return project ? project.name : 'Unknown Project'
+  }
+
+  const getProjectBadgeColor = (scopeId: any): string => {
+    if (!scopeId || scopeId.toString() === '0') {
+      return 'bg-gray-100 text-gray-600 dark:bg-gray-800/50 dark:text-gray-400 border-gray-300 dark:border-gray-700'
+    }
+    return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800'
   }
 
   // Status transition handlers
@@ -432,6 +450,9 @@ export default function CreatorPollList() {
                       {getFundingTypeString(poll.fundingInfo[0].fundingType)}
                     </Badge>
                   )}
+                  <Badge className={`w-fit text-xs ${getProjectBadgeColor(poll.scopeId)}`}>
+                    {getProjectName(poll.scopeId)}
+                  </Badge>
                 </div>
               </CardHeader>
               <CardContent className="space-y-4">
@@ -491,7 +512,7 @@ export default function CreatorPollList() {
                     onClick={() => router.push(`/polls/edit?id=${poll.id}`)}
                   >
                     <Edit className="w-4 h-4 mr-1" />
-                    Details
+                    Edit
                   </Button>
                   <Button
                     variant="outline"

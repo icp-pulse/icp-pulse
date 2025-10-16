@@ -52,7 +52,7 @@ export default function NewProjectPage() {
           startTransition(async () => {
             try {
               await createProjectAction(v, identity, isAuthenticated)
-              router.push('/admin')
+              router.push('/creator?tab=projects')
             } catch (e: any) {
               setErr(e.message || 'Error')
             }

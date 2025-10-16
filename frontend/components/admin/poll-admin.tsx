@@ -677,7 +677,7 @@ export default function PollAdmin() {
                     onClick={() => router.push(`/polls/edit?id=${poll.id}`)}
                   >
                     <Edit className="w-4 h-4 mr-1" />
-                    Details
+                    Edit
                   </Button>
                   <Button
                     variant="outline"
