@@ -17,9 +17,12 @@ It enables communities, DAOs, and organizations to create transparent, incentivi
 
 ### 🎁 New Features
 - **Token Rewards System**: Users earn PULSE tokens for participating in polls and surveys
+- **Governance Token (PULSEG)**: Stake PULSE to earn governance tokens for platform voting rights
+- **Token Staking**: Lock PULSE tokens to earn PULSEG and participate in governance
 - **ICRC-1 Token Integration**: Support for multiple tokens including ckBTC, ckETH, ckUSDC, CHAT, SNS1
 - **Internet Identity Auth**: Secure, decentralized authentication
 - **Real-time Rewards**: Automatic reward creation and secure claiming process
+- **AI-Powered Generation**: Create poll options using AI via Cloudflare Workers integration
 
 ---
 
@@ -36,19 +39,23 @@ Traditional online survey and polling platforms (e.g., Google Forms, SurveyMonke
 TruePulse leverages **ICP smart contracts** to deliver:
 - ✅ **On-chain poll creation** – polls and responses stored securely on ICP canisters
 - ✅ **Token rewards system** – users earn PULSE and other ICRC-1 tokens for participation
+- ✅ **Governance token (PULSEG)** – stake PULSE to earn voting rights in platform decisions
 - ✅ **Transparent results** – verifiable, immutable tallying of poll outcomes
 - ✅ **Secure rewards claiming** – cryptographically secure token distribution
 - ✅ **Multi-token support** – PULSE, ckBTC, ckETH, ckUSDC, and custom tokens
+- ✅ **AI-powered content generation** – create poll options using GPT-4o-mini via deterministic gateway
 - ✅ **Community ownership** – no central authority, decisions powered by participants
 
 ---
 
 ## 🛠️ Tech Stack
-- **Backend:** Motoko smart contracts on ICP mainnet
+- **Backend:** Motoko smart contracts on ICP mainnet (6 canisters)
 - **Frontend:** Next.js 14 + React + TailwindCSS + TypeScript
 - **Authentication:** Internet Identity integration
-- **Token Standard:** ICRC-1 compatible tokens
+- **Token Standard:** ICRC-1/ICRC-2 compatible tokens
 - **Smart Contracts:** Enhanced orthogonal persistence
+- **AI Gateway:** Cloudflare Workers + Durable Objects (deterministic AI responses)
+- **AI Model:** OpenAI GPT-4o-mini for content generation
 - **Deployment:** ICP mainnet canisters
 - **UI Framework:** shadcn/ui + Radix UI components
 
@@ -63,7 +70,11 @@ TruePulse leverages **ICP smart contracts** to deliver:
 ### 🏗️ Mainnet Canisters
 - **Backend:** `u2j5c-sqaaa-aaaao-a4o6q-cai`
 - **Frontend:** `utkw6-eyaaa-aaaao-a4o7a-cai`
-- **PULSE Token:** `zix77-6qaaa-aaaao-a4pwq-cai`
+- **PULSE Token (tokenmania):** `zix77-6qaaa-aaaao-a4pwq-cai`
+- **Airdrop:** `27ftn-piaaa-aaaao-a4p6a-cai`
+- **PULSEG Governance Token:** (deployed)
+- **Staking:** (deployed)
+- **Swap:** (deployed)
 
 ---
 
@@ -75,6 +86,10 @@ TruePulse leverages **ICP smart contracts** to deliver:
 - **[DEVELOP.md](./DEVELOP.md)** - Development workflow and best practices
 - **[DEPLOY.md](./DEPLOY.md)** - Comprehensive deployment guide
 - **[MAINNET_DEPLOYMENT_INFO.md](./MAINNET_DEPLOYMENT_INFO.md)** - Current mainnet deployment details
+
+### 🏗️ Architecture
+- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - Detailed system architecture with component interactions and data flows
+- **[ARCHITECTURE_SIMPLE.md](./ARCHITECTURE_SIMPLE.md)** - Simplified connectivity diagram for quick reference
 
 ### 🎁 Airdrop & Rewards System
 - **[AUTO_ALLOCATION_GUIDE.md](./AUTO_ALLOCATION_GUIDE.md)** - Automatic airdrop allocation based on user activity
@@ -101,11 +116,12 @@ TruePulse leverages **ICP smart contracts** to deliver:
 ## 📂 Repository Structure
 ```
 motoko-icp-pulse/
-├── backend/                        # Motoko smart contracts
+├── backend/                        # Motoko smart contracts (6 canisters)
 │   ├── polls_surveys_backend.mo   # Main backend canister with rewards system
-│   ├── tokenmania.mo              # PULSE token (ICRC-1 compatible)
-│   ├── airdrop.mo                 # Airdrop campaign management
-│   ├── staking.mo                 # Token staking functionality
+│   ├── tokenmania.mo              # PULSE utility token (ICRC-1 compatible)
+│   ├── pulseg.mo                  # PULSEG governance token (ICRC-1 compatible)
+│   ├── staking.mo                 # Token staking and governance token minting
+│   ├── airdrop.mo                 # Airdrop campaign and quest management
 │   └── swap.mo                    # Token swap (ckUSDC ↔ PULSE)
 ├── frontend/                       # Next.js frontend application
 │   ├── app/                       # Next.js app router pages
@@ -159,6 +175,19 @@ motoko-icp-pulse/
 - **Secure Claiming**: Cryptographically secure reward claiming process
 - **Real-time Tracking**: View pending and claimed rewards in the dedicated rewards page
 - **Flexible Funding**: Poll creators can set custom reward amounts per participant
+
+### 🏛️ Governance & Staking
+- **Stake PULSE Tokens**: Lock your PULSE tokens to participate in platform governance
+- **Earn PULSEG**: Receive governance tokens (PULSEG) by staking PULSE
+- **Voting Rights**: Use PULSEG to vote on platform decisions and proposals
+- **Flexible Unstaking**: Unlock your staked PULSE tokens anytime
+- **ICRC-1 Governance Token**: PULSEG follows ICRC-1/ICRC-2 standards
+
+### 🤖 AI-Powered Features
+- **Poll Option Generation**: Use AI to generate creative poll options
+- **Deterministic Responses**: Cloudflare Workers ensure consistent AI outputs for ICP consensus
+- **GPT-4o-mini Integration**: Powered by OpenAI's latest efficient model
+- **Cached Results**: Identical requests return cached responses for speed and cost efficiency
 
 ### 🔐 Security & Authentication
 - **Internet Identity**: Secure, decentralized authentication without passwords
@@ -262,9 +291,12 @@ dfx deploy polls_surveys_frontend --network ic
 - **MVP Launch**: Project, survey, and poll administration & voting
 - **Mainnet Deployment**: Live on ICP mainnet with full functionality
 - **Token Rewards System**: PULSE token integration with automatic rewards
+- **Governance Token (PULSEG)**: Staking system with governance token rewards
 - **ICRC-1 Support**: Multi-token support including ckBTC, ckETH, ckUSDC
 - **Internet Identity Auth**: Secure, decentralized authentication
 - **Rewards Interface**: Dedicated page for claiming and tracking rewards
+- **AI Gateway**: Cloudflare Workers integration for deterministic AI responses
+- **Token Swap**: ckUSDC ↔ PULSE exchange functionality
 
 ### 🔄 In Progress (Q1 2025)
 - **Enhanced Token Support**: Additional ICRC-1 tokens integration
@@ -293,12 +325,15 @@ dfx deploy polls_surveys_frontend --network ic
 - **Oscar (Backend Architect):** Backend architecture specialist focused on canister integrations and smart contract optimization.
 
 ## 🏆 Achievements
-- **🎯 Successfully deployed to ICP mainnet** with full functionality
+- **🎯 Successfully deployed to ICP mainnet** with full functionality (6 canisters)
 - **🏗️ Built production-ready rewards system** with ICRC-1 token integration
+- **🏛️ Governance token (PULSEG)** with staking mechanism for community voting
+- **🤖 AI-powered content generation** via deterministic Cloudflare Workers gateway
 - **🔐 Implemented secure authentication** using Internet Identity
 - **⚡ Optimized for performance** with enhanced orthogonal persistence
 - **📱 Modern, responsive UI** using Next.js 14 and shadcn/ui
-- **🎁 Live token rewards** system with real-time claiming  
+- **🎁 Live token rewards** system with real-time claiming
+- **💱 Token swap functionality** between ckUSDC and PULSE
 
 ---
 
@@ -307,6 +342,27 @@ MIT License – free to use, modify, and distribute.
 
 ---
 
+## 🔗 Related Projects
+
+TruePulse is part of a broader ecosystem:
+
+### IDO Platform (motoko-icp-ido)
+- Vested token sales with multiple pools (Private, Public, Team, Advisors, Liquidity)
+- TGE (Token Generation Event) management with cliff and vesting schedules
+- ckUSDC-based contributions for PULSE token allocation
+- Location: `/Users/east/workspace/icp/motoko-icp-ido`
+
+### AI Gateway (icp-pulse-ai-gateway)
+- Deterministic AI response gateway for ICP HTTP outcalls
+- Cloudflare Workers + Durable Objects architecture
+- OpenAI GPT-4o-mini integration with response caching
+- HMAC signature verification for consensus
+- Location: `/Users/east/workspace/icp/icp-pulse-ai-gateway`
+
+See [ARCHITECTURE.md](./ARCHITECTURE.md) for detailed system integration diagrams.
+
+---
+
 ## 📬 Contact
-- Telegram: [@eastmaels](http://t.me/eastmaels) | [@muhammedadam123](http://t.me/muhammedadam123)  
-- DoraHacks Submission: [TruePulse](https://dorahacks.io/buidl/31834/)  
+- Telegram: [@eastmaels](http://t.me/eastmaels) | [@muhammedadam123](http://t.me/muhammedadam123)
+- DoraHacks Submission: [TruePulse](https://dorahacks.io/buidl/31834/)

@@ -940,6 +940,20 @@ persistent actor class polls_surveys_backend() = this {
 
               switch (await tokenActor.icrc1_transfer(transferArgs)) {
                 case (#Ok(_)) {
+                  // Increment global tracking counters
+                  totalFundsDisbursed += userReward;
+
+                  // Track by token symbol
+                  switch (Map.get(tokenDisbursements, Map.thash, info.tokenSymbol)) {
+                    case (?existing) {
+                      let (amt, cnt) = existing;
+                      Map.set(tokenDisbursements, Map.thash, info.tokenSymbol, (amt + userReward, cnt + 1));
+                    };
+                    case null {
+                      Map.set(tokenDisbursements, Map.thash, info.tokenSymbol, (userReward, 1));
+                    };
+                  };
+
                   // Update poll to remove claimed rewards
                   polls := Array.tabulate<Poll>(polls.size(), func i {
                     let p = polls[i];
@@ -1676,6 +1690,11 @@ persistent actor class polls_surveys_backend() = this {
   private var rewardsArray : [PendingReward] = [];
   private var rewards = Map.new<Text, PendingReward>();
 
+  // Global tracking for total funds disbursed (claimed rewards)
+  private stable var totalFundsDisbursed : Nat64 = 0;
+  private stable var tokenDisbursementArray : [(Text, (Nat64, Nat))] = []; // token -> (amount, count)
+  private var tokenDisbursements = Map.new<Text, (Nat64, Nat)>();
+
   // DEPRECATED: OpenAI API key - kept for stable variable compatibility
   // No longer used - gateway handles authentication
   private var openaiApiKey : Text = "";
@@ -1698,11 +1717,19 @@ persistent actor class polls_surveys_backend() = this {
   system func preupgrade() {
     let vals = Map.vals(rewards);
     rewardsArray := Iter.toArray(vals);
+
+    // Save token disbursement map to stable array
+    tokenDisbursementArray := Iter.toArray(Map.entries(tokenDisbursements));
   };
 
   // Post-upgrade: restore rewards from stable array
   system func postupgrade() {
     initializeRewards();
+
+    // Restore token disbursement map from stable array
+    for ((symbol, data) in tokenDisbursementArray.vals()) {
+      Map.set(tokenDisbursements, Map.thash, symbol, data);
+    };
   };
 
   // Create a reward when user votes
@@ -1830,33 +1857,9 @@ persistent actor class polls_surveys_backend() = this {
     let totalSubmissions = submissions.size();
     let avgSubmissionsPerSurvey = if (totalSurveys > 0) { totalSubmissions / totalSurveys } else { 0 };
 
-    // Calculate funding stats
-    var totalDisbursed : Nat64 = 0;
-    var tokenDistMap = Map.new<Text, (Nat64, Nat)>(); // (total amount, count)
-
-    // Calculate from claimed rewards
-    let allRewards = Iter.toArray(Map.vals(rewards));
-    for (reward in allRewards.vals()) {
-      if (reward.status == #claimed) {
-        totalDisbursed += reward.amount;
-
-        // Track by token
-        let key = reward.tokenSymbol;
-        switch (Map.get(tokenDistMap, Map.thash, key)) {
-          case (?existing) {
-            let (amt, cnt) = existing;
-            Map.set(tokenDistMap, Map.thash, key, (amt + reward.amount, cnt + 1));
-          };
-          case null {
-            Map.set(tokenDistMap, Map.thash, key, (reward.amount, 1));
-          };
-        };
-      };
-    };
-
-    // Convert token distribution map to array
+    // Get funding stats from global counters (no iteration needed!)
     let tokenDistArray = Array.map<(Text, (Nat64, Nat)), TokenDistribution>(
-      Iter.toArray(Map.entries(tokenDistMap)),
+      Iter.toArray(Map.entries(tokenDisbursements)),
       func((symbol, data)) : TokenDistribution {
         let (amount, count) = data;
         {
@@ -1911,7 +1914,7 @@ persistent actor class polls_surveys_backend() = this {
         averageSubmissionsPerSurvey = avgSubmissionsPerSurvey;
       };
       funding = {
-        totalFundsDisbursed = Nat64.toText(totalDisbursed);
+        totalFundsDisbursed = Nat64.toText(totalFundsDisbursed);
         disbursedByToken = tokenDistArray;
       };
       engagement = {
