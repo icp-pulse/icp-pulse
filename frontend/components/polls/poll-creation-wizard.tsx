@@ -148,7 +148,7 @@ export function PollCreationWizard({
       </Card>
 
       {/* Navigation Buttons */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between pb-20 lg:pb-0">
         <Button
           type="button"
           variant="outline"
