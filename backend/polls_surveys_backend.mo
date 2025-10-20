@@ -778,6 +778,349 @@ persistent actor class polls_surveys_backend() = this {
     #ok(id)
   };
 
+  // V2: Create poll with validation for Fixed reward distribution
+  public shared (msg) func create_poll_v2(
+    scopeType : Text,
+    scopeId : Nat,
+    title : Text,
+    description : Text,
+    options : [Text],
+    closesAt : Int,
+    rewardFund : Nat,
+    fundingEnabled : Bool,
+    rewardPerVote : ?Nat64,
+    fundingType : ?Text,
+    // New configuration parameters
+    maxResponses : ?Nat,
+    allowAnonymous : ?Bool,
+    allowMultiple : ?Bool,
+    visibility : ?Text,
+    rewardDistributionType : ?Text
+  ) : async Result.Result<PollId, Text> {
+    if (options.size() < 2) { return #err("Poll must have at least 2 options") };
+    if (closesAt <= now()) { return #err("Poll closing time must be in the future") };
+
+    let id = nextPollId; nextPollId += 1;
+    let opts = Array.tabulate<OptionT>(options.size(), func i { { id = i; text = options[i]; votes = 0 } });
+
+    let funding_type = switch (fundingType) {
+      case (?ft) {
+        if (ft == "crowdfunded") { #Crowdfunded }
+        else if (ft == "treasury-funded") { #TreasuryFunded }
+        else { #SelfFunded }
+      };
+      case null { #SelfFunded };
+    };
+
+    let distribution_type = switch (rewardDistributionType) {
+      case (?dt) { if (dt == "equal-split") { #EqualSplit } else { #Fixed } };
+      case null { #Fixed };
+    };
+
+    // Create poll config
+    let pollConfig : PollConfig = {
+      maxResponses = maxResponses;
+      allowAnonymous = switch (allowAnonymous) { case (?val) val; case null false };
+      allowMultiple = switch (allowMultiple) { case (?val) val; case null false };
+      visibility = switch (visibility) { case (?val) val; case null "public" };
+      rewardDistributionType = distribution_type;
+    };
+
+    let fundingInfo = if (fundingEnabled) {
+      switch (rewardPerVote) {
+        case (?reward) {
+          let totalFund = Nat64.fromNat(rewardFund) * 1_000_000; // Convert cents to e8s (rewardFund is in cents, so multiply by 1M instead of 100M)
+
+          // VALIDATION: Check if funding is sufficient for Fixed distribution type
+          if (distribution_type == #Fixed) {
+            switch (maxResponses) {
+              case (?max) {
+                let requiredFund = Nat64.fromNat(max) * reward;
+                if (requiredFund > totalFund) {
+                  return #err("Insufficient funds: " # Nat.toText(max) # " responses × " # Nat64.toText(reward) # " reward = " # Nat64.toText(requiredFund) # " exceeds available fund of " # Nat64.toText(totalFund));
+                };
+              };
+              case null { /* No maxResponses set, budget-based only */ };
+            };
+          };
+
+          // Calculate maxResponses and rewardPerResponse based on distribution type
+          let (calculatedMaxResponses, calculatedRewardPerResponse) : (?Nat, Nat64) = switch (distribution_type) {
+            case (#EqualSplit) {
+              // For equal split, use the maxResponses from config
+              let rewardPerResp : Nat64 = switch (maxResponses) {
+                case (?target) {
+                  if (target > 0) { totalFund / Nat64.fromNat(target) } else { 0 : Nat64 }
+                };
+                case null { 0 : Nat64 }; // No max responses specified
+              };
+              (maxResponses, rewardPerResp)
+            };
+            case (#Fixed) {
+              // For fixed reward, optionally calculate max responses if user wants it
+              let maxResp : ?Nat = if (maxResponses != null) {
+                // User specified maxResponses, use it
+                maxResponses
+              } else {
+                // User didn't specify, leave as null (budget-based only)
+                null
+              };
+              (maxResp, reward)
+            };
+          };
+
+          ?{
+            tokenType = #ICP;
+            tokenCanister = null;
+            tokenSymbol = "ICP";
+            tokenDecimals = 8 : Nat8;
+            totalFund = totalFund;
+            rewardPerResponse = calculatedRewardPerResponse;
+            maxResponses = calculatedMaxResponses;
+            currentResponses = 0;
+            remainingFund = totalFund;
+            fundingType = funding_type;
+            contributors = [];
+            pendingClaims = [];
+          }
+        };
+        case null { null }
+      }
+    } else { null };
+
+    let poll : Poll = {
+      id = id;
+      scopeType = toScopeType(scopeType);
+      scopeId = scopeId;
+      title = title;
+      description = description;
+      options = opts;
+      createdBy = msg.caller;
+      createdAt = now();
+      closesAt = closesAt;
+      status = #active;
+      totalVotes = 0;
+      rewardFund = rewardFund;
+      fundingInfo = fundingInfo;
+      voterPrincipals = [];
+      config = ?pollConfig;
+    };
+    polls := Array.append(polls, [poll]);
+
+    // Track poll creation for quest system (non-blocking)
+    ignore async {
+      ignore await airdrop.update_quest_progress(msg.caller, 0, ?1, null, null, null, null);
+    };
+
+    #ok(id)
+  };
+
+  // V2: Create poll with custom token funding and validation for Fixed reward distribution
+  public shared (msg) func create_custom_token_poll_v2(
+    scopeType : Text,
+    scopeId : Nat,
+    title : Text,
+    description : Text,
+    options : [Text],
+    closesAt : Int,
+    tokenCanister : ?Principal,
+    totalFunding : Nat64,
+    rewardPerVote : Nat64,
+    fundingType : Text,
+    // New configuration parameters
+    maxResponses : ?Nat,
+    allowAnonymous : ?Bool,
+    allowMultiple : ?Bool,
+    visibility : ?Text,
+    rewardDistributionType : ?Text
+  ) : async Result.Result<PollId, Text> {
+    if (options.size() < 2) { return #err("Poll must have at least 2 options") };
+    if (closesAt <= now()) { return #err("Poll closing time must be in the future") };
+
+    // Validate custom token if provided (skip validation for known tokens)
+    switch (tokenCanister) {
+      case (?canister) {
+        // Skip validation for known tokens to avoid unnecessary inter-canister calls
+        if (not isKnownToken(canister)) {
+          if (not (await validateTokenCanister(canister))) {
+            return #err("Invalid or unsupported token canister");
+          };
+        };
+      };
+      case null { /* Using ICP */ };
+    };
+
+    let id = nextPollId; nextPollId += 1;
+    let opts = Array.tabulate<OptionT>(options.size(), func i { { id = i; text = options[i]; votes = 0 } });
+
+    // Get token info
+    let (tokenSymbol, tokenDecimals) = await getTokenInfo(tokenCanister);
+
+    let funding_type = if (fundingType == "crowdfunded") { #Crowdfunded }
+                      else if (fundingType == "treasury-funded") { #TreasuryFunded }
+                      else { #SelfFunded };
+
+    let distribution_type = switch (rewardDistributionType) {
+      case (?dt) { if (dt == "equal-split") { #EqualSplit } else { #Fixed } };
+      case null { #Fixed };
+    };
+
+    // Create poll config
+    let pollConfig : PollConfig = {
+      maxResponses = maxResponses;
+      allowAnonymous = switch (allowAnonymous) { case (?val) val; case null false };
+      allowMultiple = switch (allowMultiple) { case (?val) val; case null false };
+      visibility = switch (visibility) { case (?val) val; case null "public" };
+      rewardDistributionType = distribution_type;
+    };
+
+    // Calculate platform fee (10%) and net funding amount
+    let platformFee = (totalFunding * Nat64.fromNat(PLATFORM_FEE_PERCENTAGE)) / 100;
+    let netFunding = totalFunding - platformFee; // Amount that goes to poll rewards
+
+    // VALIDATION: Check if net funding is sufficient for Fixed distribution type
+    if (distribution_type == #Fixed) {
+      switch (maxResponses) {
+        case (?max) {
+          let requiredFund = Nat64.fromNat(max) * rewardPerVote;
+          if (requiredFund > netFunding) {
+            return #err("Insufficient net funds: " # Nat.toText(max) # " responses × " # Nat64.toText(rewardPerVote) # " reward = " # Nat64.toText(requiredFund) # " exceeds available net fund of " # Nat64.toText(netFunding) # " (after 10% platform fee)");
+          };
+        };
+        case null { /* No maxResponses set, budget-based only */ };
+      };
+    };
+
+    // For self-funded polls, pull the total funding (including fee) from creator
+    if (funding_type == #SelfFunded and totalFunding > 0) {
+      switch (tokenCanister) {
+        case (?canister) {
+          try {
+            let tokenActor = actor(Principal.toText(canister)) : actor {
+              icrc2_transfer_from : ({
+                from : { owner : Principal; subaccount : ?Blob };
+                to : { owner : Principal; subaccount : ?Blob };
+                amount : Nat;
+                fee : ?Nat;
+                memo : ?Blob;
+                created_at_time : ?Nat64;
+              }) -> async { #Ok : Nat; #Err : { #BadFee : { expected_fee : Nat }; #BadBurn : { min_burn_amount : Nat }; #InsufficientFunds : { balance : Nat }; #InsufficientAllowance : { allowance : Nat }; #TooOld; #CreatedInFuture : { ledger_time : Nat64 }; #Duplicate : { duplicate_of : Nat }; #TemporarilyUnavailable; #GenericError : { error_code : Nat; message : Text } } };
+            };
+
+            // Pull total funding from creator (net + fee)
+            let transferArgs = {
+              from = { owner = msg.caller; subaccount = null };
+              to = { owner = Principal.fromActor(this); subaccount = null };
+              amount = Nat64.toNat(totalFunding);
+              fee = null;
+              memo = null;
+              created_at_time = ?Nat64.fromNat(Int.abs(Time.now()));
+            };
+
+            switch (await tokenActor.icrc2_transfer_from(transferArgs)) {
+              case (#Ok(_)) {
+                // Track platform fee collected
+                switch (Map.get(treasuryFees, phash, canister)) {
+                  case (?existingFees) {
+                    Map.set(treasuryFees, phash, canister, existingFees + platformFee);
+                  };
+                  case null {
+                    Map.set(treasuryFees, phash, canister, platformFee);
+                  };
+                };
+                // Transfer successful, continue with net funding for poll
+              };
+              case (#Err(error)) {
+                let errorMsg = switch (error) {
+                  case (#InsufficientFunds { balance }) { "Insufficient funds. Balance: " # Nat.toText(balance) };
+                  case (#InsufficientAllowance { allowance }) { "Insufficient allowance. Please approve this canister first. Current allowance: " # Nat.toText(allowance) };
+                  case (#BadFee { expected_fee }) { "Bad fee. Expected: " # Nat.toText(expected_fee) };
+                  case (#GenericError { message; error_code }) { "Error " # Nat.toText(error_code) # ": " # message };
+                  case _ { "Token transfer failed" };
+                };
+                return #err("Failed to fund poll: " # errorMsg);
+              };
+            };
+          } catch (e) {
+            return #err("Failed to communicate with token canister: " # Error.message(e));
+          };
+        };
+        case null { /* No token canister, skip funding */ };
+      };
+    };
+
+    // Calculate maxResponses and rewardPerResponse based on distribution type
+    // Use netFunding (after 10% fee deduction) for reward calculations
+    let (calculatedMaxResponses, calculatedRewardPerResponse) : (?Nat, Nat64) = switch (distribution_type) {
+      case (#EqualSplit) {
+        // For equal split, use the maxResponses from config
+        let rewardPerResp : Nat64 = switch (maxResponses) {
+          case (?target) {
+            if (target > 0) { netFunding / Nat64.fromNat(target) } else { 0 : Nat64 }
+          };
+          case null { 0 : Nat64 }; // No max responses specified
+        };
+        (maxResponses, rewardPerResp)
+      };
+      case (#Fixed) {
+        // For fixed reward, optionally calculate max responses if user wants it
+        let maxResp : ?Nat = if (maxResponses != null) {
+          // User specified maxResponses, use it
+          maxResponses
+        } else {
+          // User didn't specify, leave as null (budget-based only)
+          null
+        };
+        (maxResp, rewardPerVote)
+      };
+    };
+
+    let fundingInfo = {
+      tokenType = switch (tokenCanister) {
+        case null { #ICP };
+        case (?canister) { #ICRC1(canister) };
+      };
+      tokenCanister = tokenCanister;
+      tokenSymbol = tokenSymbol;
+      tokenDecimals = tokenDecimals;
+      totalFund = netFunding; // Store net funding (after fee deduction)
+      rewardPerResponse = calculatedRewardPerResponse;
+      maxResponses = calculatedMaxResponses;
+      currentResponses = 0;
+      remainingFund = netFunding; // Remaining fund is also net amount
+      fundingType = funding_type;
+      contributors = [];
+      pendingClaims = [];
+    };
+
+    let poll : Poll = {
+      id = id;
+      scopeType = toScopeType(scopeType);
+      scopeId = scopeId;
+      title = title;
+      description = description;
+      options = opts;
+      createdBy = msg.caller;
+      createdAt = now();
+      closesAt = closesAt;
+      status = #active;
+      totalVotes = 0;
+      rewardFund = Nat64.toNat(totalFunding / 1_000_000); // Convert back to legacy format for backward compatibility
+      fundingInfo = ?fundingInfo;
+      voterPrincipals = [];
+      config = ?pollConfig;
+    };
+
+    polls := Array.append(polls, [poll]);
+
+    // Track poll creation for quest system (non-blocking)
+    ignore async {
+      ignore await airdrop.update_quest_progress(msg.caller, 0, ?1, null, null, null, null);
+    };
+
+    #ok(id)
+  };
+
   // Fund a crowdfunded poll with PULSE tokens
   public shared (msg) func fund_poll(pollId : PollId, amount : Nat64) : async Result.Result<Text, Text> {
     // Find the poll
@@ -1139,6 +1482,111 @@ persistent actor class polls_surveys_backend() = this {
         ok
       };
       case null { false }
+    }
+  };
+
+  // V2: Vote with detailed error messages
+  public shared (msg) func vote_v2(pollId : PollId, optionId : Nat) : async Result.Result<Text, Text> {
+    // First, find the poll and validate the vote
+    switch (findPoll(pollId)) {
+      case (?poll) {
+        // Only active polls accept votes
+        if (poll.status != #active) {
+          return #err("Poll is not active. Current status: " # debug_show(poll.status))
+        };
+
+        // Check if time has expired
+        if (poll.closesAt <= now()) {
+          return #err("Poll has closed. Closed at: " # Int.toText(poll.closesAt) # ", Current time: " # Int.toText(now()))
+        };
+
+        // Check one vote per principal
+        var already = false;
+        for (vp in poll.voterPrincipals.vals()) {
+          if (vp == msg.caller) { already := true }
+        };
+        if (already) {
+          return #err("You have already voted on this poll")
+        };
+
+        // Validate option ID
+        if (optionId >= poll.options.size()) {
+          return #err("Invalid option ID: " # Nat.toText(optionId) # ". Poll has " # Nat.toText(poll.options.size()) # " options")
+        };
+
+        // Check funding constraints if applicable
+        switch (poll.fundingInfo) {
+          case (?funding) {
+            let canAcceptVote = (funding.remainingFund >= funding.rewardPerResponse) and
+                               (switch (funding.maxResponses) {
+                                 case null { true };
+                                 case (?max) { funding.currentResponses < max };
+                               });
+            if (not canAcceptVote) {
+              let budgetExhausted = funding.remainingFund < funding.rewardPerResponse;
+              let maxReached = switch (funding.maxResponses) {
+                case null { false };
+                case (?max) { funding.currentResponses >= max };
+              };
+
+              if (budgetExhausted) {
+                return #err("Poll budget exhausted. Remaining: " # Nat64.toText(funding.remainingFund) # ", Required: " # Nat64.toText(funding.rewardPerResponse));
+              };
+              if (maxReached) {
+                return #err("Poll has reached maximum responses: " # Nat.toText(funding.currentResponses));
+              };
+            };
+          };
+          case null { /* No funding constraints */ };
+        };
+
+        // Now update the poll data and add reward to escrow if funding is enabled
+        var ok = false;
+        polls := Array.tabulate<Poll>(polls.size(), func i {
+          let p = polls[i];
+          if (p.id == pollId) {
+            let updatedOptions = Array.tabulate<OptionT>(p.options.size(), func j {
+              let o = p.options[j];
+              if (j == optionId) { { id = o.id; text = o.text; votes = o.votes + 1 } } else { o }
+            });
+            ok := true;
+            // Update funding info if enabled - add reward to pendingClaims instead of distributing
+            let updatedFunding = switch (p.fundingInfo) {
+              case (?funding) {
+                // Check budget availability AND optional maxResponses limit
+                let canAcceptVote = (funding.remainingFund >= funding.rewardPerResponse) and
+                                   (switch (funding.maxResponses) {
+                                     case null { true };  // No limit set, budget-based only
+                                     case (?max) { funding.currentResponses < max };
+                                   });
+                if (canAcceptVote) {
+                  // Add reward to pending claims (escrow)
+                  let newPendingClaims = Array.append(funding.pendingClaims, [(msg.caller, funding.rewardPerResponse)]);
+                  ?{
+                    funding with
+                    currentResponses = funding.currentResponses + 1;
+                    remainingFund = funding.remainingFund - funding.rewardPerResponse;
+                    pendingClaims = newPendingClaims;
+                  }
+                } else { ?funding }
+              };
+              case null { null }
+            };
+            { p with options = updatedOptions; totalVotes = p.totalVotes + 1; voterPrincipals = Array.append(p.voterPrincipals, [msg.caller]); fundingInfo = updatedFunding }
+          } else { p }
+        });
+
+        // Track vote for quest system (non-blocking)
+        if (ok) {
+          ignore async {
+            ignore await airdrop.update_quest_progress(msg.caller, 0, null, ?1, null, null, null);
+          };
+          #ok("Vote recorded successfully")
+        } else {
+          #err("Failed to update poll data")
+        }
+      };
+      case null { #err("Poll not found with ID: " # Nat.toText(pollId)) }
     }
   };
 

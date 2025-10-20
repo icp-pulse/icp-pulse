@@ -357,7 +357,42 @@ export default function PollsPage() {
         }
       }
 
-      const success = await backend.vote(pollId, optionId)
+      // Add detailed logging for debugging
+      console.log('=== Vote Submission Debug Info ===')
+      console.log('Backend actor:', backend)
+      console.log('Poll ID:', pollId, 'Type:', typeof pollId)
+      console.log('Option ID:', optionId, 'Type:', typeof optionId)
+      console.log('Current poll data:', currentPoll)
+
+      // Try vote_v2 first (with detailed errors), fallback to vote if not available
+      let voteResult
+      let success = false
+      let errorMessage = ''
+
+      try {
+        // Use vote_v2 which returns Result<Text, Text> with detailed error messages
+        if (typeof backend.vote_v2 === 'function') {
+          console.log('Using vote_v2 for detailed error messages')
+          voteResult = await backend.vote_v2(pollId, optionId)
+          console.log('vote_v2 response:', voteResult)
+
+          if ('ok' in voteResult) {
+            success = true
+            console.log('Vote successful:', voteResult.ok)
+          } else if ('err' in voteResult) {
+            errorMessage = voteResult.err
+            console.error('Vote failed with error:', errorMessage)
+          }
+        } else {
+          // Fallback to original vote function
+          console.log('Using original vote function')
+          success = await backend.vote(pollId, optionId)
+          console.log('Vote response:', success, 'Type:', typeof success)
+        }
+      } catch (voteError) {
+        console.error('Vote call threw an error:', voteError)
+        throw voteError // Re-throw to be caught by outer try/catch
+      }
 
       if (success) {
         // Save vote to localStorage and state
@@ -406,15 +441,37 @@ export default function PollsPage() {
           has_rewards: Number(currentPoll.rewardFund) > 0,
         })
       } else {
-        // If backend returns false, try to provide a specific reason
-        setError('Failed to vote. Please refresh the page and try again.')
+        // Vote returned false - fetch latest poll state to diagnose
+        console.log('=== Vote Failed - Fetching Latest Poll State ===')
+        try {
+          const latestPollData = await backend.get_poll(pollId)
+          console.log('Latest poll data from backend:', latestPollData)
+
+          if (latestPollData && latestPollData.length > 0 && latestPollData[0]) {
+            const latestPoll = latestPollData[0]
+            console.log('Poll status:', latestPoll.status)
+            console.log('Poll closesAt:', latestPoll.closesAt, 'Current time (ns):', BigInt(Date.now()) * 1_000_000n)
+            console.log('Poll totalVotes:', latestPoll.totalVotes)
+            console.log('Voter principals:', latestPoll.voterPrincipals.map((p: any) => p.toString()))
+            console.log('User principal:', identity?.getPrincipal().toString())
+            console.log('Poll fundingInfo:', latestPoll.fundingInfo)
+          } else {
+            console.log('Poll not found in backend')
+          }
+        } catch (pollFetchError) {
+          console.error('Error fetching poll state:', pollFetchError)
+        }
+
+        // Display the detailed error message from vote_v2 or a generic message
+        const displayError = errorMessage || 'Failed to vote. Please refresh the page and try again.'
+        setError(displayError)
         setOpenVoteDialog(null)
         toast({
           title: "✗ Vote failed",
-          description: "Unable to submit your vote. Please refresh the page and try again.",
+          description: errorMessage || "Unable to submit your vote. Please check the browser console for details, then refresh the page and try again.",
           variant: "destructive",
           className: "bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800",
-          duration: 5000,
+          duration: 8000,
         })
 
         // Refresh to get latest state
