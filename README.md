@@ -3,12 +3,15 @@
 🎉 **Now Live on ICP Mainnet!** 🎉
 
 * [Live App (Mainnet)](https://utkw6-eyaaa-aaaao-a4o7a-cai.icp0.io/)
-* [Demo Video (Regional)](https://youtu.be/UPu3-1xkLNo)
-* [Pitchdeck](https://www.canva.com/design/DAGxLqA2h3U/5uTAN5rb1lzDqD7qiNl5Yg/view?utm_content=DAGxLqA2h3U&utm_campaign=designshare&utm_medium=link2&utm_source=uniquelinks&utlId=ha53a44d899)
-* [Pitchdeck Video](https://youtu.be/tGnw1th9j10)
+* [Demo Video (Global Round)](https://youtu.be/y37qk5tM3k8)
+* [Pitchdeck Video (Global Round)](https://youtu.be/V7o_i9tu1Y0)
 
 ### Previous Demos
-* [Demo Video](https://youtu.be/sonGyeNZkjA)
+* [Demo Video (Qualification)](https://youtu.be/sonGyeNZkjA)
+* [Demo Video (Regional)](https://youtu.be/UPu3-1xkLNo)
+* [Pitchdeck Video](https://youtu.be/tGnw1th9j10)
+* [Pitchdeck](https://www.canva.com/design/DAGxLqA2h3U/5uTAN5rb1lzDqD7qiNl5Yg/view?utm_content=DAGxLqA2h3U&utm_campaign=designshare&utm_medium=link2&utm_source=uniquelinks&utlId=ha53a44d899)
+
 
 
 ## 🚀 Project Summary
