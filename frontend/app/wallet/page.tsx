@@ -927,6 +927,38 @@ export default function WalletPage() {
                       </p>
                     </div>
 
+                    {/* Where to Get ckUSDC */}
+                    {swapDirection === 'buy' && (
+                      <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                        <p className="text-xs text-purple-700 dark:text-purple-300 font-semibold mb-2">
+                          Need ckUSDC?
+                        </p>
+                        <div className="space-y-2">
+                          <a
+                            href="https://app.icpswap.com/swap?input=ryjl3-tyaaa-aaaaa-aaaba-cai&output=xevnm-gaaaa-aaaar-qafnq-cai"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center text-xs text-purple-600 dark:text-purple-400 hover:underline"
+                          >
+                            <ExternalLink className="h-3 w-3 mr-1" />
+                            Buy ckUSDC on ICPSwap
+                          </a>
+                          <a
+                            href="https://nns.ic0.app/"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center text-xs text-purple-600 dark:text-purple-400 hover:underline"
+                          >
+                            <ExternalLink className="h-3 w-3 mr-1" />
+                            Get ckUSDC via NNS Dapp
+                          </a>
+                          <p className="text-xs text-purple-600/80 dark:text-purple-400/80 mt-2">
+                            ckUSDC Canister: <code className="bg-purple-100 dark:bg-purple-900/50 px-1 rounded">xevnm-gaaaa-aaaar-qafnq-cai</code>
+                          </p>
+                        </div>
+                      </div>
+                    )}
+
                     {/* Swap Button */}
                     <Button
                       onClick={buyPulse}
