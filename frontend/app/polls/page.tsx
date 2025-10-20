@@ -223,7 +223,15 @@ export default function PollsPage() {
     if (statusFilter !== 'all') {
       filtered = filtered.filter(poll => {
         const isActive = 'active' in poll.status
-        return statusFilter === 'active' ? isActive : !isActive
+        const hasEnded = isPollEnded(poll)
+
+        if (statusFilter === 'active') {
+          // For active filter, show only polls that are status=active AND haven't ended by time
+          return isActive && !hasEnded
+        } else {
+          // For closed filter, show polls that are status=closed OR have ended by time
+          return !isActive || hasEnded
+        }
       })
     }
 
@@ -514,6 +522,11 @@ export default function PollsPage() {
 
   const hasUserVoted = (poll: BackendPoll) => {
     return poll.voterPrincipals.some(principal => principal.toString() === identity?.getPrincipal().toString())
+  }
+
+  const isPollEnded = (poll: BackendPoll) => {
+    const now = BigInt(Date.now()) * 1_000_000n // Convert to nanoseconds
+    return now >= poll.closesAt
   }
 
   const getVotePercentage = (votes: bigint, totalVotes: bigint) => {
@@ -1051,7 +1064,9 @@ export default function PollsPage() {
                     const creatorShort = formatPrincipal(poll.createdBy)
 
                     return (
-                      <Card key={poll.id} className="overflow-hidden hover:shadow-lg transition-shadow">
+                      <Card key={poll.id} className={`overflow-hidden hover:shadow-lg transition-shadow ${
+                        userVoted ? 'border-green-300 dark:border-green-700 bg-gradient-to-br from-green-50/30 to-transparent dark:from-green-900/10 dark:to-transparent' : ''
+                      }`}>
                         {/* Creator Header */}
                         <CardHeader className="pb-3 border-b">
                           <div className="flex items-start justify-between">
@@ -1076,9 +1091,17 @@ export default function PollsPage() {
                                 </div>
                               </div>
                             </div>
-                            <Badge variant={isActive ? "default" : "secondary"} className="text-xs">
-                              {isActive ? 'Active' : 'Closed'}
-                            </Badge>
+                            <div className="flex flex-col gap-1 items-end">
+                              <Badge variant={isActive ? "default" : "secondary"} className="text-xs">
+                                {isActive ? 'Active' : 'Closed'}
+                              </Badge>
+                              {userVoted && (
+                                <Badge variant="secondary" className="text-xs bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-300 dark:border-green-700">
+                                  <CheckCircle className="h-3 w-3 mr-1" />
+                                  Voted
+                                </Badge>
+                              )}
+                            </div>
                           </div>
                         </CardHeader>
 
@@ -1269,8 +1292,9 @@ export default function PollsPage() {
                                   variant="outline"
                                   size="sm"
                                   onClick={() => router.push(`/results?pollId=${poll.id}`)}
+                                  className="border-green-300 dark:border-green-700 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 hover:bg-green-100 dark:hover:bg-green-900/30"
                                 >
-                                  <Eye className="h-4 w-4 mr-2" />
+                                  <CheckCircle className="h-4 w-4 mr-2" />
                                   View Details
                                 </Button>
                               ) : (
