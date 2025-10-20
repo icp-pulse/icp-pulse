@@ -423,6 +423,7 @@ export const idlFactory = ({ IDL: I = IDL }) => {
       []
     ),
     vote: I.Func([PollId, I.Nat], [I.Bool], []),
+    vote_v2: I.Func([PollId, I.Nat], [Result_1], []),
     withdraw_unused_funds: I.Func([PollId], [Result], [])
   })
 }
