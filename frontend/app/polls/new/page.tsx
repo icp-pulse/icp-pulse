@@ -456,13 +456,15 @@ function NewPollPageContent() {
       toast({
         title: "Poll created successfully!",
         description: "Your poll is now live and ready for votes.",
+        className: "bg-green-100 dark:bg-green-900 border-green-200 dark:border-green-800",
       })
       router.push('/creator?tab=polls')
     } catch (e: any) {
       toast({
         title: "Error",
         description: e.message || 'Failed to create poll',
-        variant: "destructive"
+        variant: "destructive",
+        className: "bg-red-100 dark:bg-red-900 border-red-200 dark:border-red-800",
       })
     } finally {
       setIsSubmitting(false)
